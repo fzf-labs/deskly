@@ -34,7 +34,7 @@ export function ErrorMessage({ message }: ErrorMessageProps) {
   // Check if this is an internal error
   const isInternalError = message.startsWith('__INTERNAL_ERROR__|');
   if (isInternalError) {
-    const logPath = message.split('|')[1] || '~/.VibeWork/logs/VibeWork.log';
+    const logPath = message.split('|')[1] || '~/.deskly/logs/Deskly.log';
     const errorMessage = (
       t.common.errors.internalError ||
       'Internal server error. Please check log file: {logPath}'

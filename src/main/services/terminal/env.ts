@@ -120,7 +120,7 @@ const ALLOWED_ENV_VARS = new Set([
   'DOTNET_ROOT'
 ])
 
-const ALLOWED_PREFIXES = ['VIBEWORK_', 'LC_']
+const ALLOWED_PREFIXES = ['DESKLY_', 'LC_']
 
 function isAllowedVar(key: string, isWindows: boolean): boolean {
   if (isWindows) {
@@ -189,11 +189,11 @@ export function buildTerminalEnv(params: {
     ...baseEnv,
     SHELL: params.shell,
     TERM: 'xterm-256color',
-    TERM_PROGRAM: 'VibeWork',
+    TERM_PROGRAM: 'Deskly',
     TERM_PROGRAM_VERSION: process.env.npm_package_version || '1.0.0',
     COLORTERM: 'truecolor',
     LANG: locale,
-    VIBEWORK_PANE_ID: params.paneId,
-    VIBEWORK_WORKSPACE_ID: params.workspaceId || ''
+    DESKLY_PANE_ID: params.paneId,
+    DESKLY_WORKSPACE_ID: params.workspaceId || ''
   }
 }

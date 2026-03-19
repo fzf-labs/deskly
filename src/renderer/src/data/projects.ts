@@ -1,7 +1,7 @@
 import type { Project, CreateProjectInput } from './types';
 
-const PROJECTS_KEY = 'vibework_projects';
-const CURRENT_PROJECT_KEY = 'vibework_current_project';
+const PROJECTS_KEY = 'deskly_projects';
+const CURRENT_PROJECT_KEY = 'deskly_current_project';
 
 // Get all projects from localStorage
 export function getProjects(): Project[] {

@@ -111,7 +111,7 @@ export const defaultProviders: AIProvider[] = [
     enabled: true,
     models: ['claude-sonnet-4-5-20250929'],
     icon: '3',
-    apiKeyUrl: 'https://302.ai/?utm_source=VibeWork_desktop',
+    apiKeyUrl: 'https://302.ai/?utm_source=Deskly_desktop',
     canDelete: true,
   },
   {
@@ -160,7 +160,7 @@ export const defaultSettings: Settings = {
   },
   defaultCliToolId: '',
   gitWorktreeBranchPrefix: 'VW-',
-  gitWorktreeDir: '~/.vibework/worktrees',
+  gitWorktreeDir: '~/.deskly/worktrees',
   claudeCodePath: '',
   codexCliPath: '',
 };
@@ -329,7 +329,7 @@ const normalizeLoadedSettings = (value: unknown): Settings => {
 
 const loadSettingsFromStorage = (): Settings | null => {
   try {
-    const stored = localStorage.getItem('VibeWork_settings');
+    const stored = localStorage.getItem('Deskly_settings');
     if (!stored) return null;
     return normalizeLoadedSettings(JSON.parse(stored));
   } catch (error) {
@@ -407,7 +407,7 @@ export function saveSettings(settings: Settings): void {
     } as Settings & { mcpEnabled?: boolean };
     if ('mcpEnabled' in sanitized) delete sanitized.mcpEnabled;
     delete (sanitized.profile as { avatar?: string }).avatar;
-    localStorage.setItem('VibeWork_settings', JSON.stringify(sanitized));
+    localStorage.setItem('Deskly_settings', JSON.stringify(sanitized));
   } catch (error) {
     console.error('[Settings] Failed to save to localStorage:', error);
   }
@@ -415,7 +415,7 @@ export function saveSettings(settings: Settings): void {
 
 export async function saveSettingItem(key: string, value: string): Promise<void> {
   try {
-    localStorage.setItem(`VibeWork_${key}`, value);
+    localStorage.setItem(`Deskly_${key}`, value);
   } catch (error) {
     console.error(`[Settings] Failed to save ${key}:`, error);
   }
@@ -458,7 +458,7 @@ export function clearAllSettings(): void {
   try {
     const keys = Object.keys(localStorage);
     for (const key of keys) {
-      if (key.startsWith('VibeWork')) {
+      if (key.startsWith('Deskly')) {
         localStorage.removeItem(key);
       }
     }

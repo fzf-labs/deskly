@@ -5,7 +5,7 @@ import { path, shell } from '@/lib/electron-api';
 import type { SettingsTabProps } from '../types';
 
 const DEFAULT_WORKTREE_PREFIX = 'VW-';
-const DEFAULT_WORKTREE_DIR = '~/.vibework/worktrees';
+const DEFAULT_WORKTREE_DIR = '~/.deskly/worktrees';
 
 export function GitSettings({
   settings,

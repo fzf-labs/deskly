@@ -16,7 +16,7 @@ type TestContext = {
 }
 
 const createTestContext = (): TestContext | null => {
-  const tempDir = mkdtempSync(join(tmpdir(), 'vibework-task-execution-'))
+  const tempDir = mkdtempSync(join(tmpdir(), 'deskly-task-execution-'))
   const dbPath = join(tempDir, 'test.db')
   const connection = new DatabaseConnection(dbPath)
 

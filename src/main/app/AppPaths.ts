@@ -4,7 +4,7 @@ import { config } from '../config'
 
 /**
  * 应用数据路径管理服务
- * 统一管理所有数据存储路径，使用 ~/.vibework/ 作为根目录
+ * 统一管理所有数据存储路径，使用 ~/.deskly/ 作为根目录
  */
 export class AppPaths {
   private static instance: AppPaths
@@ -23,42 +23,42 @@ export class AppPaths {
   }
 
   /**
-   * 获取根目录路径 ~/.vibework/
+   * 获取根目录路径 ~/.deskly/
    */
   getRootDir(): string {
     return this.rootDir
   }
 
   /**
-   * 获取配置目录路径 ~/.vibework/config/
+   * 获取配置目录路径 ~/.deskly/config/
    */
   getConfigDir(): string {
     return join(this.rootDir, 'config')
   }
 
   /**
-   * 获取数据目录路径 ~/.vibework/data/
+   * 获取数据目录路径 ~/.deskly/data/
    */
   getDataDir(): string {
     return join(this.rootDir, 'data')
   }
 
   /**
-   * 获取日志目录路径 ~/.vibework/logs/
+   * 获取日志目录路径 ~/.deskly/logs/
    */
   getLogsDir(): string {
     return join(this.rootDir, 'logs')
   }
 
   /**
-   * 获取 session 数据目录路径 ~/.vibework/data/sessions/
+   * 获取 session 数据目录路径 ~/.deskly/data/sessions/
    */
   getSessionsDir(): string {
     return join(this.getDataDir(), 'sessions')
   }
 
   /**
-   * 获取项目级 session 目录路径 ~/.vibework/data/sessions/<projectId>/
+   * 获取项目级 session 目录路径 ~/.deskly/data/sessions/<projectId>/
    */
   getProjectSessionsDir(projectId?: string | null): string {
     const normalizedProjectId = projectId?.trim() || 'project'
@@ -73,28 +73,28 @@ export class AppPaths {
   }
 
   /**
-   * 获取指定 task 的日志文件路径（兼容旧结构） ~/.vibework/data/sessions/<projectId>/<taskId>.jsonl
+   * 获取指定 task 的日志文件路径（兼容旧结构） ~/.deskly/data/sessions/<projectId>/<taskId>.jsonl
    */
   getTaskMessagesFile(taskId: string, projectId?: string | null): string {
     return join(this.getProjectSessionsDir(projectId), `${taskId}.jsonl`)
   }
 
   /**
-   * 获取指定 task node 的日志文件路径 ~/.vibework/data/sessions/<projectId>/<taskId>/<taskNodeId>.jsonl
+   * 获取指定 task node 的日志文件路径 ~/.deskly/data/sessions/<projectId>/<taskId>/<taskNodeId>.jsonl
    */
   getTaskNodeMessagesFile(taskId: string, taskNodeId: string, projectId?: string | null): string {
     return join(this.getTaskDataDir(taskId, projectId), `${taskNodeId}.jsonl`)
   }
 
   /**
-   * 获取缓存目录路径 ~/.vibework/cache/
+   * 获取缓存目录路径 ~/.deskly/cache/
    */
   getCacheDir(): string {
     return join(this.rootDir, 'cache')
   }
 
   /**
-   * 获取 worktree 目录路径 ~/.vibework/worktrees/
+   * 获取 worktree 目录路径 ~/.deskly/worktrees/
    */
   getWorktreesDir(): string {
     return join(this.rootDir, 'worktrees')
@@ -111,7 +111,7 @@ export class AppPaths {
    * 获取数据库文件路径
    */
   getDatabaseFile(): string {
-    return join(this.getDataDir(), 'vibework.db')
+    return join(this.getDataDir(), 'deskly.db')
   }
 
 

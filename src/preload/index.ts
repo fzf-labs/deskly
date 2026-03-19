@@ -385,7 +385,7 @@ const api = {
     tempDir: () => invoke(IPC_CHANNELS.path.tempDir),
     resourcesDir: () => invoke(IPC_CHANNELS.path.resourcesDir),
     appPath: () => invoke(IPC_CHANNELS.path.appPath),
-    vibeworkDataDir: () => invoke(IPC_CHANNELS.path.vibeworkDataDir),
+    desklyDataDir: () => invoke(IPC_CHANNELS.path.desklyDataDir),
     homeDir: () => invoke(IPC_CHANNELS.path.homeDir)
   },
   app: {

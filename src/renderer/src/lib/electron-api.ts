@@ -219,13 +219,13 @@ export const path = {
   },
 
   /**
-   * 获取应用数据目录 (~/.vibework)
+   * 获取应用数据目录 (~/.deskly)
    */
-  async vibeworkDataDir(): Promise<string> {
+  async desklyDataDir(): Promise<string> {
     if (!window.api) {
       throw new Error('Electron API not available')
     }
-    return window.api.path.vibeworkDataDir()
+    return window.api.path.desklyDataDir()
   },
 
   /**

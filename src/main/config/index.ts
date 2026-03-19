@@ -46,7 +46,7 @@ const defaultCommandAllowlist = [
   'where'
 ]
 
-const appRoot = join(homedir(), '.vibework')
+const appRoot = join(homedir(), '.deskly')
 
 export const config = {
   paths: {
@@ -54,43 +54,43 @@ export const config = {
     logsDir: join(appRoot, 'logs')
   },
   models: {
-    claudeDefaultModel: process.env.VIBEWORK_CLAUDE_MODEL || 'sonnet'
+    claudeDefaultModel: process.env.DESKLY_CLAUDE_MODEL || 'sonnet'
   },
   commandAllowlist: new Set(
-    [...defaultCommandAllowlist, ...parseCsv(process.env.VIBEWORK_COMMAND_ALLOWLIST)].map(
+    [...defaultCommandAllowlist, ...parseCsv(process.env.DESKLY_COMMAND_ALLOWLIST)].map(
       (entry) => entry.toLowerCase()
     )
   ),
-  commandTimeoutMs: parseNumber(process.env.VIBEWORK_COMMAND_TIMEOUT_MS, 30000),
+  commandTimeoutMs: parseNumber(process.env.DESKLY_COMMAND_TIMEOUT_MS, 30000),
   cliToolDetection: {
-    fastTimeoutMs: parseNumber(process.env.VIBEWORK_CLI_DETECT_FAST_TIMEOUT_MS, 800),
-    fullTimeoutMs: parseNumber(process.env.VIBEWORK_CLI_DETECT_FULL_TIMEOUT_MS, 2000),
-    fastCacheMs: parseNumber(process.env.VIBEWORK_CLI_DETECT_FAST_CACHE_MS, 5 * 60 * 1000),
-    fullCacheMs: parseNumber(process.env.VIBEWORK_CLI_DETECT_FULL_CACHE_MS, 24 * 60 * 60 * 1000)
+    fastTimeoutMs: parseNumber(process.env.DESKLY_CLI_DETECT_FAST_TIMEOUT_MS, 800),
+    fullTimeoutMs: parseNumber(process.env.DESKLY_CLI_DETECT_FULL_TIMEOUT_MS, 2000),
+    fastCacheMs: parseNumber(process.env.DESKLY_CLI_DETECT_FAST_CACHE_MS, 5 * 60 * 1000),
+    fullCacheMs: parseNumber(process.env.DESKLY_CLI_DETECT_FULL_CACHE_MS, 24 * 60 * 60 * 1000)
   },
   log: {
-    batchFlushIntervalMs: parseNumber(process.env.VIBEWORK_LOG_FLUSH_INTERVAL_MS, 50),
-    maxBatchBytes: parseNumber(process.env.VIBEWORK_LOG_BATCH_MAX_BYTES, 256 * 1024),
+    batchFlushIntervalMs: parseNumber(process.env.DESKLY_LOG_FLUSH_INTERVAL_MS, 50),
+    maxBatchBytes: parseNumber(process.env.DESKLY_LOG_BATCH_MAX_BYTES, 256 * 1024),
     rotation: {
-      maxFileBytes: parseNumber(process.env.VIBEWORK_LOG_MAX_BYTES, 10 * 1024 * 1024),
-      maxFiles: parseNumber(process.env.VIBEWORK_LOG_MAX_FILES, 5)
+      maxFileBytes: parseNumber(process.env.DESKLY_LOG_MAX_BYTES, 10 * 1024 * 1024),
+      maxFiles: parseNumber(process.env.DESKLY_LOG_MAX_FILES, 5)
     }
   },
   output: {
     buffer: {
-      maxBytes: parseNumber(process.env.VIBEWORK_OUTPUT_MAX_BYTES, 512 * 1024),
-      maxEntries: parseNumber(process.env.VIBEWORK_OUTPUT_MAX_ENTRIES, 2000)
+      maxBytes: parseNumber(process.env.DESKLY_OUTPUT_MAX_BYTES, 512 * 1024),
+      maxEntries: parseNumber(process.env.DESKLY_OUTPUT_MAX_ENTRIES, 2000)
     },
     spool: {
-      enabled: parseBoolean(process.env.VIBEWORK_OUTPUT_SPOOL_ENABLED, false),
-      flushIntervalMs: parseNumber(process.env.VIBEWORK_OUTPUT_SPOOL_FLUSH_MS, 250),
-      maxBatchBytes: parseNumber(process.env.VIBEWORK_OUTPUT_SPOOL_BATCH_BYTES, 128 * 1024),
-      maxFileBytes: parseNumber(process.env.VIBEWORK_OUTPUT_SPOOL_MAX_BYTES, 5 * 1024 * 1024),
-      maxFiles: parseNumber(process.env.VIBEWORK_OUTPUT_SPOOL_MAX_FILES, 3)
+      enabled: parseBoolean(process.env.DESKLY_OUTPUT_SPOOL_ENABLED, false),
+      flushIntervalMs: parseNumber(process.env.DESKLY_OUTPUT_SPOOL_FLUSH_MS, 250),
+      maxBatchBytes: parseNumber(process.env.DESKLY_OUTPUT_SPOOL_BATCH_BYTES, 128 * 1024),
+      maxFileBytes: parseNumber(process.env.DESKLY_OUTPUT_SPOOL_MAX_BYTES, 5 * 1024 * 1024),
+      maxFiles: parseNumber(process.env.DESKLY_OUTPUT_SPOOL_MAX_FILES, 3)
     }
   },
   ipc: {
-    allowedUrlDomains: parseCsv(process.env.VIBEWORK_ALLOWED_URL_DOMAINS),
-    allowedFsRoots: parseCsv(process.env.VIBEWORK_ALLOWED_FS_ROOTS)
+    allowedUrlDomains: parseCsv(process.env.DESKLY_ALLOWED_URL_DOMAINS),
+    allowedFsRoots: parseCsv(process.env.DESKLY_ALLOWED_FS_ROOTS)
   }
 }

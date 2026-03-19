@@ -179,7 +179,7 @@ export const IPC_CHANNELS = {
     tempDir: 'path:tempDir',
     resourcesDir: 'path:resourcesDir',
     appPath: 'path:appPath',
-    vibeworkDataDir: 'path:vibeworkDataDir',
+    desklyDataDir: 'path:desklyDataDir',
     homeDir: 'path:homeDir'
   },
   settings: {
@@ -458,7 +458,7 @@ export interface IpcContracts {
   'path:tempDir': IpcContract<[], string>
   'path:resourcesDir': IpcContract<[], string>
   'path:appPath': IpcContract<[], string>
-  'path:vibeworkDataDir': IpcContract<[], string>
+  'path:desklyDataDir': IpcContract<[], string>
   'path:homeDir': IpcContract<[], string>
 
   'settings:get': IpcContract<[], UnknownRecord>

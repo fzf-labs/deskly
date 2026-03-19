@@ -1,9 +1,9 @@
 import { path as electronPath } from './electron-api';
 
 /**
- * Path utilities for VibeWork
+ * Path utilities for Deskly
  *
- * Uses ~/.vibework/ as the standard data directory across all platforms.
+ * Uses ~/.deskly/ as the standard data directory across all platforms.
  * This follows the Unix dotfile convention used by developer tools like:
  * - ~/.claude/ (Claude Code)
  * - ~/.npm/ (npm)
@@ -23,7 +23,7 @@ function isElectron(): boolean {
 
 /**
  * Get the data root directory
- * Returns ~/.vibework on all platforms
+ * Returns ~/.deskly on all platforms
  */
 export async function getDataRootDir(): Promise<string> {
   if (cachedDataRootDir) {
@@ -32,7 +32,7 @@ export async function getDataRootDir(): Promise<string> {
 
   if (isElectron()) {
     try {
-      cachedDataRootDir = await electronPath.vibeworkDataDir();
+      cachedDataRootDir = await electronPath.desklyDataDir();
       return cachedDataRootDir;
     } catch (error) {
       console.warn('[Paths] Failed to get data root dir:', error);
@@ -40,7 +40,7 @@ export async function getDataRootDir(): Promise<string> {
   }
 
   // Fallback for browser mode
-  cachedDataRootDir = '~/.vibework';
+  cachedDataRootDir = '~/.deskly';
   return cachedDataRootDir;
 }
 

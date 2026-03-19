@@ -12,8 +12,8 @@ import { createAppContext } from './app/create-app-context'
 
 let appContext: AppContext | null = null
 
-const APP_NAME = 'VibeWork'
-const APP_IDENTIFIER = 'com.fzf-labs.vibework'
+const APP_NAME = 'Deskly'
+const APP_IDENTIFIER = 'com.fzf-labs.deskly'
 
 let mainWindow: BrowserWindow | null = null
 const resolveProjectIdForSession = (sessionId: string): string | null =>

@@ -34,13 +34,13 @@ export function AppSidebar() {
             type="button"
             onClick={handleLogoClick}
             onAnimationEnd={() => setLogoPulse(false)}
-            aria-label="VibeWork"
+            aria-label="Deskly"
             className={cn(
               'border-sidebar-border flex w-12 shrink-0 items-center justify-center border-r',
               logoPulse && 'logo-click-effect'
             )}
           >
-            <img src={ImageLogo} alt="VibeWork" className="size-7" />
+            <img src={ImageLogo} alt="Deskly" className="size-7" />
           </button>
           <div
             className={cn(
@@ -54,7 +54,7 @@ export function AppSidebar() {
                 aria-label="折叠侧边栏"
                 className="text-sidebar-foreground hover:bg-sidebar-accent flex h-8 w-full items-center justify-center rounded-md px-2 font-mono text-base font-medium transition-colors"
               >
-                <span className="truncate">VibeWork</span>
+                <span className="truncate">Deskly</span>
               </button>
             ) : (
               <Tooltip>
@@ -64,7 +64,7 @@ export function AppSidebar() {
                     aria-label="展开侧边栏"
                     className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground flex h-8 w-10 items-center justify-center rounded-md font-mono text-sm font-semibold tracking-wide transition-colors"
                   >
-                    VW
+                    DK
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">展开侧边栏</TooltipContent>

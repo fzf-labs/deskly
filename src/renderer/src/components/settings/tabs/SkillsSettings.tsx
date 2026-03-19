@@ -115,7 +115,7 @@ export function SkillsSettings({
   const [importing, setImporting] = useState(false);
   const [homeDir, setHomeDir] = useState<string | null>(null);
   const { t } = useLanguage();
-  const defaultAppSkillsPath = '~/.vibework/skills';
+  const defaultAppSkillsPath = '~/.deskly/skills';
   const appSkillsPath = settings.skillsPath || defaultAppSkillsPath;
 
   const isSkillConfigured = (skill: SkillInfo) => {

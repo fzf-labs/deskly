@@ -30,9 +30,9 @@ export function AboutSettings() {
       {/* Product Info */}
       <div className="border-border bg-muted/20 flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <img src={ImageLogo} alt="VibeWork" className="size-14 rounded-xl" />
+          <img src={ImageLogo} alt="Deskly" className="size-14 rounded-xl" />
           <div className="space-y-1">
-            <h2 className="text-foreground text-lg font-semibold">VibeWork</h2>
+            <h2 className="text-foreground text-lg font-semibold">Deskly</h2>
             <p className="text-muted-foreground text-sm">
               {t.settings.aiPlatform}
             </p>
@@ -50,7 +50,7 @@ export function AboutSettings() {
           <button
             onClick={() =>
               openExternalUrl(
-                'https://VibeWork.ai/download?utm_source=VibeWork_desktop'
+                'https://Deskly.ai/download?utm_source=Deskly_desktop'
               )
             }
             className="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"

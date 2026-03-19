@@ -27,9 +27,9 @@ export const API_BASE_URL = `http://localhost:${API_PORT}`;
 /**
  * App name
  */
-export const APP_NAME = 'VibeWork';
+export const APP_NAME = 'Deskly';
 
 /**
  * App identifier (must match package.json)
  */
-export const APP_IDENTIFIER = 'com.fzf-labs.vibework';
+export const APP_IDENTIFIER = 'com.fzf-labs.deskly';

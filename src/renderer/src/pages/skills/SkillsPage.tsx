@@ -212,7 +212,7 @@ export function SkillsPage() {
 
   const loadGlobalSkills = useCallback(async () => {
     const settings = getSettings();
-    const appSkillsPath = settings.skillsPath || '~/.vibework/skills';
+    const appSkillsPath = settings.skillsPath || '~/.deskly/skills';
     const skills = await loadSkillsFromDirectory(appSkillsPath, 'global');
     setGlobalSkills(skills);
   }, []);

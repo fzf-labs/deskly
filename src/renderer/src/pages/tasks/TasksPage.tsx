@@ -210,7 +210,7 @@ export function TasksPage() {
       const prompt = text.trim()
       try {
         const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'VW-'
-        const worktreeRootPath = settings.gitWorktreeDir || '~/.vibework/worktrees'
+        const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
 
         const result = await window.api.task.create({
           title: trimmedTitle,

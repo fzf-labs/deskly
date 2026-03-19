@@ -6,7 +6,7 @@ import { DatabaseConnection } from '../../src/main/services/database/DatabaseCon
 
 describe('task nodes schema', () => {
   it('migrates to schema v5 and creates unique in-progress index', () => {
-    const tempDir = mkdtempSync(join(tmpdir(), 'vibework-task-nodes-'))
+    const tempDir = mkdtempSync(join(tmpdir(), 'deskly-task-nodes-'))
     const dbPath = join(tempDir, 'test.db')
 
     const connection = new DatabaseConnection(dbPath)

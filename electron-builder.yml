@@ -1,5 +1,5 @@
-appId: com.fzf-labs.vibework
-productName: VibeWork
+appId: com.fzf-labs.deskly
+productName: Deskly
 icon: resources/icon.png
 directories:
   buildResources: build
@@ -14,7 +14,7 @@ asarUnpack:
   - resources/**
   - node_modules/node-pty/**
 win:
-  executableName: VibeWork
+  executableName: Deskly
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

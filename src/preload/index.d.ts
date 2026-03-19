@@ -318,7 +318,7 @@ interface PathAPI {
   tempDir: () => Promise<string>
   resourcesDir: () => Promise<string>
   appPath: () => Promise<string>
-  vibeworkDataDir: () => Promise<string>
+  desklyDataDir: () => Promise<string>
   homeDir: () => Promise<string>
 }
 

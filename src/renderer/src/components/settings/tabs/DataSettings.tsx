@@ -105,7 +105,7 @@ const writeZipFromDirectory = async (
   fs: FsApi
 ): Promise<void> => {
   const zip = new JSZip();
-  const rootName = getBaseName(dirPath) || '.vibework';
+  const rootName = getBaseName(dirPath) || '.deskly';
   await addDirectoryToZip(zip, dirPath, rootName, fs);
   const zipData = await zip.generateAsync({
     type: 'uint8array',
@@ -126,9 +126,9 @@ const extractZipToDirectory = async (
   }
 
   const hasRootDir = files.some((file) =>
-    toZipPath(file.name).startsWith('.vibework/')
+    toZipPath(file.name).startsWith('.deskly/')
   );
-  const stripPrefix = hasRootDir ? '.vibework/' : '';
+  const stripPrefix = hasRootDir ? '.deskly/' : '';
 
   for (const file of files) {
     let relativePath = toZipPath(file.name);
@@ -165,7 +165,7 @@ export function DataSettings() {
   const [pendingBackupPath, setPendingBackupPath] = useState<string>('');
   const [pendingBackupDisplayPath, setPendingBackupDisplayPath] =
     useState<string>('');
-  const [vibeworkDisplayPath, setVibeworkDisplayPath] = useState('~/.vibework');
+  const [desklyDisplayPath, setDesklyDisplayPath] = useState('~/.deskly');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
@@ -174,30 +174,30 @@ export function DataSettings() {
         const dirPath = await getDataRootDir();
         const resolvedPath = await resolvePath(dirPath);
         const displayPath = await getDisplayPath(resolvedPath);
-        setVibeworkDisplayPath(displayPath);
+        setDesklyDisplayPath(displayPath);
       } catch {
-        setVibeworkDisplayPath('~/.vibework');
+        setDesklyDisplayPath('~/.deskly');
       }
     };
 
     loadDisplayPath();
   }, []);
 
-  const getResolvedVibeworkDir = async () => {
+  const getResolvedDesklyDir = async () => {
     const dirPath = await getDataRootDir();
     return resolvePath(dirPath);
   };
 
-  const buildBackupPath = (vibeworkDir: string) => {
-    const parentDir = getParentDir(vibeworkDir);
+  const buildBackupPath = (desklyDir: string) => {
+    const parentDir = getParentDir(desklyDir);
     return joinPath(
       parentDir,
-      `vibework-backup-${formatDateTime(new Date())}.zip`
+      `deskly-backup-${formatDateTime(new Date())}.zip`
     );
   };
 
   const buildExportFilename = () =>
-    `vibework-backup-${formatDate(new Date())}.zip`;
+    `deskly-backup-${formatDate(new Date())}.zip`;
 
   const ensureElectron = () => {
     if (!window.api) {
@@ -205,15 +205,15 @@ export function DataSettings() {
     }
   };
 
-  // Export ~/.vibework to zip
+  // Export ~/.deskly to zip
   const handleExport = async () => {
     setExportStatus('loading');
     setErrorMessage('');
 
     try {
       ensureElectron();
-      const vibeworkDir = await getResolvedVibeworkDir();
-      const exists = await fs.exists(vibeworkDir);
+      const desklyDir = await getResolvedDesklyDir();
+      const exists = await fs.exists(desklyDir);
       if (!exists) {
         throw new Error(
           t.settings.dataDirectoryMissing || 'Data directory not found.'
@@ -230,7 +230,7 @@ export function DataSettings() {
         return;
       }
 
-      await writeZipFromDirectory(vibeworkDir, filePath, fs as FsApi);
+      await writeZipFromDirectory(desklyDir, filePath, fs as FsApi);
       setExportStatus('success');
       setTimeout(() => setExportStatus('idle'), 2000);
     } catch (error) {
@@ -261,8 +261,8 @@ export function DataSettings() {
       // Preload zip to validate file exists
       await fs.readFile(filePath as string);
 
-      const vibeworkDir = await getResolvedVibeworkDir();
-      const backupPath = buildBackupPath(vibeworkDir);
+      const desklyDir = await getResolvedDesklyDir();
+      const backupPath = buildBackupPath(desklyDir);
       const backupDisplayPath = await getDisplayPath(backupPath);
 
       setPendingImportPath(filePath as string);
@@ -286,20 +286,20 @@ export function DataSettings() {
 
     try {
       ensureElectron();
-      const vibeworkDir = await getResolvedVibeworkDir();
-      const exists = await fs.exists(vibeworkDir);
+      const desklyDir = await getResolvedDesklyDir();
+      const exists = await fs.exists(desklyDir);
 
       if (exists) {
-        await writeZipFromDirectory(vibeworkDir, pendingBackupPath, fs as FsApi);
+        await writeZipFromDirectory(desklyDir, pendingBackupPath, fs as FsApi);
       }
 
       if (exists) {
-        await fs.remove(vibeworkDir, { recursive: true });
+        await fs.remove(desklyDir, { recursive: true });
       }
-      await fs.mkdir(vibeworkDir);
+      await fs.mkdir(desklyDir);
 
       const zipData = await fs.readFile(pendingImportPath);
-      await extractZipToDirectory(zipData, vibeworkDir, fs as FsApi);
+      await extractZipToDirectory(zipData, desklyDir, fs as FsApi);
 
       setImportStatus('success');
       setTimeout(() => {
@@ -325,10 +325,10 @@ export function DataSettings() {
 
     try {
       ensureElectron();
-      const vibeworkDir = await getResolvedVibeworkDir();
-      const exists = await fs.exists(vibeworkDir);
+      const desklyDir = await getResolvedDesklyDir();
+      const exists = await fs.exists(desklyDir);
       if (exists) {
-        await fs.remove(vibeworkDir, { recursive: true });
+        await fs.remove(desklyDir, { recursive: true });
       }
       setDeleteStatus('success');
       setTimeout(() => {
@@ -390,7 +390,7 @@ export function DataSettings() {
             </h3>
             <p className="text-muted-foreground mt-1 text-sm">
               {t.settings.dataExportDescription ||
-                'Export ~/.vibework to a zip file.'}
+                'Export ~/.deskly to a zip file.'}
             </p>
           </div>
           <button
@@ -421,7 +421,7 @@ export function DataSettings() {
             </h3>
             <p className="text-muted-foreground mt-1 text-sm">
               {t.settings.dataImportDescription ||
-                'Import from a zip file and replace ~/.vibework (backup first).'}
+                'Import from a zip file and replace ~/.deskly (backup first).'}
             </p>
           </div>
           <button
@@ -452,7 +452,7 @@ export function DataSettings() {
             </h3>
             <p className="text-muted-foreground mt-1 text-sm">
               {t.settings.dataClearDescription ||
-                'Permanently delete ~/.vibework. This action cannot be undone.'}
+                'Permanently delete ~/.deskly. This action cannot be undone.'}
             </p>
           </div>
           <button
@@ -514,7 +514,7 @@ export function DataSettings() {
                   {t.settings.dataImportConfirmTargetLabel || 'Restore target'}
                 </div>
                 <code className="text-foreground text-xs break-all">
-                  {vibeworkDisplayPath}
+                  {desklyDisplayPath}
                 </code>
               </div>
             </div>
@@ -563,11 +563,11 @@ export function DataSettings() {
 
             <p className="text-muted-foreground mb-4 text-sm">
               {t.settings.dataDeleteConfirmDescription ||
-                'This will permanently delete ~/.vibework. This action cannot be undone.'}
+                'This will permanently delete ~/.deskly. This action cannot be undone.'}
             </p>
             <div className="bg-muted mb-6 rounded-lg p-3">
               <code className="text-foreground text-xs break-all">
-                {vibeworkDisplayPath}
+                {desklyDisplayPath}
               </code>
             </div>
 

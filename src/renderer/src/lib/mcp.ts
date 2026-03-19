@@ -237,7 +237,7 @@ export const getProjectMcpConfigPath = (
   if (!projectPath) return projectPath;
   const normalized = projectPath.replace(/[\\/]+$/, '');
   const fileName = cliId ? `${cliId}.json` : 'mcp.json';
-  return `${normalized}/.vibework/mcp/${fileName}`;
+  return `${normalized}/.deskly/mcp/${fileName}`;
 };
 
 export const ensureParentDir = async (filePath: string): Promise<void> => {

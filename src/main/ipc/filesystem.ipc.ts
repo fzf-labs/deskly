@@ -242,6 +242,6 @@ export const registerFilesystemIpc = ({
   handle(IPC_CHANNELS.path.tempDir, [], () => app.getPath('temp'))
   handle(IPC_CHANNELS.path.resourcesDir, [], () => process.resourcesPath)
   handle(IPC_CHANNELS.path.appPath, [], () => app.getAppPath())
-  handle(IPC_CHANNELS.path.vibeworkDataDir, [], () => appPaths.getRootDir())
+  handle(IPC_CHANNELS.path.desklyDataDir, [], () => appPaths.getRootDir())
   handle(IPC_CHANNELS.path.homeDir, [], () => app.getPath('home'))
 }

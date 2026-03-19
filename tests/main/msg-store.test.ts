@@ -4,7 +4,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const createSessionRoot = () => mkdtempSync(join(tmpdir(), 'vibework-msgstore-'))
+const createSessionRoot = () => mkdtempSync(join(tmpdir(), 'deskly-msgstore-'))
 const sessionRoots: string[] = []
 
 const waitFor = async (predicate: () => boolean, timeoutMs = 1000): Promise<void> => {
@@ -18,10 +18,10 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 1000): Promise<void
 }
 
 const envSnapshot = {
-  VIBEWORK_LOG_BATCH_MAX_BYTES: process.env.VIBEWORK_LOG_BATCH_MAX_BYTES,
-  VIBEWORK_LOG_FLUSH_INTERVAL_MS: process.env.VIBEWORK_LOG_FLUSH_INTERVAL_MS,
-  VIBEWORK_LOG_MAX_BYTES: process.env.VIBEWORK_LOG_MAX_BYTES,
-  VIBEWORK_LOG_MAX_FILES: process.env.VIBEWORK_LOG_MAX_FILES
+  DESKLY_LOG_BATCH_MAX_BYTES: process.env.DESKLY_LOG_BATCH_MAX_BYTES,
+  DESKLY_LOG_FLUSH_INTERVAL_MS: process.env.DESKLY_LOG_FLUSH_INTERVAL_MS,
+  DESKLY_LOG_MAX_BYTES: process.env.DESKLY_LOG_MAX_BYTES,
+  DESKLY_LOG_MAX_FILES: process.env.DESKLY_LOG_MAX_FILES
 }
 
 const setupMsgStore = async (env: Record<string, string>) => {
@@ -71,10 +71,10 @@ describe('MsgStoreService', () => {
 
   it('flushes logs asynchronously on the batch interval', async () => {
     const { MsgStoreService, sessionRoot } = await setupMsgStore({
-      VIBEWORK_LOG_BATCH_MAX_BYTES: '1000000',
-      VIBEWORK_LOG_FLUSH_INTERVAL_MS: '10',
-      VIBEWORK_LOG_MAX_BYTES: '1000000',
-      VIBEWORK_LOG_MAX_FILES: '1'
+      DESKLY_LOG_BATCH_MAX_BYTES: '1000000',
+      DESKLY_LOG_FLUSH_INTERVAL_MS: '10',
+      DESKLY_LOG_MAX_BYTES: '1000000',
+      DESKLY_LOG_MAX_FILES: '1'
     })
 
     const store = new MsgStoreService(undefined, 'task-a', 'session-a', 'project', 'node-a')
@@ -92,10 +92,10 @@ describe('MsgStoreService', () => {
 
   it('rotates logs when file size exceeds limits', async () => {
     const { MsgStoreService, sessionRoot } = await setupMsgStore({
-      VIBEWORK_LOG_BATCH_MAX_BYTES: '1',
-      VIBEWORK_LOG_FLUSH_INTERVAL_MS: '1',
-      VIBEWORK_LOG_MAX_BYTES: '200',
-      VIBEWORK_LOG_MAX_FILES: '2'
+      DESKLY_LOG_BATCH_MAX_BYTES: '1',
+      DESKLY_LOG_FLUSH_INTERVAL_MS: '1',
+      DESKLY_LOG_MAX_BYTES: '200',
+      DESKLY_LOG_MAX_FILES: '2'
     })
 
     const store = new MsgStoreService(undefined, 'task-b', 'session-b', 'project', 'node-b')
@@ -114,10 +114,10 @@ describe('MsgStoreService', () => {
 
   it('stores and loads logs by task node file', async () => {
     const { MsgStoreService, sessionRoot } = await setupMsgStore({
-      VIBEWORK_LOG_BATCH_MAX_BYTES: '1000000',
-      VIBEWORK_LOG_FLUSH_INTERVAL_MS: '10',
-      VIBEWORK_LOG_MAX_BYTES: '1000000',
-      VIBEWORK_LOG_MAX_FILES: '1'
+      DESKLY_LOG_BATCH_MAX_BYTES: '1000000',
+      DESKLY_LOG_FLUSH_INTERVAL_MS: '10',
+      DESKLY_LOG_MAX_BYTES: '1000000',
+      DESKLY_LOG_MAX_FILES: '1'
     })
 
     const store = new MsgStoreService(undefined, 'task-c', 'session-c', 'project', 'node-1')

@@ -59,7 +59,7 @@ export function ProjectsPage() {
         <div className="mt-8 flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/30 p-10 text-center">
           <div className="text-lg font-medium">暂无项目</div>
           <div className="text-muted-foreground mt-2 max-w-md text-sm">
-            创建一个项目来开始使用 VibeWork。项目可以是本地目录或通过仓库克隆。
+            创建一个项目来开始使用 Deskly。项目可以是本地目录或通过仓库克隆。
           </div>
         </div>
       ) : (

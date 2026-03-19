@@ -237,7 +237,7 @@ export function CreateTaskDialog({
     const trimmedPrompt = text.trim()
     try {
       const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'VW-'
-      const worktreeRootPath = settings.gitWorktreeDir || '~/.vibework/worktrees'
+      const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
       const cliToolId = taskMode === 'conversation' ? resolvedCliToolId : undefined
       const agentToolConfigId = taskMode === 'conversation' ? resolvedCliConfigId : undefined
 

@@ -89,7 +89,7 @@ export class GitService {
 
     const env = this.buildGitEnv()
     const candidates = [
-      ...(process.env.VIBEWORK_GIT_PATH ? [process.env.VIBEWORK_GIT_PATH] : []),
+      ...(process.env.DESKLY_GIT_PATH ? [process.env.DESKLY_GIT_PATH] : []),
       ...defaultGitCandidates
     ].filter(Boolean)
 

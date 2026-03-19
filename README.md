@@ -1,6 +1,6 @@
-# VibeWork
+# Deskly
 
-VibeWork 是一个本地优先的桌面 AI 工作台，基于 Electron + React + TypeScript 构建。它聚合了项目管理、任务编排、Agent CLI 调用、自动化调度与执行日志，目标是把「AI 协作开发」放进一个可追踪、可复用、可自动化的工作流里。
+Deskly 是一个本地优先的桌面 AI 工作台，基于 Electron + React + TypeScript 构建。它聚合了项目管理、任务编排、Agent CLI 调用、自动化调度与执行日志，目标是把「AI 协作开发」放进一个可追踪、可复用、可自动化的工作流里。
 
 ## 核心能力
 
@@ -12,7 +12,7 @@ VibeWork 是一个本地优先的桌面 AI 工作台，基于 Electron + React +
 - Git 协作能力：分支、Worktree、Diff、提交与冲突处理。
 - 内置终端与日志：任务输出流、会话历史、终端交互。
 - Skills 与 MCP：可配置 Skills 目录与 MCP 配置。
-- 本地持久化：SQLite + 本地文件存储（默认 `~/.vibework`）。
+- 本地持久化：SQLite + 本地文件存储（默认 `~/.deskly`）。
 
 ## 技术栈
 
@@ -79,13 +79,13 @@ pnpm dev
 默认数据根目录：
 
 ```bash
-~/.vibework
+~/.deskly
 ```
 
 主要文件与目录：
 
 - `config/settings.json`：应用设置（主题、通知、编辑器等）。
-- `data/vibework.db`：SQLite 数据库（项目、任务、节点、模板、自动化）。
+- `data/deskly.db`：SQLite 数据库（项目、任务、节点、模板、自动化）。
 - `data/sessions/`：任务会话与消息日志。
 - `logs/cli-output/`：CLI 输出日志。
 - `logs/pipeline-output/`：流水线阶段日志。
@@ -98,37 +98,37 @@ pnpm dev
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `VIBEWORK_GIT_PATH` | - | 指定 Git 可执行文件路径 |
-| `VIBEWORK_COMMAND_ALLOWLIST` | - | 追加命令白名单（逗号分隔） |
-| `VIBEWORK_COMMAND_TIMEOUT_MS` | `30000` | 命令执行超时（毫秒） |
-| `VIBEWORK_CLI_DETECT_FAST_TIMEOUT_MS` | `800` | 快速检测超时（毫秒） |
-| `VIBEWORK_CLI_DETECT_FULL_TIMEOUT_MS` | `2000` | 完整检测超时（毫秒） |
-| `VIBEWORK_CLI_DETECT_FAST_CACHE_MS` | `300000` | 快速检测缓存时长（毫秒） |
-| `VIBEWORK_CLI_DETECT_FULL_CACHE_MS` | `86400000` | 完整检测缓存时长（毫秒） |
-| `VIBEWORK_CLAUDE_MODEL` | `sonnet` | Claude 默认模型 |
+| `DESKLY_GIT_PATH` | - | 指定 Git 可执行文件路径 |
+| `DESKLY_COMMAND_ALLOWLIST` | - | 追加命令白名单（逗号分隔） |
+| `DESKLY_COMMAND_TIMEOUT_MS` | `30000` | 命令执行超时（毫秒） |
+| `DESKLY_CLI_DETECT_FAST_TIMEOUT_MS` | `800` | 快速检测超时（毫秒） |
+| `DESKLY_CLI_DETECT_FULL_TIMEOUT_MS` | `2000` | 完整检测超时（毫秒） |
+| `DESKLY_CLI_DETECT_FAST_CACHE_MS` | `300000` | 快速检测缓存时长（毫秒） |
+| `DESKLY_CLI_DETECT_FULL_CACHE_MS` | `86400000` | 完整检测缓存时长（毫秒） |
+| `DESKLY_CLAUDE_MODEL` | `sonnet` | Claude 默认模型 |
 
 ### 日志与输出
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `VIBEWORK_LOG_FLUSH_INTERVAL_MS` | `50` | 日志批量刷盘间隔 |
-| `VIBEWORK_LOG_BATCH_MAX_BYTES` | `262144` | 单批日志最大字节数 |
-| `VIBEWORK_LOG_MAX_BYTES` | `10485760` | 单日志文件最大字节数 |
-| `VIBEWORK_LOG_MAX_FILES` | `5` | 日志轮转保留文件数 |
-| `VIBEWORK_OUTPUT_MAX_BYTES` | `524288` | 输出缓冲最大字节数 |
-| `VIBEWORK_OUTPUT_MAX_ENTRIES` | `2000` | 输出缓冲最大条目数 |
-| `VIBEWORK_OUTPUT_SPOOL_ENABLED` | `false` | 是否启用输出落盘 |
-| `VIBEWORK_OUTPUT_SPOOL_FLUSH_MS` | `250` | 输出落盘刷盘间隔 |
-| `VIBEWORK_OUTPUT_SPOOL_BATCH_BYTES` | `131072` | 输出落盘单批最大字节数 |
-| `VIBEWORK_OUTPUT_SPOOL_MAX_BYTES` | `5242880` | 输出落盘单文件最大字节数 |
-| `VIBEWORK_OUTPUT_SPOOL_MAX_FILES` | `3` | 输出落盘轮转文件数 |
+| `DESKLY_LOG_FLUSH_INTERVAL_MS` | `50` | 日志批量刷盘间隔 |
+| `DESKLY_LOG_BATCH_MAX_BYTES` | `262144` | 单批日志最大字节数 |
+| `DESKLY_LOG_MAX_BYTES` | `10485760` | 单日志文件最大字节数 |
+| `DESKLY_LOG_MAX_FILES` | `5` | 日志轮转保留文件数 |
+| `DESKLY_OUTPUT_MAX_BYTES` | `524288` | 输出缓冲最大字节数 |
+| `DESKLY_OUTPUT_MAX_ENTRIES` | `2000` | 输出缓冲最大条目数 |
+| `DESKLY_OUTPUT_SPOOL_ENABLED` | `false` | 是否启用输出落盘 |
+| `DESKLY_OUTPUT_SPOOL_FLUSH_MS` | `250` | 输出落盘刷盘间隔 |
+| `DESKLY_OUTPUT_SPOOL_BATCH_BYTES` | `131072` | 输出落盘单批最大字节数 |
+| `DESKLY_OUTPUT_SPOOL_MAX_BYTES` | `5242880` | 输出落盘单文件最大字节数 |
+| `DESKLY_OUTPUT_SPOOL_MAX_FILES` | `3` | 输出落盘轮转文件数 |
 
 ### IPC 安全边界
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `VIBEWORK_ALLOWED_URL_DOMAINS` | - | 允许访问的 URL 域名白名单（逗号分隔） |
-| `VIBEWORK_ALLOWED_FS_ROOTS` | - | 额外允许的文件系统根路径（逗号分隔） |
+| `DESKLY_ALLOWED_URL_DOMAINS` | - | 允许访问的 URL 域名白名单（逗号分隔） |
+| `DESKLY_ALLOWED_FS_ROOTS` | - | 额外允许的文件系统根路径（逗号分隔） |
 
 ## 安全设计
 

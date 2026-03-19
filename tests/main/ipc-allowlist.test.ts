@@ -4,7 +4,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { assertFsPathAllowed } from '../../src/main/utils/fs-allowlist'
 
-const createTempDir = async () => mkdtemp(join(tmpdir(), 'vibework-allowlist-'))
+const createTempDir = async () => mkdtemp(join(tmpdir(), 'deskly-allowlist-'))
 
 describe('filesystem allowlist', () => {
   it('allows paths within extra roots', async () => {
@@ -28,21 +28,21 @@ describe('filesystem allowlist', () => {
 })
 
 describe('url allowlist', () => {
-  const originalDomains = process.env.VIBEWORK_ALLOWED_URL_DOMAINS
+  const originalDomains = process.env.DESKLY_ALLOWED_URL_DOMAINS
 
   afterEach(() => {
     if (originalDomains === undefined) {
-      delete process.env.VIBEWORK_ALLOWED_URL_DOMAINS
+      delete process.env.DESKLY_ALLOWED_URL_DOMAINS
     } else {
-      process.env.VIBEWORK_ALLOWED_URL_DOMAINS = originalDomains
+      process.env.DESKLY_ALLOWED_URL_DOMAINS = originalDomains
     }
   })
 
   const loadUrlGuard = async (domains?: string) => {
     if (domains === undefined) {
-      delete process.env.VIBEWORK_ALLOWED_URL_DOMAINS
+      delete process.env.DESKLY_ALLOWED_URL_DOMAINS
     } else {
-      process.env.VIBEWORK_ALLOWED_URL_DOMAINS = domains
+      process.env.DESKLY_ALLOWED_URL_DOMAINS = domains
     }
     vi.resetModules()
     return await import('../../src/main/utils/url-guard')

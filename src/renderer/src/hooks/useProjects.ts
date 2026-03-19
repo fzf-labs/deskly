@@ -19,7 +19,7 @@ export interface CreateProjectInput {
   projectType?: 'normal' | 'git';
 }
 
-const CURRENT_PROJECT_KEY = 'vibework_current_project';
+const CURRENT_PROJECT_KEY = 'deskly_current_project';
 const CURRENT_PROJECT_CHANGED_EVENT = 'current-project:changed';
 
 export function useProjects() {

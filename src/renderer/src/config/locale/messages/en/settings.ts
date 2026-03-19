@@ -78,7 +78,7 @@ export default {
     'Notifications may be suppressed by focus modes or system policies.',
 
   // Editor
-  editorDescription: 'Choose the editor VibeWork uses to open files and projects.',
+  editorDescription: 'Choose the editor Deskly uses to open files and projects.',
   editorDefault: 'Default Editor',
   editorCustomOption: 'Custom',
   editorCustomCommand: 'Custom Command',
@@ -160,7 +160,7 @@ export default {
   gitWorktreePrefixDesc: 'Prefix used when creating new Git worktree branches.',
   gitWorktreePrefixError: 'Prefix cannot be empty.',
   gitWorktreeDirLabel: 'Worktree Directory',
-  gitWorktreeDirPlaceholder: '~/.vibework/worktrees',
+  gitWorktreeDirPlaceholder: '~/.deskly/worktrees',
   gitWorktreeDirDesc: 'Directory used to create new Git worktrees.',
   gitWorktreeDirError: 'Directory cannot be empty.',
   gitWorktreeDirOpen: 'Open folder',
@@ -177,7 +177,7 @@ export default {
   skillsSettings: 'Skill Settings',
   skillsDescription: 'Manage capabilities & tools for your agents',
   skillsAppDirectory: 'App Skills Directory',
-  skillsAppDirectoryDescription: 'Skills added in VibeWork are stored here',
+  skillsAppDirectoryDescription: 'Skills added in Deskly are stored here',
   skillsGlobalSkills: 'CLI Global Skills',
   skillsGlobalSkillsDescription: 'Skills loaded by each CLI runtime',
   skillsGlobalEmpty: 'No global skills found',
@@ -355,17 +355,17 @@ export default {
     'Manage your data: export backups, import data, or delete data.',
   dataExport: 'Export Data',
   dataExportDescription:
-    'Export ~/.vibework to a zip file.',
+    'Export ~/.deskly to a zip file.',
   dataExportButton: 'Export',
   dataExporting: 'Exporting...',
   dataImport: 'Import Data',
   dataImportDescription:
-    'Import from a zip file and replace ~/.vibework (backup first).',
+    'Import from a zip file and replace ~/.deskly (backup first).',
   dataImportButton: 'Import',
   dataImporting: 'Importing...',
   dataClear: 'Delete Data',
   dataClearDescription:
-    'Permanently delete ~/.vibework. This action cannot be undone.',
+    'Permanently delete ~/.deskly. This action cannot be undone.',
   dataClearButton: 'Delete',
   dataClearing: 'Deleting...',
   dataSuccess: 'Success',
@@ -380,7 +380,7 @@ export default {
   dataImportConfirmButton: 'Yes, Import',
   dataDeleteConfirmTitle: 'Delete Data',
   dataDeleteConfirmDescription:
-    'This will permanently delete ~/.vibework. This action cannot be undone.',
+    'This will permanently delete ~/.deskly. This action cannot be undone.',
   dataDeleteConfirmButton: 'Yes, Delete',
   dataDirectoryMissing: 'Data directory not found.',
   dataNotSupported: 'Data operations are not supported in this environment.',

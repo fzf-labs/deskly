@@ -102,7 +102,7 @@ export function EditorSettings({
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
         {t.settings?.editorDescription ||
-          'Choose the editor VibeWork uses to open files and projects.'}
+          'Choose the editor Deskly uses to open files and projects.'}
       </p>
 
       <div className="flex flex-col gap-2">

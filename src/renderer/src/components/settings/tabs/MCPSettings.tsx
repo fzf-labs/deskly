@@ -437,7 +437,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
   );
 
   const isAppConfigName = useCallback(
-    (name: string) => name.toLowerCase() === 'vibework',
+    (name: string) => name.toLowerCase() === 'deskly',
     []
   );
 
@@ -487,7 +487,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
         string,
         MCPServerStdio | { url: string; headers?: Record<string, string>; type?: 'http' | 'sse' }
       >,
-      'VibeWork'
+      'Deskly'
     );
   }, [buildServersFromConfig, getSaveConfigPath, resolvePath]);
 
@@ -548,7 +548,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
     const appConfigPath = await getSaveConfigPath();
     const appConfig = await readTextIfExists(appConfigPath);
     if (appConfig) {
-      addConfig('VibeWork', appConfig.path, safeParseJsonServers(appConfig.content));
+      addConfig('Deskly', appConfig.path, safeParseJsonServers(appConfig.content));
     }
 
     const cursorMcp = await readTextIfExists('~/.cursor/mcp.json');
@@ -690,7 +690,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
       if (configs && appServersResult === null) {
         const appConfig = configs.find((config) => isAppConfigName(config.name));
         if (appConfig?.exists) {
-          appServersList = buildServersFromConfig(appConfig.servers, 'VibeWork');
+          appServersList = buildServersFromConfig(appConfig.servers, 'Deskly');
         }
       }
 
@@ -761,7 +761,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
 
   const saveMCPConfig = async (serverList: MCPServerUI[]) => {
     const config = buildMcpConfig(
-      serverList.filter((server) => !server.source || server.source === 'VibeWork')
+      serverList.filter((server) => !server.source || server.source === 'Deskly')
     );
 
     let fileSaved = false;
@@ -806,7 +806,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
     setExporting(true);
     try {
       const config = buildMcpConfig(
-        appServers.filter((server) => !server.source || server.source === 'VibeWork')
+        appServers.filter((server) => !server.source || server.source === 'Deskly')
       );
 
       for (const targetId of selectedCliTargets) {
@@ -897,7 +897,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
       for (const [name, config] of Object.entries(mcpServers)) {
         const cfg = config as Record<string, unknown>;
         const existingIndex = newServers.findIndex(
-          (s) => s.name === name && s.source === 'VibeWork'
+          (s) => s.name === name && s.source === 'Deskly'
         );
 
         // Determine type: use explicit type if provided, otherwise default based on config
@@ -907,7 +907,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
         }
 
         const serverData: MCPServerUI = {
-          id: `VibeWork-${name}`,
+          id: `Deskly-${name}`,
           name,
           type: serverType,
           enabled: true,
@@ -917,7 +917,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
           url: cfg.url as string | undefined,
           headers: cfg.headers as Record<string, string> | undefined,
           autoExecute: true,
-          source: 'VibeWork',
+          source: 'Deskly',
         };
 
         if (existingIndex >= 0) {
@@ -1036,7 +1036,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
         };
       }
     } else {
-      const fullId = `VibeWork-${configDialog.serverName}`;
+      const fullId = `Deskly-${configDialog.serverName}`;
       if (
         newServers.some(
           (s) => s.id === fullId || s.name === configDialog.serverName
@@ -1064,7 +1064,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
         url: isUrlType ? configDialog.url : undefined,
         headers: isUrlType && hasHeaders ? headersObj : undefined,
         autoExecute: true,
-        source: 'VibeWork',
+        source: 'Deskly',
       });
     }
 
@@ -1077,7 +1077,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
   // Handle delete server
   const handleDeleteServer = (serverId: string) => {
     const server = appServers.find((s) => s.id === serverId);
-    if (!server || server.source !== 'VibeWork') return;
+    if (!server || server.source !== 'Deskly') return;
 
     const newServers = appServers.filter((s) => s.id !== serverId);
     setAppServers(newServers);
@@ -1216,7 +1216,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
                     </h3>
                     <div className="mt-2 flex items-center gap-2">
                     <code className="bg-muted text-muted-foreground block min-w-0 flex-1 truncate rounded px-2 py-1 text-xs">
-                        {formatDisplayPath(settings?.mcpConfigPath || '~/.vibework/mcp/mcp.json')}
+                        {formatDisplayPath(settings?.mcpConfigPath || '~/.deskly/mcp/mcp.json')}
                     </code>
                       <button
                         onClick={() => {
