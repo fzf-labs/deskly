@@ -4,3 +4,8 @@ export { LeftSidebar } from './left-sidebar';
 export { AppSidebar } from './app-sidebar';
 export { ProjectRail } from './project-rail';
 export { MainLayout } from './MainLayout';
+export { WorkspaceSidebarGroups } from './workspace-sidebar-groups';
+export { WorkspaceSidebarNewThread } from './workspace-sidebar-new-thread';
+export { WorkspaceSidebarUtilityNav } from './workspace-sidebar-utility-nav';
+export { WorkspaceSidebarProjectGroup } from './workspace-sidebar-project-group';
+export { WorkspaceSidebarTaskItem } from './workspace-sidebar-task-item';
