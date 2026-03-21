@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles } from 'lucide-react'
+import { Bot, Sparkles } from 'lucide-react'
 
 import type { MessageAttachment } from '@/hooks/useAgent'
 import { ChatInput } from '@/components/shared/ChatInput'
@@ -8,7 +8,7 @@ import {
   TaskCreateMenu,
   type TaskMode,
   type TaskMenuCliToolInfo,
-  type TaskMenuWorkflowTemplate,
+  type TaskMenuWorkflowTemplate
 } from '@/components/task/TaskCreateMenu'
 import { db, type AgentToolConfig } from '@/data'
 import { getSettings } from '@/data/settings'
@@ -152,7 +152,7 @@ export function TasksPage() {
       try {
         const [branchesResult, currentResult] = await Promise.all([
           window.api?.git?.getBranches?.(currentProject.path),
-          window.api?.git?.getCurrentBranch?.(currentProject.path),
+          window.api?.git?.getCurrentBranch?.(currentProject.path)
         ])
 
         const branchList = Array.isArray(branchesResult)
@@ -230,7 +230,7 @@ export function TasksPage() {
           worktreeRootPath,
           cliToolId: taskMode === 'conversation' ? resolvedCliToolId : undefined,
           agentToolConfigId: taskMode === 'conversation' ? resolvedCliConfigId : undefined,
-          workflowTemplateId: taskMode === 'workflow' ? selectedTemplateId : undefined,
+          workflowTemplateId: taskMode === 'workflow' ? selectedTemplateId : undefined
         })
 
         if (result.success && result.data) {
@@ -250,26 +250,30 @@ export function TasksPage() {
       selectedCliConfigId,
       selectedCliToolId,
       selectedTemplateId,
-      taskMode,
+      taskMode
     ]
   )
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#f8fafc_0%,#ffffff_48%,#f8fafc_100%)]">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[linear-gradient(180deg,rgba(148,163,184,0.12),rgba(255,255,255,0))]" />
+    <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.08),transparent_26%),linear-gradient(180deg,#fbfcff_0%,#f5f7fb_100%)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[linear-gradient(180deg,rgba(255,255,255,0.86),rgba(255,255,255,0))]" />
 
       <div className="relative flex flex-1 flex-col overflow-auto px-6 py-10">
         <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center">
-          <div className="mb-10 flex flex-col items-center gap-4 text-center">
-            <div className="flex size-14 items-center justify-center rounded-full border border-white/80 bg-white/85 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
-              <Sparkles className="size-6" />
+          <div className="mb-10 flex flex-col items-center gap-5 text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/92 px-4 py-2 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
+              <Bot className="size-3.5" />
+              <span>{currentProject?.name || 'Deskly workspace'}</span>
+            </div>
+            <div className="flex size-16 items-center justify-center rounded-[22px] border border-white/80 bg-white/88 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              <Sparkles className="size-7" />
             </div>
             <div className="space-y-1">
               <h1 className="text-foreground text-4xl font-semibold tracking-tight md:text-5xl">
                 {t.home.welcomeTitle}
               </h1>
-              <p className="text-muted-foreground text-xl font-medium">
-                {currentProject?.name || 'Deskly'}
+              <p className="text-muted-foreground text-lg font-medium md:text-xl">
+                {currentProject?.path || 'A calmer coding workspace for your projects'}
               </p>
             </div>
             <p className="text-muted-foreground max-w-xl text-sm leading-6">

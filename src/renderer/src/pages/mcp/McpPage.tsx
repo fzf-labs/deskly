@@ -1,107 +1,107 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, X } from 'lucide-react';
-import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { useProjects } from '@/hooks/useProjects';
-import { useLanguage } from '@/providers/language-provider';
-import { API_BASE_URL } from '@/config';
-import { resolvePath } from '@/lib/skills';
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { EmptyStatePanel, PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
+import { Loader2, RefreshCw, X } from 'lucide-react'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { useProjects } from '@/hooks/useProjects'
+import { useLanguage } from '@/providers/language-provider'
+import { API_BASE_URL } from '@/config'
+import { resolvePath } from '@/lib/skills'
 import {
   buildMcpServersFromConfig,
   extractMcpServers,
   getProjectMcpConfigPath,
   parseTomlMcpServers,
-  type MCPServerRecord,
-} from '@/lib/mcp';
-import type { MCPServerUI } from '@/components/settings/types';
+  type MCPServerRecord
+} from '@/lib/mcp'
+import type { MCPServerUI } from '@/components/settings/types'
 
-type CliToolInfo = { id: string; displayName?: string };
-type KeyValuePair = { id: string; key: string; value: string };
+type CliToolInfo = { id: string; displayName?: string }
+type KeyValuePair = { id: string; key: string; value: string }
 
 type CliMcpStatus = {
-  id: string;
-  label: string;
-  global: { configured: boolean; serverCount: number; servers: MCPServerUI[] };
-  project: { configured: boolean; serverCount: number; servers: MCPServerUI[] };
-};
+  id: string
+  label: string
+  global: { configured: boolean; serverCount: number; servers: MCPServerUI[] }
+  project: { configured: boolean; serverCount: number; servers: MCPServerUI[] }
+}
 
-type ConfigCandidate = { path: string; format: 'json' | 'toml' };
+type ConfigCandidate = { path: string; format: 'json' | 'toml' }
 
 const CLI_GLOBAL_CONFIGS: Record<string, string[]> = {
   'cursor-agent': ['~/.cursor/mcp.json', '~/.cursor/agent-config.json'],
   codex: ['~/.codex/config.toml', '~/.codex/config.json'],
   'gemini-cli': ['~/.gemini/settings.json', '~/.gemini/config.json'],
   opencode: ['~/.opencode/config.json'],
-  'claude-code': ['~/.claude.json', '~/.config/claude/config.json'],
-};
+  'claude-code': ['~/.claude.json', '~/.config/claude/config.json']
+}
 
 const getConfigCandidates = (paths: string[]): ConfigCandidate[] =>
   paths.map((path) => ({
     path,
-    format: path.endsWith('.toml') ? 'toml' : 'json',
-  }));
+    format: path.endsWith('.toml') ? 'toml' : 'json'
+  }))
 
 export function McpPage() {
-  const { t } = useLanguage();
-  const { currentProject } = useProjects();
-  const [cliTools, setCliTools] = useState<CliToolInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [cliStatuses, setCliStatuses] = useState<CliMcpStatus[]>([]);
-  const [detailServer, setDetailServer] = useState<MCPServerUI | null>(null);
+  const { t } = useLanguage()
+  const { currentProject } = useProjects()
+  const [cliTools, setCliTools] = useState<CliToolInfo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [cliStatuses, setCliStatuses] = useState<CliMcpStatus[]>([])
+  const [detailServer, setDetailServer] = useState<MCPServerUI | null>(null)
 
   const cliIds = useMemo(() => {
-    if (cliTools.length > 0) return cliTools.map((tool) => tool.id);
-    return Object.keys(CLI_GLOBAL_CONFIGS);
-  }, [cliTools]);
+    if (cliTools.length > 0) return cliTools.map((tool) => tool.id)
+    return Object.keys(CLI_GLOBAL_CONFIGS)
+  }, [cliTools])
 
   const cliLabelMap = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, string>()
     for (const tool of cliTools) {
-      map.set(tool.id, tool.displayName || tool.id);
+      map.set(tool.id, tool.displayName || tool.id)
     }
-    return map;
-  }, [cliTools]);
+    return map
+  }, [cliTools])
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
     const loadCliTools = async () => {
-      const tools =
-        (await window.api?.cliTools?.getAll?.())?.filter(Boolean) ?? [];
-      if (cancelled) return;
-      setCliTools(tools as CliToolInfo[]);
-    };
-    loadCliTools();
+      const tools = (await window.api?.cliTools?.getAll?.())?.filter(Boolean) ?? []
+      if (cancelled) return
+      setCliTools(tools as CliToolInfo[])
+    }
+    loadCliTools()
     return () => {
-      cancelled = true;
-    };
-  }, []);
+      cancelled = true
+    }
+  }, [])
 
   const readMcpConfigFile = useCallback(async (candidate: ConfigCandidate) => {
-    const resolvedPath = await resolvePath(candidate.path);
-    if (!resolvedPath) return { exists: false, servers: {} };
+    const resolvedPath = await resolvePath(candidate.path)
+    if (!resolvedPath) return { exists: false, servers: {} }
 
     const parseContent = (content: string) => {
       if (candidate.format === 'toml') {
-        return parseTomlMcpServers(content);
+        return parseTomlMcpServers(content)
       }
       try {
-        const parsed = JSON.parse(content) as unknown;
-        return extractMcpServers(parsed);
+        const parsed = JSON.parse(content) as unknown
+        return extractMcpServers(parsed)
       } catch (error) {
-        console.warn('[Project MCP] Failed to parse JSON config:', error);
-        return {};
+        console.warn('[Project MCP] Failed to parse JSON config:', error)
+        return {}
       }
-    };
+    }
 
     if (window.api?.fs?.exists && window.api?.fs?.readTextFile) {
       try {
-        const exists = await window.api.fs.exists(resolvedPath);
-        if (!exists) return { exists: false, servers: {} };
-        const content = await window.api.fs.readTextFile(resolvedPath);
-        return { exists: true, servers: parseContent(content) };
+        const exists = await window.api.fs.exists(resolvedPath)
+        if (!exists) return { exists: false, servers: {} }
+        const content = await window.api.fs.readTextFile(resolvedPath)
+        return { exists: true, servers: parseContent(content) }
       } catch (error) {
-        console.warn('[Project MCP] Failed to read config file:', error);
-        return { exists: false, servers: {} };
+        console.warn('[Project MCP] Failed to read config file:', error)
+        return { exists: false, servers: {} }
       }
     }
 
@@ -109,85 +109,92 @@ export function McpPage() {
       const response = await fetch(`${API_BASE_URL}/files/read`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: resolvedPath, expandHome: true }),
-      });
-      const data = await response.json();
+        body: JSON.stringify({ path: resolvedPath, expandHome: true })
+      })
+      const data = await response.json()
       if (!data.success || !data.content) {
-        return { exists: false, servers: {} };
+        return { exists: false, servers: {} }
       }
-      return { exists: true, servers: parseContent(data.content) };
+      return { exists: true, servers: parseContent(data.content) }
     } catch (error) {
-      console.warn('[Project MCP] Failed to read config via API:', error);
+      console.warn('[Project MCP] Failed to read config via API:', error)
     }
 
-    return { exists: false, servers: {} };
-  }, []);
+    return { exists: false, servers: {} }
+  }, [])
 
   const getAggregateStatus = useCallback(
     async (candidates: ConfigCandidate[], sourceLabel: string) => {
-      let configured = false;
-      const combined: MCPServerRecord = {};
+      let configured = false
+      const combined: MCPServerRecord = {}
       for (const candidate of candidates) {
-        const result = await readMcpConfigFile(candidate);
+        const result = await readMcpConfigFile(candidate)
         if (result.exists) {
-          configured = true;
+          configured = true
         }
-        Object.assign(combined, result.servers || {});
+        Object.assign(combined, result.servers || {})
       }
-      const servers = buildMcpServersFromConfig(combined, sourceLabel);
-      return { configured, serverCount: servers.length, servers };
+      const servers = buildMcpServersFromConfig(combined, sourceLabel)
+      return { configured, serverCount: servers.length, servers }
     },
     [readMcpConfigFile]
-  );
+  )
 
   const loadStatuses = useCallback(async () => {
     if (!currentProject?.path) {
-      setCliStatuses([]);
-      setLoading(false);
-      return;
+      setCliStatuses([])
+      setLoading(false)
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
 
     const statuses = await Promise.all(
       cliIds.map(async (cliId) => {
-        const globalPaths = CLI_GLOBAL_CONFIGS[cliId] || [];
-        const globalCandidates = getConfigCandidates(globalPaths);
+        const globalPaths = CLI_GLOBAL_CONFIGS[cliId] || []
+        const globalCandidates = getConfigCandidates(globalPaths)
 
-        const projectPath = getProjectMcpConfigPath(currentProject.path, cliId);
-        const projectCandidates = getConfigCandidates([projectPath]);
+        const projectPath = getProjectMcpConfigPath(currentProject.path, cliId)
+        const projectCandidates = getConfigCandidates([projectPath])
 
         return {
           id: cliId,
           label: cliLabelMap.get(cliId) || cliId,
           global: await getAggregateStatus(globalCandidates, t.settings.mcpProjectSourceGlobal),
-          project: await getAggregateStatus(projectCandidates, t.settings.mcpProjectSourceProject),
-        } as CliMcpStatus;
+          project: await getAggregateStatus(projectCandidates, t.settings.mcpProjectSourceProject)
+        } as CliMcpStatus
       })
-    );
+    )
 
-    setCliStatuses(statuses);
-    setLoading(false);
-  }, [cliIds, cliLabelMap, currentProject?.path, getAggregateStatus, t.settings.mcpProjectSourceGlobal, t.settings.mcpProjectSourceProject]);
+    setCliStatuses(statuses)
+    setLoading(false)
+  }, [
+    cliIds,
+    cliLabelMap,
+    currentProject?.path,
+    getAggregateStatus,
+    t.settings.mcpProjectSourceGlobal,
+    t.settings.mcpProjectSourceProject
+  ])
 
   const formatServerType = (server: MCPServerUI) => {
-    if (server.type === 'stdio') return t.settings.mcpTypeStdio;
-    if (server.type === 'sse') return t.settings.mcpTypeSse || 'SSE';
-    return t.settings.mcpTypeHttp;
-  };
+    if (server.type === 'stdio') return t.settings.mcpTypeStdio
+    if (server.type === 'sse') return t.settings.mcpTypeSse || 'SSE'
+    return t.settings.mcpTypeHttp
+  }
 
   const toKeyValuePairs = (values?: Record<string, string>): KeyValuePair[] =>
     Object.entries(values ?? {}).map(([key, value], index) => ({
       id: `${key}-${index}`,
       key,
-      value,
-    }));
+      value
+    }))
 
-  const detailArgs = detailServer?.args ?? [];
-  const detailEnv = toKeyValuePairs(detailServer?.env);
-  const detailHeaders = toKeyValuePairs(detailServer?.headers);
-  const detailTransportType = detailServer?.type ?? 'stdio';
-  const noop = () => {};
+  const detailArgs = detailServer?.args ?? []
+  const detailEnv = toKeyValuePairs(detailServer?.env)
+  const detailHeaders = toKeyValuePairs(detailServer?.headers)
+  const detailTransportType = detailServer?.type ?? 'stdio'
+  const noop = () => {}
 
   const renderServers = (servers: MCPServerUI[]) => {
     if (!servers.length) {
@@ -195,7 +202,7 @@ export function McpPage() {
         <div className="text-muted-foreground flex h-20 items-center justify-center rounded-lg border border-dashed border-border text-sm">
           {t.settings.mcpNoServers}
         </div>
-      );
+      )
     }
 
     return (
@@ -208,9 +215,7 @@ export function McpPage() {
             onClick={() => setDetailServer(server)}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-foreground text-sm font-medium">
-                {server.name}
-              </span>
+              <span className="text-foreground text-sm font-medium">{server.name}</span>
               <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
                 {formatServerType(server)}
               </span>
@@ -218,12 +223,12 @@ export function McpPage() {
           </button>
         ))}
       </div>
-    );
-  };
+    )
+  }
 
   useEffect(() => {
-    void loadStatuses();
-  }, [loadStatuses]);
+    void loadStatuses()
+  }, [loadStatuses])
 
   if (loading) {
     return (
@@ -231,55 +236,39 @@ export function McpPage() {
         <Loader2 className="size-4 animate-spin" />
         {t.common.loading}
       </div>
-    );
+    )
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">MCP</h1>
-          <p className="text-muted-foreground mt-2 text-sm">
-            {currentProject
-              ? currentProject.name
-              : t.settings.mcpProjectNoProjectTitle}
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={loadStatuses}
-          disabled={!currentProject?.path}
-        >
-          <RefreshCw className="mr-2 size-4" />
-          {t.common.refresh}
-        </Button>
-      </div>
+    <PageFrame>
+      <PageHeader
+        title="MCP"
+        subtitle={currentProject ? currentProject.name : t.settings.mcpProjectNoProjectTitle}
+        actions={
+          <Button variant="outline" onClick={loadStatuses} disabled={!currentProject?.path}>
+            <RefreshCw className="mr-2 size-4" />
+            {t.common.refresh}
+          </Button>
+        }
+      />
 
-      <div className="mt-6 min-h-0 flex-1 overflow-y-auto">
+      <PageBody>
         {!currentProject ? (
-          <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/30 p-10 text-center">
-            <div className="text-lg font-medium">
-              {t.settings.mcpProjectNoProjectTitle}
-            </div>
-            <div className="text-muted-foreground mt-2 max-w-md text-sm">
-              {t.settings.mcpProjectNoProjectDescription}
-            </div>
-          </div>
+          <EmptyStatePanel
+            title={t.settings.mcpProjectNoProjectTitle}
+            description={t.settings.mcpProjectNoProjectDescription}
+          />
         ) : cliStatuses.length === 0 ? (
-          <div className="text-muted-foreground flex h-28 items-center justify-center rounded-xl border border-dashed border-border text-sm">
-            {t.settings.mcpCliEmpty}
-          </div>
+          <EmptyStatePanel title={t.settings.mcpCliEmpty} className="min-h-[180px]" />
         ) : (
           <div className="space-y-6">
             {cliStatuses.map((status) => (
               <div
                 key={status.id}
-                className="border-border bg-background rounded-xl border p-4"
+                className="surface-card rounded-[24px] border border-border/70 bg-card/92 p-4"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-foreground text-sm font-medium">
-                    {status.label}
-                  </h4>
+                  <h4 className="text-foreground text-sm font-medium">{status.label}</h4>
                   <span className="text-muted-foreground text-xs">
                     {t.settings.mcpProjectSourceGlobal} {status.global.serverCount} /{' '}
                     {t.settings.mcpProjectSourceProject} {status.project.serverCount}
@@ -341,12 +330,12 @@ export function McpPage() {
             ))}
           </div>
         )}
-      </div>
+      </PageBody>
 
       <DialogPrimitive.Root
         open={!!detailServer}
         onOpenChange={(open) => {
-          if (!open) setDetailServer(null);
+          if (!open) setDetailServer(null)
         }}
       >
         <DialogPrimitive.Portal>
@@ -522,6 +511,6 @@ export function McpPage() {
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
-    </div>
-  );
+    </PageFrame>
+  )
 }

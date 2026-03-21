@@ -1,4 +1,5 @@
 export { SidebarProvider, useSidebar } from './sidebar-context';
+export { AppTitleBar } from './app-title-bar';
 export { LeftSidebar } from './left-sidebar';
 export { AppSidebar } from './app-sidebar';
 export { ProjectRail } from './project-rail';

@@ -7,7 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 
 export type TaskMode = 'conversation' | 'workflow'
@@ -63,7 +63,7 @@ export function TaskCreateMenu({
   isGitProject,
   branches,
   selectedBaseBranch,
-  onSelectBaseBranch,
+  onSelectBaseBranch
 }: TaskCreateMenuProps) {
   const { t } = useLanguage()
 
@@ -75,12 +75,18 @@ export function TaskCreateMenu({
 
   const selectedCliConfigName = useMemo(() => {
     if (!selectedCliConfigId) return t.task.createCliConfigLabel
-    return cliConfigs.find((item) => item.id === selectedCliConfigId)?.name || t.task.createCliConfigLabel
+    return (
+      cliConfigs.find((item) => item.id === selectedCliConfigId)?.name ||
+      t.task.createCliConfigLabel
+    )
   }, [cliConfigs, selectedCliConfigId, t.task.createCliConfigLabel])
 
   const selectedWorkflowTemplateName = useMemo(() => {
     if (selectedTemplateId) {
-      return workflowTemplates.find((item) => item.id === selectedTemplateId)?.name || t.task.createPipelineLabel
+      return (
+        workflowTemplates.find((item) => item.id === selectedTemplateId)?.name ||
+        t.task.createPipelineLabel
+      )
     }
     return workflowTemplates[0]?.name || t.task.createPipelineLabel
   }, [selectedTemplateId, t.task.createPipelineLabel, workflowTemplates])
@@ -93,7 +99,7 @@ export function TaskCreateMenu({
           onClick={() => onTaskModeChange('conversation')}
           className={
             taskMode === 'conversation'
-              ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs'
+              ? 'bg-foreground text-background px-3 py-1.5 text-xs shadow-sm'
               : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs'
           }
         >
@@ -105,7 +111,7 @@ export function TaskCreateMenu({
           disabled={!canUseWorkflowMode}
           className={
             taskMode === 'workflow'
-              ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs disabled:opacity-50'
+              ? 'bg-foreground text-background px-3 py-1.5 text-xs shadow-sm disabled:opacity-50'
               : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50'
           }
         >
@@ -198,9 +204,7 @@ export function TaskCreateMenu({
           className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           <GitBranch className="size-3.5" />
-          <span className="max-w-[140px] truncate">
-            {selectedBaseBranch || '工作流基础分支'}
-          </span>
+          <span className="max-w-[140px] truncate">{selectedBaseBranch || '工作流基础分支'}</span>
           <ChevronDown className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" sideOffset={8} className="max-h-64 w-56 overflow-auto">

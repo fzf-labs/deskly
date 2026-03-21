@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -20,7 +20,7 @@ const resolveProjectIdForSession = (sessionId: string): string | null =>
   appContext?.resolveProjectIdForSession(sessionId) ?? null
 
 function createWindow(): BrowserWindow {
-  mainWindow = new BrowserWindow({
+  const windowOptions: BrowserWindowConstructorOptions = {
     width: 900,
     height: 670,
     title: '',
@@ -34,7 +34,13 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false
     }
-  })
+  }
+
+  if (process.platform === 'darwin') {
+    windowOptions.titleBarStyle = 'hiddenInset'
+  }
+
+  mainWindow = new BrowserWindow(windowOptions)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.maximize()
