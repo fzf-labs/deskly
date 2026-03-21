@@ -1,5 +1,7 @@
 export default {
   title: '设置',
+  back: '返回',
+  pageDescription: '管理 Deskly 的偏好设置与集成能力。',
 
   // Categories
   account: '账号',
@@ -21,12 +23,10 @@ export default {
 
   // General
   language: '语言',
-  themeColor: '主题色',
   appearance: '外观',
   light: '浅色',
   dark: '深色',
   system: '跟随系统',
-  backgroundStyle: '背景风格',
 
   // Sound Alerts
   soundAlertsTitle: '提示音提醒',

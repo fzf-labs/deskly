@@ -21,6 +21,8 @@ export interface WorkspaceProjectGroup {
   kind: 'project' | 'unassigned';
 }
 
+export type WorkspaceSidebarSortMode = 'recent' | 'title';
+
 const UNASSIGNED_GROUP_ID = '__unassigned__';
 
 function toTaskItem(task: Task): WorkspaceTaskItem {
@@ -35,15 +37,66 @@ function toTaskItem(task: Task): WorkspaceTaskItem {
   };
 }
 
-function sortTasksByUpdatedAt(tasks: WorkspaceTaskItem[]): WorkspaceTaskItem[] {
-  return [...tasks].sort((left, right) => {
-    const leftTime = new Date(left.updatedAt).getTime();
-    const rightTime = new Date(right.updatedAt).getTime();
-    return rightTime - leftTime;
+function compareTaskUpdatedAt(left: WorkspaceTaskItem, right: WorkspaceTaskItem) {
+  const leftTime = new Date(left.updatedAt).getTime();
+  const rightTime = new Date(right.updatedAt).getTime();
+  return rightTime - leftTime;
+}
+
+function compareTaskTitle(left: WorkspaceTaskItem, right: WorkspaceTaskItem) {
+  return (
+    left.title.localeCompare(right.title, undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    }) || compareTaskUpdatedAt(left, right)
+  );
+}
+
+function sortTasks(
+  tasks: WorkspaceTaskItem[],
+  sortMode: WorkspaceSidebarSortMode
+): WorkspaceTaskItem[] {
+  return [...tasks].sort(
+    sortMode === 'title' ? compareTaskTitle : compareTaskUpdatedAt
+  );
+}
+
+function latestTaskTimestamp(tasks: WorkspaceTaskItem[]) {
+  return tasks.reduce((latest, task) => {
+    const timestamp = new Date(task.updatedAt).getTime();
+    return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+  }, 0);
+}
+
+function compareGroupName(left: WorkspaceProjectGroup, right: WorkspaceProjectGroup) {
+  return left.name.localeCompare(right.name, undefined, {
+    numeric: true,
+    sensitivity: 'base',
   });
 }
 
-export function useWorkspaceSidebar() {
+function sortGroups(
+  groups: WorkspaceProjectGroup[],
+  sortMode: WorkspaceSidebarSortMode
+): WorkspaceProjectGroup[] {
+  return [...groups].sort((left, right) => {
+    if (left.kind === 'unassigned' && right.kind !== 'unassigned') return 1;
+    if (right.kind === 'unassigned' && left.kind !== 'unassigned') return -1;
+
+    if (sortMode === 'title') {
+      return compareGroupName(left, right);
+    }
+
+    const recentDifference =
+      latestTaskTimestamp(right.tasks) - latestTaskTimestamp(left.tasks);
+
+    return recentDifference || compareGroupName(left, right);
+  });
+}
+
+export function useWorkspaceSidebar(
+  sortMode: WorkspaceSidebarSortMode = 'recent'
+) {
   const {
     projects,
     currentProject,
@@ -51,6 +104,7 @@ export function useWorkspaceSidebar() {
     loading: projectsLoading,
     error: projectsError,
     setCurrentProjectId,
+    addProject,
   } = useProjects();
   const [tasks, setTasks] = useState<WorkspaceTaskItem[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
@@ -94,7 +148,7 @@ export function useWorkspaceSidebar() {
     const groups: WorkspaceProjectGroup[] = projects.map((project) => ({
       id: project.id,
       name: project.name,
-      tasks: sortTasksByUpdatedAt(grouped.get(project.id) ?? []),
+      tasks: sortTasks(grouped.get(project.id) ?? [], sortMode),
       isCurrent: currentProjectId === project.id,
       kind: 'project' as const,
     }));
@@ -103,16 +157,17 @@ export function useWorkspaceSidebar() {
       groups.push({
         id: UNASSIGNED_GROUP_ID,
         name: 'Unassigned',
-        tasks: sortTasksByUpdatedAt(unassignedTasks),
+        tasks: sortTasks(unassignedTasks, sortMode),
         isCurrent: currentProjectId === null,
         kind: 'unassigned',
       });
     }
 
-    return groups;
-  }, [currentProjectId, projects, tasks]);
+    return sortGroups(groups, sortMode);
+  }, [currentProjectId, projects, sortMode, tasks]);
 
   return {
+    addProject,
     currentProject,
     currentProjectId,
     projects,

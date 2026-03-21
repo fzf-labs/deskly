@@ -9,8 +9,6 @@ export type {
   AgentRuntimeType,
   AgentRuntimeSetting,
   UserProfile,
-  AccentColor,
-  BackgroundStyle,
   EditorType,
   EditorSettings,
   Settings,
@@ -25,9 +23,6 @@ export {
   defaultAgentRuntimes,
   defaultProviders,
   defaultSettings,
-  // Theme
-  accentColors,
-  backgroundStyles,
   // Core functions
   getSettings,
   getSettingsAsync,

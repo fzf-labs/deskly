@@ -328,8 +328,6 @@ interface AppAPI {
 
 interface AppSettings {
   theme: 'light' | 'dark' | 'system'
-  accentColor: string
-  backgroundStyle: string
   language: string
   notifications: {
     enabled: boolean

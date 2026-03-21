@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Settings, FolderPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { SettingsModal } from '@/components/settings';
 import {
   Tooltip,
   TooltipContent,
@@ -12,7 +10,6 @@ import { useProjects, type Project } from '@/hooks/useProjects';
 
 export function ProjectRail() {
   const navigate = useNavigate();
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const {
     projects,
     currentProject,
@@ -41,60 +38,56 @@ export function ProjectRail() {
   const hasProjects = projects.length > 0;
 
   return (
-    <>
-      <aside className="border-sidebar-border bg-sidebar flex h-full w-12 shrink-0 flex-col border-r">
-        {/* Project List - Scrollable */}
-        <div className="flex-1 overflow-y-auto py-2">
-          {hasProjects ? (
-            <div className="flex flex-col items-center gap-2">
-              {projects.map((project) => (
-                <ProjectAvatar
-                  key={project.id}
-                  project={project}
-                  isActive={currentProject?.id === project.id}
-                  onClick={() => handleSelectProject(project.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyProjectsHint onAddProject={() => navigate('/projects')} />
-          )}
-        </div>
+    <aside className="border-sidebar-border bg-sidebar flex h-full w-12 shrink-0 flex-col border-r">
+      {/* Project List - Scrollable */}
+      <div className="flex-1 overflow-y-auto py-2">
+        {hasProjects ? (
+          <div className="flex flex-col items-center gap-2">
+            {projects.map((project) => (
+              <ProjectAvatar
+                key={project.id}
+                project={project}
+                isActive={currentProject?.id === project.id}
+                onClick={() => handleSelectProject(project.id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyProjectsHint onAddProject={() => navigate('/projects')} />
+        )}
+      </div>
 
-        {/* Bottom Actions */}
-        <div className="border-sidebar-border flex flex-col items-center gap-1 border-t py-2">
-          {/* Add Project Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => navigate('/projects')}
-                aria-label="新建项目"
-                className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
-              >
-                <Plus className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">新建项目</TooltipContent>
-          </Tooltip>
+      {/* Bottom Actions */}
+      <div className="border-sidebar-border flex flex-col items-center gap-1 border-t py-2">
+        {/* Add Project Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => navigate('/projects')}
+              aria-label="新建项目"
+              className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
+            >
+              <Plus className="size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">新建项目</TooltipContent>
+        </Tooltip>
 
-          {/* Settings Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setSettingsOpen(true)}
-                aria-label="设置"
-                className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
-              >
-                <Settings className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">设置</TooltipContent>
-          </Tooltip>
-        </div>
-      </aside>
-
-      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
-    </>
+        {/* Settings Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => navigate('/settings')}
+              aria-label="设置"
+              className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
+            >
+              <Settings className="size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">设置</TooltipContent>
+        </Tooltip>
+      </div>
+    </aside>
   );
 }
 

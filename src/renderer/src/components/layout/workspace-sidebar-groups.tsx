@@ -29,11 +29,11 @@ export function WorkspaceSidebarGroups({
   onToggleGroup
 }: WorkspaceSidebarGroupsProps) {
   return (
-    <div className="flex-1 overflow-y-auto px-2 py-3">
+    <div className={cn('flex-1 overflow-y-auto px-3 pb-4', !leftOpen && 'px-2')}>
       {loading ? (
         <div
           className={cn(
-            'text-sidebar-foreground/55 px-3 py-4 text-sm',
+            'text-sidebar-foreground/55 rounded-2xl px-3 py-4 text-sm',
             !leftOpen && 'px-0 text-center'
           )}
         >
@@ -42,14 +42,14 @@ export function WorkspaceSidebarGroups({
       ) : projectGroups.length === 0 ? (
         <div
           className={cn(
-            'text-sidebar-foreground/55 px-3 py-4 text-sm',
+            'text-sidebar-foreground/55 rounded-2xl px-3 py-4 text-sm',
             !leftOpen && 'px-0 text-center'
           )}
         >
           {leftOpen ? emptyLabel : '...'}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {projectGroups.map((group) => {
             const isExpanded = expandedGroups[group.id] ?? true
             const isCurrentGroup =

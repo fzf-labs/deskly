@@ -1,5 +1,7 @@
 export default {
   title: 'Settings',
+  back: 'Back',
+  pageDescription: 'Manage your Deskly preferences and integrations.',
 
   // Categories
   account: 'Account',
@@ -21,12 +23,10 @@ export default {
 
   // General
   language: 'Language',
-  themeColor: 'Theme Color',
   appearance: 'Appearance',
   light: 'Light',
   dark: 'Dark',
   system: 'System',
-  backgroundStyle: 'Background Style',
 
   // Sound Alerts
   soundAlertsTitle: 'Sound alerts',

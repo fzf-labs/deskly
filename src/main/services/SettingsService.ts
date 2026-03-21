@@ -3,8 +3,6 @@ import { getAppPaths } from '../app/AppPaths'
 
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system'
-  accentColor: string
-  backgroundStyle: string
   language: string
   notifications: {
     enabled: boolean
@@ -14,8 +12,6 @@ export interface AppSettings {
 
 const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
-  accentColor: '#3b82f6',
-  backgroundStyle: 'default',
   language: 'zh-CN',
   notifications: {
     enabled: true,
@@ -38,7 +34,9 @@ export class SettingsService {
       if (existsSync(this.settingsFile)) {
         const data = readFileSync(this.settingsFile, 'utf-8')
         const loaded = JSON.parse(data)
-        return { ...DEFAULT_SETTINGS, ...loaded }
+        const { accentColor: _accentColor, backgroundStyle: _backgroundStyle, ...rest } =
+          loaded as Record<string, unknown>
+        return { ...DEFAULT_SETTINGS, ...rest }
       }
     } catch (error) {
       console.error('[SettingsService] Failed to load settings:', error)

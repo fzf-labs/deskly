@@ -1,26 +1,47 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
+  ArrowUpDown,
+  Clock3,
+  FolderPlus,
   FolderKanban,
-  KanbanSquare,
   LayoutDashboard,
   ListChecks,
+  PenSquare,
   Server,
   Settings,
   Sparkles,
   Workflow
 } from 'lucide-react'
 
-import { SettingsModal } from '@/components/settings'
+import { CreateProjectDialog } from '@/components/projects/ProjectDialogs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
 
 import { useSidebar } from './sidebar-context'
-import { useWorkspaceSidebar } from './useWorkspaceSidebar'
+import { WorkspaceSidebarPrimaryNav } from './workspace-sidebar-primary-nav'
+import {
+  type WorkspaceSidebarSortMode,
+  useWorkspaceSidebar
+} from './useWorkspaceSidebar'
 import { WorkspaceSidebarGroups } from './workspace-sidebar-groups'
-import { WorkspaceSidebarNewThread } from './workspace-sidebar-new-thread'
 import { WorkspaceSidebarUtilityNav } from './workspace-sidebar-utility-nav'
+
+const SIDEBAR_SORT_MODE_KEY = 'deskly_sidebar_sort_mode'
+
+function getInitialSidebarSortMode(): WorkspaceSidebarSortMode {
+  if (typeof window === 'undefined') return 'recent'
+
+  const storedMode = window.localStorage.getItem(SIDEBAR_SORT_MODE_KEY)
+  return storedMode === 'title' ? 'title' : 'recent'
+}
 
 function useActiveTaskId() {
   const location = useLocation()
@@ -35,10 +56,16 @@ export function AppSidebar() {
   const location = useLocation()
   const { t } = useLanguage()
   const { leftOpen } = useSidebar()
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+  const [sortMode, setSortMode] = useState<WorkspaceSidebarSortMode>(getInitialSidebarSortMode)
   const activeTaskId = useActiveTaskId()
-  const { projectGroups, loading, refresh, setCurrentProjectId } = useWorkspaceSidebar()
+  const { addProject, projectGroups, loading, refresh, setCurrentProjectId } =
+    useWorkspaceSidebar(sortMode)
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_SORT_MODE_KEY, sortMode)
+  }, [sortMode])
 
   useEffect(() => {
     const nextExpanded: Record<string, boolean> = {}
@@ -63,6 +90,11 @@ export function AppSidebar() {
     navigate('/tasks')
   }
 
+  const handleSetCurrentProject = (projectId: string) => {
+    setCurrentProjectId(projectId)
+    navigate('/tasks')
+  }
+
   const handleSelectTask = (taskId: string, projectId: string | null) => {
     if (projectId) {
       setCurrentProjectId(projectId)
@@ -74,20 +106,40 @@ export function AppSidebar() {
     setExpandedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }))
   }
 
+  const primaryItems = [
+    {
+      id: 'new-thread',
+      label: t.nav.newThread,
+      icon: PenSquare,
+      onClick: handleOpenWorkspace,
+      isActive:
+        location.pathname.startsWith('/tasks') ||
+        location.pathname.startsWith('/task/') ||
+        location.pathname.startsWith('/home')
+    }
+  ]
+
   const utilityItems = [
+    {
+      id: 'automations',
+      label: t.nav.automations,
+      icon: Clock3,
+      onClick: () => navigate('/automations'),
+      isActive: location.pathname.startsWith('/automations')
+    },
+    {
+      id: 'skills',
+      label: t.nav.skills,
+      icon: Sparkles,
+      onClick: () => navigate('/skills'),
+      isActive: location.pathname.startsWith('/skills')
+    },
     {
       id: 'dashboard',
       label: t.nav.dashboard,
       icon: LayoutDashboard,
       onClick: () => navigate('/dashboard'),
       isActive: location.pathname.startsWith('/dashboard')
-    },
-    {
-      id: 'board',
-      label: t.nav.board,
-      icon: KanbanSquare,
-      onClick: () => navigate('/board'),
-      isActive: location.pathname.startsWith('/board')
     },
     {
       id: 'projects',
@@ -97,13 +149,6 @@ export function AppSidebar() {
       isActive: location.pathname.startsWith('/projects')
     },
     {
-      id: 'automations',
-      label: t.nav.automations,
-      icon: Workflow,
-      onClick: () => navigate('/automations'),
-      isActive: location.pathname.startsWith('/automations')
-    },
-    {
       id: 'pipelineTemplates',
       label: t.nav.pipelineTemplates,
       icon: ListChecks,
@@ -111,11 +156,11 @@ export function AppSidebar() {
       isActive: location.pathname.startsWith('/pipeline-templates')
     },
     {
-      id: 'skills',
-      label: t.nav.skills,
-      icon: Sparkles,
-      onClick: () => navigate('/skills'),
-      isActive: location.pathname.startsWith('/skills')
+      id: 'board',
+      label: t.nav.board,
+      icon: Workflow,
+      onClick: () => navigate('/board'),
+      isActive: location.pathname.startsWith('/board')
     },
     {
       id: 'mcp',
@@ -128,46 +173,93 @@ export function AppSidebar() {
       id: 'settings',
       label: t.nav.settings,
       icon: Settings,
-      onClick: () => setSettingsOpen(true),
-      isActive: false
+      onClick: () => navigate('/settings'),
+      isActive: location.pathname.startsWith('/settings')
     }
   ]
 
+  const sidebarVisible = leftOpen
+
   return (
     <TooltipProvider delayDuration={120}>
-      <>
-        <aside
-          className={cn(
-            'bg-sidebar/78 border-sidebar-border/80 flex h-full shrink-0 flex-col border-r backdrop-blur-xl transition-all duration-300 ease-in-out',
-            leftOpen ? 'w-[308px]' : 'w-[78px]'
-          )}
-        >
-          <WorkspaceSidebarNewThread
-            leftOpen={leftOpen}
-            label={t.nav.newThread}
-            onClick={handleOpenWorkspace}
+      <aside
+        className={cn(
+          'bg-sidebar/88 border-sidebar-border/75 flex h-full shrink-0 flex-col overflow-hidden border-r backdrop-blur-xl transition-all duration-300 ease-in-out',
+          sidebarVisible
+            ? 'w-[320px] translate-x-0 opacity-100'
+            : 'w-0 -translate-x-3 border-r-0 opacity-0 pointer-events-none'
+        )}
+        aria-hidden={!sidebarVisible}
+      >
+        <WorkspaceSidebarPrimaryNav leftOpen items={primaryItems} />
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="px-3 pb-2 pt-4">
+            <div className="border-sidebar-border/70 border-t" />
+          </div>
+
+          <div className="flex items-center justify-between px-4 pb-2">
+            <div className="text-sidebar-foreground/48 text-[13px] font-medium tracking-wide">
+              {t.nav.threads}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCreateProjectOpen(true)}
+                className="text-sidebar-foreground/48 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-7 items-center justify-center rounded-lg transition-colors"
+                aria-label={t.nav.addProject}
+                title={t.nav.addProject}
+              >
+                <FolderPlus className="size-3.5" />
+              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-sidebar-foreground/48 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-7 items-center justify-center rounded-lg transition-colors"
+                    aria-label={t.nav.sortThreads}
+                    title={t.nav.sortThreads}
+                  >
+                    <ArrowUpDown className="size-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setSortMode('recent')}>
+                    <span className="flex-1">{t.nav.sortByRecent}</span>
+                    {sortMode === 'recent' ? <span className="text-xs">✓</span> : null}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortMode('title')}>
+                    <span className="flex-1">{t.nav.sortByTitle}</span>
+                    {sortMode === 'title' ? <span className="text-xs">✓</span> : null}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          <WorkspaceSidebarGroups
+            leftOpen
+            loading={loading}
+            emptyLabel={t.nav.noTasksYet}
+            startConversationLabel={t.nav.startConversation}
+            activeTaskId={activeTaskId}
+            projectGroups={projectGroups}
+            expandedGroups={expandedGroups}
+            onSelectProject={handleSelectProject}
+            onSelectTask={handleSelectTask}
+            onToggleGroup={toggleGroup}
           />
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <WorkspaceSidebarGroups
-              leftOpen={leftOpen}
-              loading={loading}
-              emptyLabel={t.nav.noTasksYet}
-              startConversationLabel={t.nav.startConversation}
-              activeTaskId={activeTaskId}
-              projectGroups={projectGroups}
-              expandedGroups={expandedGroups}
-              onSelectProject={handleSelectProject}
-              onSelectTask={handleSelectTask}
-              onToggleGroup={toggleGroup}
-            />
+          <WorkspaceSidebarUtilityNav leftOpen items={utilityItems} />
+        </div>
+      </aside>
 
-            <WorkspaceSidebarUtilityNav leftOpen={leftOpen} items={utilityItems} />
-          </div>
-        </aside>
-
-        <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
-      </>
+      <CreateProjectDialog
+        open={createProjectOpen}
+        onOpenChange={setCreateProjectOpen}
+        onAddProject={addProject}
+        onSetCurrentProject={handleSetCurrentProject}
+      />
     </TooltipProvider>
   )
 }

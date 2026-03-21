@@ -58,17 +58,6 @@ export interface UserProfile {
   nickname: string;
 }
 
-export type AccentColor =
-  | 'orange'
-  | 'blue'
-  | 'green'
-  | 'purple'
-  | 'pink'
-  | 'red'
-  | 'sage';
-
-export type BackgroundStyle = 'default' | 'warm' | 'cool';
-
 export type EditorType =
   | 'vscode'
   | 'cursor'
@@ -119,8 +108,6 @@ export interface Settings {
   agentRuntimes: AgentRuntimeSetting[];
   defaultAgentRuntime: string;
   theme: 'light' | 'dark' | 'system';
-  accentColor: AccentColor;
-  backgroundStyle: BackgroundStyle;
   language: string;
   editor: EditorSettings;
   defaultCliToolId: string;

@@ -9,7 +9,11 @@ function isMacPlatform() {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform)
 }
 
-export function AppTitleBar() {
+interface AppTitleBarProps {
+  showSidebarToggle?: boolean
+}
+
+export function AppTitleBar({ showSidebarToggle = true }: AppTitleBarProps) {
   const { leftOpen, toggleLeft } = useSidebar()
   const isMac = isMacPlatform()
 
@@ -26,14 +30,17 @@ export function AppTitleBar() {
           isMac ? 'pl-[68px]' : 'pl-0'
         )}
       >
-        <button
-          type="button"
-          onClick={toggleLeft}
-          className="app-no-drag text-muted-foreground/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-0 active:bg-transparent flex size-8 shrink-0 items-center justify-center bg-transparent transition-colors"
-          aria-label={leftOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-        >
-          {leftOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
-        </button>
+        {showSidebarToggle ? (
+          <button
+            type="button"
+            onClick={toggleLeft}
+            className="app-no-drag text-muted-foreground/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-0 active:bg-transparent flex size-8 shrink-0 items-center justify-center bg-transparent transition-colors"
+            aria-label={leftOpen ? 'Hide sidebar' : 'Show sidebar'}
+            title={leftOpen ? 'Hide sidebar' : 'Show sidebar'}
+          >
+            {leftOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
+          </button>
+        ) : null}
       </div>
     </div>
   )

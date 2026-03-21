@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { taskStatusUi } from '@/lib/task-status'
 
 import type { WorkspaceTaskItem } from './useWorkspaceSidebar'
 
@@ -13,6 +14,23 @@ function formatTaskMeta(updatedAt: string) {
   if (Number.isNaN(date.getTime())) return ''
 
   const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+
+  if (diffMs < hour) {
+    return `${Math.max(1, Math.floor(diffMs / minute))}m`
+  }
+
+  if (diffMs < day) {
+    return `${Math.floor(diffMs / hour)}h`
+  }
+
+  if (diffMs < day * 7) {
+    return `${Math.floor(diffMs / day)}d`
+  }
+
   const isSameYear = now.getFullYear() === date.getFullYear()
   return date.toLocaleDateString(undefined, {
     month: 'short',
@@ -32,28 +50,36 @@ export function WorkspaceSidebarTaskItem({
   isActive,
   onClick
 }: WorkspaceSidebarTaskItemProps) {
+  const statusInfo = taskStatusUi[task.status]
+
   return (
     <button
       type="button"
       onClick={() => onClick(task.id, task.projectId)}
+      aria-label={`${formatTaskLabel(task.title, task.prompt)} · ${statusInfo.label}`}
       className={cn(
-        'hover:bg-sidebar-accent/90 flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors',
-        isActive && 'bg-background/95 text-foreground shadow-sm'
+        'hover:bg-sidebar-accent/80 flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors',
+        isActive && 'bg-background/92 text-foreground shadow-sm'
       )}
     >
       <div
         className={cn(
-          'mt-1 size-2.5 shrink-0 rounded-full',
-          isActive ? 'bg-foreground' : 'bg-sidebar-foreground/20'
+          'size-2 shrink-0 rounded-full',
+          isActive ? statusInfo.dotColor : cn(statusInfo.dotColor, 'opacity-85')
         )}
       />
-      <div className="min-w-0 flex-1">
-        <div className="text-sidebar-foreground truncate text-sm font-medium">
+      <div className="min-w-0 flex-1 truncate">
+        <span
+          className={cn(
+            'truncate text-[13px] font-medium',
+            isActive ? 'text-foreground' : 'text-sidebar-foreground'
+          )}
+        >
           {formatTaskLabel(task.title, task.prompt)}
-        </div>
-        <div className="text-sidebar-foreground/50 mt-0.5 truncate text-xs">
-          {formatTaskMeta(task.updatedAt)}
-        </div>
+        </span>
+      </div>
+      <div className="text-sidebar-foreground/44 shrink-0 text-[11px] font-medium tabular-nums">
+        {formatTaskMeta(task.updatedAt)}
       </div>
     </button>
   )

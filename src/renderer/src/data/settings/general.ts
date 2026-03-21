@@ -1,4 +1,4 @@
-// General settings - theme, language, AI providers, sandbox, agent runtime
+// General settings - language, theme, AI providers, sandbox, agent runtime
 
 import { API_BASE_URL } from '@/config';
 import {
@@ -12,8 +12,6 @@ import type {
   AIProvider,
   SandboxProviderSetting,
   AgentRuntimeSetting,
-  AccentColor,
-  BackgroundStyle,
   SoundChoice,
   SoundPresetId,
 } from './types';
@@ -151,8 +149,6 @@ export const defaultSettings: Settings = {
   agentRuntimes: defaultAgentRuntimes,
   defaultAgentRuntime: 'claude',
   theme: 'system',
-  accentColor: 'orange',
-  backgroundStyle: 'default',
   language: '',
   editor: {
     editorType: 'vscode',
@@ -164,33 +160,6 @@ export const defaultSettings: Settings = {
   claudeCodePath: '',
   codexCliPath: '',
 };
-
-// ============ Theme Constants ============
-
-export const accentColors: {
-  id: AccentColor;
-  name: string;
-  color: string;
-  darkColor: string;
-}[] = [
-  { id: 'orange', name: 'Orange', color: 'oklch(0.6716 0.1368 48.513)', darkColor: 'oklch(0.7214 0.1337 49.9802)' },
-  { id: 'blue', name: 'Blue', color: 'oklch(0.5469 0.1914 262.881)', darkColor: 'oklch(0.6232 0.1914 262.881)' },
-  { id: 'green', name: 'Green', color: 'oklch(0.5966 0.1397 149.214)', darkColor: 'oklch(0.6489 0.1397 149.214)' },
-  { id: 'purple', name: 'Purple', color: 'oklch(0.5412 0.1879 293.541)', darkColor: 'oklch(0.6135 0.1879 293.541)' },
-  { id: 'pink', name: 'Pink', color: 'oklch(0.6171 0.1762 349.761)', darkColor: 'oklch(0.6894 0.1762 349.761)' },
-  { id: 'red', name: 'Red', color: 'oklch(0.5772 0.2077 27.325)', darkColor: 'oklch(0.6495 0.2077 27.325)' },
-  { id: 'sage', name: 'Sage', color: 'oklch(0.4531 0.0891 152.535)', darkColor: 'oklch(0.5654 0.1091 152.535)' },
-];
-
-export const backgroundStyles: {
-  id: BackgroundStyle;
-  name: string;
-  description: string;
-}[] = [
-  { id: 'default', name: 'Default', description: 'Clean neutral background' },
-  { id: 'warm', name: 'Warm', description: 'Cozy cream and beige tones' },
-  { id: 'cool', name: 'Cool', description: 'Crisp blue-gray tones' },
-];
 
 // ============ Settings Cache ============
 
@@ -249,8 +218,6 @@ const loadGeneralSettingsFromMain = async (): Promise<Partial<Settings>> => {
     const appSettings = await window.api.settings.get();
     return {
       theme: appSettings.theme,
-      accentColor: appSettings.accentColor as AccentColor,
-      backgroundStyle: appSettings.backgroundStyle as BackgroundStyle,
       language: appSettings.language,
     };
   } catch (error) {
@@ -267,10 +234,20 @@ const normalizeLoadedSettings = (value: unknown): Settings => {
     mcpEnabled?: boolean;
     profile?: { avatar?: string };
     providers?: unknown;
+    accentColor?: unknown;
+    backgroundStyle?: unknown;
   };
 
   if ('mcpEnabled' in loadedSettings) {
     delete loadedSettings.mcpEnabled;
+  }
+
+  if ('accentColor' in loadedSettings) {
+    delete loadedSettings.accentColor;
+  }
+
+  if ('backgroundStyle' in loadedSettings) {
+    delete loadedSettings.backgroundStyle;
   }
 
   if (!loadedSettings.profile || typeof loadedSettings.profile !== 'object') {
@@ -368,8 +345,6 @@ export function saveSettings(settings: Settings): void {
   if (isElectron && window.api.settings) {
     window.api.settings.update({
       theme: settings.theme,
-      accentColor: settings.accentColor,
-      backgroundStyle: settings.backgroundStyle,
       language: settings.language,
     }).catch((error) => {
       console.error('[Settings] Failed to sync to main process:', error);

@@ -1,11 +1,10 @@
 import { cn } from '@/lib/utils';
+import { taskStatusUi } from '@/lib/task-status';
 import { type Task, type TaskStatus } from '@/data';
 import {
   GitBranch,
   FolderGit2,
   Clock,
-  Play,
-  CheckCircle,
   ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,32 +17,6 @@ interface TaskMetadataPanelProps {
   className?: string;
 }
 
-const statusConfig: Record<
-  TaskStatus,
-  { icon: typeof Clock; label: string; color: string }
-> = {
-  todo: {
-    icon: Clock,
-    label: 'Todo',
-    color: 'text-slate-500 bg-slate-500/10',
-  },
-  in_progress: {
-    icon: Play,
-    label: 'In Progress',
-    color: 'text-blue-500 bg-blue-500/10',
-  },
-  in_review: {
-    icon: Clock,
-    label: 'In Review',
-    color: 'text-amber-500 bg-amber-500/10',
-  },
-  done: {
-    icon: CheckCircle,
-    label: 'Done',
-    color: 'text-green-500 bg-green-500/10',
-  },
-};
-
 export function TaskMetadataPanel({
   task,
   cliToolId,
@@ -53,7 +26,7 @@ export function TaskMetadataPanel({
 }: TaskMetadataPanelProps) {
   if (!task) return null;
 
-  const config = statusConfig[task.status];
+  const config = taskStatusUi[task.status];
   const StatusIcon = config?.icon || Clock;
 
   return (
@@ -66,7 +39,7 @@ export function TaskMetadataPanel({
         <div
           className={cn(
             'flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
-            config?.color
+            config?.badgeColor
           )}
         >
           <StatusIcon className="size-3" />

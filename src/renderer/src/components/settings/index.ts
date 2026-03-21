@@ -1,4 +1,4 @@
-export { SettingsModal } from './SettingsModal';
+export { SettingsContent } from './SettingsContent';
 export type {
   SettingsCategory,
   SettingsTabProps,

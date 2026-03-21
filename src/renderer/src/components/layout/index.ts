@@ -9,3 +9,4 @@ export { WorkspaceSidebarNewThread } from './workspace-sidebar-new-thread';
 export { WorkspaceSidebarUtilityNav } from './workspace-sidebar-utility-nav';
 export { WorkspaceSidebarProjectGroup } from './workspace-sidebar-project-group';
 export { WorkspaceSidebarTaskItem } from './workspace-sidebar-task-item';
+export { WorkspaceSidebarPrimaryNav } from './workspace-sidebar-primary-nav';

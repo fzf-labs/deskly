@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Folder, FolderOpen } from 'lucide-react'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -29,7 +29,14 @@ export function WorkspaceSidebarProjectGroup({
   onSelectTask,
   onToggleGroup
 }: WorkspaceSidebarProjectGroupProps) {
+  const handleToggleProjectGroup = () => {
+    onSelectProject(group.kind === 'project' ? group.id : null)
+    onToggleGroup(group.id)
+  }
+
   if (!leftOpen) {
+    const Icon = isCurrentGroup ? FolderOpen : Folder
+
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -37,11 +44,11 @@ export function WorkspaceSidebarProjectGroup({
             type="button"
             onClick={() => onSelectProject(group.kind === 'project' ? group.id : null)}
             className={cn(
-              'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-12 items-center justify-center rounded-2xl transition-colors',
-              isCurrentGroup && 'bg-sidebar-accent text-sidebar-foreground shadow-sm'
+              'text-sidebar-foreground/62 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-10 items-center justify-center rounded-2xl transition-colors',
+              isCurrentGroup && 'bg-sidebar-accent/85 text-sidebar-foreground'
             )}
           >
-            <span className="text-sm font-semibold uppercase">{group.name.slice(0, 2)}</span>
+            <Icon className="size-4" />
           </button>
         </TooltipTrigger>
         <TooltipContent side="right">{group.name}</TooltipContent>
@@ -49,47 +56,33 @@ export function WorkspaceSidebarProjectGroup({
     )
   }
 
+  const Icon = isCurrentGroup ? FolderOpen : Folder
+
   return (
     <section className="space-y-1">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <button
           type="button"
-          onClick={() => onSelectProject(group.kind === 'project' ? group.id : null)}
+          onClick={handleToggleProjectGroup}
           className={cn(
-            'text-sidebar-foreground hover:bg-sidebar-accent/80 flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors',
-            isCurrentGroup && 'bg-sidebar-accent shadow-sm'
+            'text-sidebar-foreground/78 hover:bg-sidebar-accent/78 hover:text-sidebar-foreground flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-2.5 py-2 text-left transition-colors',
+            isCurrentGroup && 'bg-sidebar-accent/72 text-sidebar-foreground'
           )}
+          aria-expanded={isExpanded}
         >
-          <div className="bg-background/90 text-sidebar-foreground/70 flex size-8 shrink-0 items-center justify-center rounded-xl border border-white/70 text-xs font-semibold uppercase shadow-sm">
-            {group.name.slice(0, 2)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{group.name}</div>
-            <div className="text-sidebar-foreground/55 truncate text-xs">
-              {group.tasks.length} threads
-            </div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onToggleGroup(group.id)}
-          className="text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-8 shrink-0 items-center justify-center rounded-xl transition-colors"
-          aria-label={`Toggle ${group.name}`}
-        >
-          <ChevronDown
-            className={cn('size-4 transition-transform', !isExpanded && '-rotate-90')}
-          />
+          <Icon className="text-sidebar-foreground/55 size-4 shrink-0" />
+          <div className="min-w-0 flex-1 truncate text-[13px] font-medium">{group.name}</div>
+          <ChevronDown className={cn('size-3.5 transition-transform', !isExpanded && '-rotate-90')} />
         </button>
       </div>
 
       {isExpanded && (
-        <div className="space-y-1 pl-3">
+        <div className="ml-2 space-y-0.5 pl-1">
           {group.tasks.length === 0 ? (
             <button
               type="button"
               onClick={() => onSelectProject(group.kind === 'project' ? group.id : null)}
-              className="text-sidebar-foreground/45 hover:text-sidebar-foreground flex w-full items-center rounded-xl px-3 py-2 text-xs transition-colors"
+              className="text-sidebar-foreground/40 hover:text-sidebar-foreground flex w-full items-center rounded-xl px-2 py-2 text-xs transition-colors"
             >
               {startConversationLabel}
             </button>

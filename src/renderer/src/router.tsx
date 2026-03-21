@@ -9,6 +9,7 @@ import {
   McpPage,
   ProjectsPage,
   PipelineTemplatesPage,
+  SettingsPage,
   TasksPage,
   AutomationsPage,
 } from '@/pages';
@@ -76,6 +77,14 @@ export const router = createHashRouter([
     element: (
       <SetupGuard>
         <SetupPage />
+      </SetupGuard>
+    ),
+  },
+  {
+    path: '/settings',
+    element: (
+      <SetupGuard>
+        <SettingsPage />
       </SetupGuard>
     ),
   },
