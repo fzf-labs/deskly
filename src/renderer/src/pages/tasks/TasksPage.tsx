@@ -215,7 +215,7 @@ export function TasksPage() {
           ?.slice(0, 80) || 'New thread'
 
       try {
-        const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'VW-'
+        const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'WT-'
         const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
 
         const result = await window.api.task.create({

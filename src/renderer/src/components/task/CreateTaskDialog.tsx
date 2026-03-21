@@ -236,7 +236,7 @@ export function CreateTaskDialog({
 
     const trimmedPrompt = text.trim()
     try {
-      const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'VW-'
+      const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'WT-'
       const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
       const cliToolId = taskMode === 'conversation' ? resolvedCliToolId : undefined
       const agentToolConfigId = taskMode === 'conversation' ? resolvedCliConfigId : undefined

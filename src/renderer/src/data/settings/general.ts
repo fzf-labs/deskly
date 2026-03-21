@@ -155,7 +155,7 @@ export const defaultSettings: Settings = {
     customCommand: '',
   },
   defaultCliToolId: '',
-  gitWorktreeBranchPrefix: 'VW-',
+  gitWorktreeBranchPrefix: 'WT-',
   gitWorktreeDir: '~/.deskly/worktrees',
   claudeCodePath: '',
   codexCliPath: '',

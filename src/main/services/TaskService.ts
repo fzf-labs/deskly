@@ -13,7 +13,7 @@ const TASK_STATUS_VALUES = ['todo', 'in_progress', 'in_review', 'done'] as const
 type TaskStatusValue = (typeof TASK_STATUS_VALUES)[number]
 
 export class TaskService {
-  private static readonly DEFAULT_WORKTREE_PREFIX = 'VW-'
+  private static readonly DEFAULT_WORKTREE_PREFIX = 'WT-'
 
   private db: DatabaseService
   private git: GitService

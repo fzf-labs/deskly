@@ -4,7 +4,7 @@ import { useLanguage } from '@/providers/language-provider';
 import { path, shell } from '@/lib/electron-api';
 import type { SettingsTabProps } from '../types';
 
-const DEFAULT_WORKTREE_PREFIX = 'VW-';
+const DEFAULT_WORKTREE_PREFIX = 'WT-';
 const DEFAULT_WORKTREE_DIR = '~/.deskly/worktrees';
 
 export function GitSettings({
@@ -186,7 +186,7 @@ export function GitSettings({
         <input
           type="text"
           value={prefixInput}
-          placeholder={t.settings?.gitWorktreePrefixPlaceholder || 'e.g., VW-'}
+          placeholder={t.settings?.gitWorktreePrefixPlaceholder || 'e.g., WT-'}
           onChange={(e) => handlePrefixChange(e.target.value)}
           onBlur={handlePrefixBlur}
           className="border-input bg-background text-foreground focus:ring-ring block h-10 w-full max-w-sm rounded-lg border px-3 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
