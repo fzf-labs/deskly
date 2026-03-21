@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import {
+  isSettingsCategory,
   SettingsContent,
   SettingsSidebar,
   type SettingsCategory
@@ -17,7 +18,26 @@ function canNavigateBack() {
 
 export function SettingsPage() {
   const navigate = useNavigate()
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('account')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedCategory = searchParams.get('tab')
+  const activeCategory: SettingsCategory = isSettingsCategory(requestedCategory)
+    ? requestedCategory
+    : 'account'
+
+  const handleSelectCategory = useCallback(
+    (category: SettingsCategory) => {
+      const nextSearchParams = new URLSearchParams(searchParams)
+
+      if (category === 'account') {
+        nextSearchParams.delete('tab')
+      } else {
+        nextSearchParams.set('tab', category)
+      }
+
+      setSearchParams(nextSearchParams, { replace: true })
+    },
+    [searchParams, setSearchParams]
+  )
 
   const handleBack = useCallback(() => {
     if (canNavigateBack()) {
@@ -34,7 +54,7 @@ export function SettingsPage() {
         content: (
           <SettingsSidebar
             activeCategory={activeCategory}
-            onSelectCategory={setActiveCategory}
+            onSelectCategory={handleSelectCategory}
             onBack={handleBack}
           />
         ),
@@ -45,7 +65,7 @@ export function SettingsPage() {
         visible: false
       }
     }),
-    [activeCategory, handleBack]
+    [activeCategory, handleBack, handleSelectCategory]
   )
 
   useAppShell(shellConfig)

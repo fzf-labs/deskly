@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { useProjects } from '@/hooks/useProjects';
 import type { AgentToolConfig } from '@/data';
 import type { Automation, AutomationTriggerType } from '@/types/automation';
@@ -266,15 +267,16 @@ export function AutomationFormDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-medium text-muted-foreground">触发方式</label>
-                <select
-                  className="mt-1.5 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                <Select
                   value={triggerType}
-                  onChange={(event) => setTriggerType(event.target.value as AutomationTriggerType)}
-                >
-                  <option value="interval">间隔触发</option>
-                  <option value="daily">每日</option>
-                  <option value="weekly">每周</option>
-                </select>
+                  onValueChange={(value) => setTriggerType(value as AutomationTriggerType)}
+                  triggerClassName="mt-1.5"
+                  options={[
+                    { value: 'interval', label: '间隔触发' },
+                    { value: 'daily', label: '每日' },
+                    { value: 'weekly', label: '每周' },
+                  ]}
+                />
               </div>
 
               {triggerType === 'interval' ? (
@@ -302,17 +304,15 @@ export function AutomationFormDialog({
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">星期</label>
-                    <select
-                      className="mt-1.5 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      value={weeklyDay}
-                      onChange={(event) => setWeeklyDay(Number(event.target.value))}
-                    >
-                      {weekdayOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={String(weeklyDay)}
+                      onValueChange={(value) => setWeeklyDay(Number(value))}
+                      triggerClassName="mt-1.5"
+                      options={weekdayOptions.map((option) => ({
+                        value: String(option.value),
+                        label: option.label,
+                      }))}
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">时间</label>
@@ -332,35 +332,31 @@ export function AutomationFormDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-medium text-muted-foreground">CLI 工具</label>
-                <select
-                  className="mt-1.5 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                <Select
                   value={cliToolId}
-                  onChange={(event) => setCliToolId(event.target.value)}
-                >
-                  <option value="">请选择 CLI 工具</option>
-                  {cliTools.map((tool) => (
-                    <option key={tool.id} value={tool.id}>
-                      {tool.displayName || tool.name || tool.id}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setCliToolId}
+                  triggerClassName="mt-1.5"
+                  placeholder="请选择 CLI 工具"
+                  options={cliTools.map((tool) => ({
+                    value: tool.id,
+                    label: tool.displayName || tool.name || tool.id,
+                  }))}
+                />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground">CLI 配置（可选）</label>
-                <select
-                  className="mt-1.5 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                <Select
                   value={cliConfigId}
-                  onChange={(event) => setCliConfigId(event.target.value)}
                   disabled={!cliToolId}
-                >
-                  <option value="">默认配置</option>
-                  {filteredConfigs.map((config) => (
-                    <option key={config.id} value={config.id}>
-                      {config.name}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setCliConfigId}
+                  triggerClassName="mt-1.5"
+                  placeholder="默认配置"
+                  options={filteredConfigs.map((config) => ({
+                    value: config.id,
+                    label: config.name,
+                  }))}
+                />
               </div>
             </div>
           </div>

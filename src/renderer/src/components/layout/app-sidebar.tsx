@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowUpDown,
   Clock3,
   FolderPlus,
-  FolderKanban,
   LayoutDashboard,
   ListChecks,
   PenSquare,
@@ -33,6 +32,12 @@ import {
 } from './useWorkspaceSidebar'
 import { WorkspaceSidebarGroups } from './workspace-sidebar-groups'
 import { WorkspaceSidebarUtilityNav } from './workspace-sidebar-utility-nav'
+import {
+  APP_SHELL_SIDEBAR_DIVIDER_CLASS,
+  APP_SHELL_SIDEBAR_HERO_CLASS,
+  APP_SHELL_SIDEBAR_SECTION_HEADER_CLASS,
+  APP_SHELL_SIDEBAR_TOP_OFFSET_CLASS
+} from './sidebar-rhythm'
 
 const SIDEBAR_SORT_MODE_KEY = 'deskly_sidebar_sort_mode'
 
@@ -63,6 +68,7 @@ export function WorkspaceSidebarContent() {
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [sortMode, setSortMode] = useState<WorkspaceSidebarSortMode>(getInitialSidebarSortMode)
+  const hasMountedRef = useRef(false)
   const activeTaskId = useActiveTaskId()
   const { addProject, projectGroups, loading, refresh, setCurrentProjectId } =
     useWorkspaceSidebar(sortMode)
@@ -82,7 +88,12 @@ export function WorkspaceSidebarContent() {
   }, [projectGroups.map((group) => group.id).join('|')])
 
   useEffect(() => {
-    void refresh()
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      return
+    }
+
+    void refresh({ silent: true })
   }, [location.pathname, refresh])
 
   const handleOpenWorkspace = () => {
@@ -125,39 +136,11 @@ export function WorkspaceSidebarContent() {
 
   const utilityItems = [
     {
-      id: 'automations',
-      label: t.nav.automations,
-      icon: Clock3,
-      onClick: () => navigate('/automations'),
-      isActive: location.pathname.startsWith('/automations')
-    },
-    {
-      id: 'skills',
-      label: t.nav.skills,
-      icon: Sparkles,
-      onClick: () => navigate('/skills'),
-      isActive: location.pathname.startsWith('/skills')
-    },
-    {
       id: 'dashboard',
       label: t.nav.dashboard,
       icon: LayoutDashboard,
       onClick: () => navigate('/dashboard'),
       isActive: location.pathname.startsWith('/dashboard')
-    },
-    {
-      id: 'projects',
-      label: t.nav.projects,
-      icon: FolderKanban,
-      onClick: () => navigate('/projects'),
-      isActive: location.pathname.startsWith('/projects')
-    },
-    {
-      id: 'pipelineTemplates',
-      label: t.nav.pipelineTemplates,
-      icon: ListChecks,
-      onClick: () => navigate('/pipeline-templates'),
-      isActive: location.pathname.startsWith('/pipeline-templates')
     },
     {
       id: 'board',
@@ -167,20 +150,42 @@ export function WorkspaceSidebarContent() {
       isActive: location.pathname.startsWith('/board')
     },
     {
+      id: 'automations',
+      label: t.nav.automations,
+      icon: Clock3,
+      onClick: () => navigate('/automations'),
+      isActive: location.pathname.startsWith('/automations')
+    },
+    {
+      id: 'pipelineTemplates',
+      label: t.nav.pipelineTemplates,
+      icon: ListChecks,
+      onClick: () => navigate('/pipeline-templates'),
+      isActive: location.pathname.startsWith('/pipeline-templates')
+    },
+    {
+      id: 'skills',
+      label: t.nav.skills,
+      icon: Sparkles,
+      onClick: () => navigate('/skills'),
+      isActive: location.pathname.startsWith('/skills')
+    },
+    {
       id: 'mcp',
       label: t.nav.mcp,
       icon: Server,
       onClick: () => navigate('/mcp'),
       isActive: location.pathname.startsWith('/mcp')
-    },
-    {
-      id: 'settings',
-      label: t.nav.settings,
-      icon: Settings,
-      onClick: () => navigate('/settings'),
-      isActive: location.pathname.startsWith('/settings')
     }
   ]
+
+  const settingsItem = {
+    id: 'settings',
+    label: t.nav.settings,
+    icon: Settings,
+    onClick: () => navigate('/settings'),
+    isActive: location.pathname.startsWith('/settings')
+  }
 
   const sidebarVisible = leftOpen
 
@@ -189,16 +194,18 @@ export function WorkspaceSidebarContent() {
       <div
         className={cn('flex h-full min-h-0 flex-col overflow-hidden', !sidebarVisible && 'hidden')}
       >
-        <div className="h-12 shrink-0" />
+        <div className={APP_SHELL_SIDEBAR_TOP_OFFSET_CLASS} />
 
-        <WorkspaceSidebarPrimaryNav leftOpen items={primaryItems} />
+        <div className={APP_SHELL_SIDEBAR_HERO_CLASS}>
+          <WorkspaceSidebarPrimaryNav leftOpen={leftOpen} items={primaryItems} />
+        </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="px-3 pb-2 pt-4">
+          <div className={APP_SHELL_SIDEBAR_DIVIDER_CLASS}>
             <div className="border-sidebar-border/70 border-t" />
           </div>
 
-          <div className="flex items-center justify-between px-4 pb-2">
+          <div className={cn('flex items-center justify-between', APP_SHELL_SIDEBAR_SECTION_HEADER_CLASS)}>
             <div className="text-sidebar-foreground/48 text-[13px] font-medium tracking-wide">
               {t.nav.threads}
             </div>
@@ -251,6 +258,16 @@ export function WorkspaceSidebarContent() {
           />
 
           <WorkspaceSidebarUtilityNav leftOpen items={utilityItems} />
+          <div className="px-3 pb-3 pt-4">
+            <div className="border-sidebar-border/70 border-t pt-3">
+              <WorkspaceSidebarUtilityNav
+                leftOpen={leftOpen}
+                items={[settingsItem]}
+                variant="standalone"
+                className="border-0 px-0 py-0"
+              />
+            </div>
+          </div>
         </div>
       </div>
 

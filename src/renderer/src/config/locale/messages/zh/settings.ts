@@ -6,6 +6,7 @@ export default {
   // Categories
   account: '账号',
   general: '通用',
+  projects: '项目',
   sound: '提示音',
   notification: '通知',
   editor: '编辑器',
@@ -27,6 +28,15 @@ export default {
   light: '浅色',
   dark: '深色',
   system: '跟随系统',
+
+  // Projects
+  projectsDescription: '创建、编辑或删除项目。',
+  projectsCreate: '新建项目',
+  projectsEmptyTitle: '暂无项目',
+  projectsEmptyDescription: '创建一个项目来开始使用 Deskly。项目可以是本地目录或通过仓库克隆。',
+  projectsNoDescription: '暂无描述',
+  projectsUpdatedAt: '最近更新：{value}',
+  projectsDeleteConfirm: '确定要删除项目“{name}”吗？',
 
   // Sound Alerts
   soundAlertsTitle: '提示音提醒',

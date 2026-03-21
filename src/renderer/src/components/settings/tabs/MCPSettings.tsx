@@ -4,6 +4,7 @@ import { buildMcpServersFromConfig, extractMcpServers } from '@/lib/mcp';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/providers/language-provider';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   DropdownMenu,
@@ -1559,21 +1560,21 @@ export function MCPSettings({ settings }: SettingsTabProps) {
                   <label className="text-foreground mb-2 block text-sm font-medium">
                     {t.settings.mcpTransportType}
                   </label>
-                  <select
+                  <Select
                     value={configDialog.transportType}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       setConfigDialog({
                         ...configDialog,
-                        transportType: e.target.value as 'stdio' | 'http' | 'sse',
+                        transportType: value as 'stdio' | 'http' | 'sse',
                       })
                     }
                     disabled={isViewMode}
-                    className="border-input bg-background text-foreground focus:ring-ring h-10 w-full cursor-pointer rounded-lg border px-3 text-sm focus:ring-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    <option value="stdio">stdio</option>
-                    <option value="http">http</option>
-                    <option value="sse">sse</option>
-                  </select>
+                    options={[
+                      { value: 'stdio', label: 'stdio' },
+                      { value: 'http', label: 'http' },
+                      { value: 'sse', label: 'sse' },
+                    ]}
+                  />
                 </div>
 
                 {configDialog.transportType === 'stdio' ? (

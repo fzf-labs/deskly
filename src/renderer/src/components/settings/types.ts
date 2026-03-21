@@ -6,6 +6,7 @@ export type { SettingsType };
 export type SettingsCategory =
   | 'account'
   | 'general'
+  | 'projects'
   | 'sound'
   | 'notification'
   | 'editor'
@@ -17,6 +18,43 @@ export type SettingsCategory =
   | 'connector'
   | 'data'
   | 'about';
+
+export const SETTINGS_CATEGORIES: SettingsCategory[] = [
+  'account',
+  'general',
+  'projects',
+  'sound',
+  'notification',
+  'editor',
+  'cli',
+  'git',
+  'pipelineTemplates',
+  'mcp',
+  'skills',
+  'data',
+  'about',
+];
+
+export function isSettingsCategory(
+  value: string | null | undefined
+): value is SettingsCategory {
+  if (!value) {
+    return false;
+  }
+
+  return SETTINGS_CATEGORIES.includes(value as SettingsCategory);
+}
+
+export function buildSettingsRoute(category?: SettingsCategory): string {
+  if (!category || category === 'account') {
+    return '/settings';
+  }
+
+  const searchParams = new URLSearchParams({ tab: category });
+  return `/settings?${searchParams.toString()}`;
+}
+
+export const PROJECT_SETTINGS_ROUTE = buildSettingsRoute('projects');
 
 // Common props for settings tabs
 export interface SettingsTabProps {

@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -82,37 +83,31 @@ export function TaskDialogs({
               <label className="text-sm font-medium">
                 {t.task.createCliLabel}
               </label>
-              <select
+              <Select
                 value={editCliToolId}
-                onChange={(e) => setEditCliToolId(e.target.value)}
-                className="border-input bg-background text-foreground w-full rounded-md border px-3 py-2 text-sm"
-              >
-                <option value="">{t.task.createCliPlaceholder}</option>
-                {cliTools.map((tool) => (
-                  <option key={tool.id} value={tool.id}>
-                    {tool.displayName || tool.name || tool.id}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setEditCliToolId}
+                placeholder={t.task.createCliPlaceholder}
+                options={cliTools.map((tool) => ({
+                  value: tool.id,
+                  label: tool.displayName || tool.name || tool.id,
+                }))}
+              />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">
                 {t.task.createCliConfigLabel || 'CLI 配置项'}
               </label>
-              <select
+              <Select
                 value={editCliConfigId}
-                onChange={(e) => setEditCliConfigId(e.target.value)}
-                className="border-input bg-background text-foreground w-full rounded-md border px-3 py-2 text-sm"
                 disabled={!editCliToolId || cliConfigs.length === 0}
-              >
-                <option value="">{t.task.createCliConfigPlaceholder || '请选择 CLI 配置项'}</option>
-                {cliConfigs.map((config) => (
-                  <option key={config.id} value={config.id}>
-                    {config.name}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setEditCliConfigId}
+                placeholder={t.task.createCliConfigPlaceholder || '请选择 CLI 配置项'}
+                options={cliConfigs.map((config) => ({
+                  value: config.id,
+                  label: config.name,
+                }))}
+              />
               {!editCliToolId && (
                 <p className="text-muted-foreground text-xs">
                   {t.task.createCliConfigSelectTool || '请先选择 CLI 工具'}

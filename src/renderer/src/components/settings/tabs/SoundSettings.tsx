@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import {
   isAudioFileExtensionSupported,
   playSoundChoice,
@@ -232,18 +233,13 @@ export function SoundSettings({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <select
+            <Select
               value={taskSelectValue}
-              onChange={(e) => handleTaskSoundChange(e.target.value)}
+              onValueChange={handleTaskSoundChange}
               disabled={!settings.taskCompleteSoundEnabled}
-              className="border-input bg-background text-foreground block h-10 w-full max-w-xs cursor-pointer rounded-lg border px-3 text-sm focus:border-transparent focus:ring-2 focus:ring-ring focus:outline-none"
-            >
-              {RESOURCE_SOUND_OPTIONS.map((sound) => (
-                <option key={sound.value} value={sound.value}>
-                  {sound.label}
-                </option>
-              ))}
-            </select>
+              triggerClassName="max-w-xs"
+              options={RESOURCE_SOUND_OPTIONS}
+            />
             <Button
               type="button"
               variant="outline"
@@ -341,18 +337,13 @@ export function SoundSettings({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <select
+            <Select
               value={nodeSelectValue}
-              onChange={(e) => handleTaskNodeSoundChange(e.target.value)}
+              onValueChange={handleTaskNodeSoundChange}
               disabled={!settings.taskNodeCompleteSoundEnabled}
-              className="border-input bg-background text-foreground block h-10 w-full max-w-xs cursor-pointer rounded-lg border px-3 text-sm focus:border-transparent focus:ring-2 focus:ring-ring focus:outline-none"
-            >
-              {RESOURCE_SOUND_OPTIONS.map((sound) => (
-                <option key={sound.value} value={sound.value}>
-                  {sound.label}
-                </option>
-              ))}
-            </select>
+              triggerClassName="max-w-xs"
+              options={RESOURCE_SOUND_OPTIONS}
+            />
             <Button
               type="button"
               variant="outline"

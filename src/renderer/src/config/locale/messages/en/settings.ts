@@ -6,6 +6,7 @@ export default {
   // Categories
   account: 'Account',
   general: 'General',
+  projects: 'Projects',
   sound: 'Sound',
   notification: 'Notifications',
   editor: 'Editor',
@@ -27,6 +28,16 @@ export default {
   light: 'Light',
   dark: 'Dark',
   system: 'System',
+
+  // Projects
+  projectsDescription: 'Create, edit, or remove projects.',
+  projectsCreate: 'New project',
+  projectsEmptyTitle: 'No projects yet',
+  projectsEmptyDescription:
+    'Create a project to start using Deskly. Projects can point to a local folder or be cloned from a repository.',
+  projectsNoDescription: 'No description yet',
+  projectsUpdatedAt: 'Updated: {value}',
+  projectsDeleteConfirm: 'Are you sure you want to delete project "{name}"?',
 
   // Sound Alerts
   soundAlertsTitle: 'Sound alerts',

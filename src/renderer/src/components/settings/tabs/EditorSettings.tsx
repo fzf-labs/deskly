@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Select } from '@/components/ui/select';
 import { useLanguage } from '@/providers/language-provider';
 import type { EditorType } from '@/data/settings';
 import type { SettingsTabProps } from '../types';
@@ -109,17 +110,15 @@ export function EditorSettings({
         <label className="text-foreground block text-sm font-medium">
           {t.settings?.editorDefault || 'Default Editor'}
         </label>
-        <select
+        <Select
           value={selectedType}
-          onChange={(e) => handleEditorTypeChange(e.target.value as EditorType)}
-          className="border-input bg-background text-foreground focus:ring-ring block h-10 w-full max-w-sm cursor-pointer rounded-lg border px-3 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
-        >
-          {editorOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => handleEditorTypeChange(value as EditorType)}
+          triggerClassName="max-w-sm"
+          options={editorOptions.map((option) => ({
+            value: option.value,
+            label: option.label,
+          }))}
+        />
         {error && (
           <p className="text-destructive text-sm">
             {t.settings?.editorDetectError ||

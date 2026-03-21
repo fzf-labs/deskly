@@ -3,6 +3,7 @@ import {
   Bell,
   Code,
   Database,
+  FolderKanban,
   GitBranch,
   Info,
   ListChecks,
@@ -15,22 +16,9 @@ import {
   Volume2,
 } from 'lucide-react';
 
-import type { SettingsCategory } from './types';
+import { SETTINGS_CATEGORIES, type SettingsCategory } from './types';
 
-export const settingsCategories: SettingsCategory[] = [
-  'account',
-  'general',
-  'sound',
-  'notification',
-  'editor',
-  'cli',
-  'git',
-  'pipelineTemplates',
-  'mcp',
-  'skills',
-  'data',
-  'about',
-];
+export const settingsCategories = SETTINGS_CATEGORIES;
 
 // Category icons mapping
 export const categoryIcons: Record<
@@ -39,6 +27,7 @@ export const categoryIcons: Record<
 > = {
   account: User,
   general: Settings,
+  projects: FolderKanban,
   sound: Volume2,
   notification: Bell,
   editor: Code,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '@/providers/language-provider';
 import { Terminal, Check, AlertCircle, Plus, Pencil, Star, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { newUlid } from '@/lib/ids';
 import {
@@ -668,18 +669,15 @@ export function CLISettings({
       <div key={fieldKey} className={cn('space-y-2', isWideField ? 'md:col-span-2' : '')}>
         <label className="text-sm font-medium">{label}</label>
         {field.type === 'string' && field.options?.length ? (
-          <select
+          <Select
             value={typeof value === 'string' ? value : ''}
-            onChange={(e) => setDraftFieldValue(fieldKey, e.target.value)}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          >
-            <option value="">{t.settings?.cliConfigOptionDefault || "Default"}</option>
-            {field.options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(nextValue) => setDraftFieldValue(fieldKey, nextValue)}
+            placeholder={t.settings?.cliConfigOptionDefault || "Default"}
+            options={field.options.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+          />
         ) : field.type === 'string' && field.multiline ? (
           <textarea
             value={typeof value === 'string' ? value : ''}
@@ -726,7 +724,7 @@ export function CLISettings({
             rows={4}
           />
         ) : field.type === 'booleanNullable' ? (
-          <select
+          <Select
             value={
               typeof value === 'boolean'
                 ? value
@@ -734,16 +732,15 @@ export function CLISettings({
                   : 'false'
                 : 'null'
             }
-            onChange={(e) => {
-              const selected = e.target.value;
+            onValueChange={(selected) => {
               setDraftFieldValue(fieldKey, selected === 'null' ? null : selected === 'true');
             }}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          >
-            <option value="null">{t.settings?.cliConfigOptionDefault || "Default"}</option>
-            <option value="true">{t.settings?.cliConfigOptionEnabled || "Enabled"}</option>
-            <option value="false">{t.settings?.cliConfigOptionDisabled || "Disabled"}</option>
-          </select>
+            options={[
+              { value: 'null', label: t.settings?.cliConfigOptionDefault || "Default" },
+              { value: 'true', label: t.settings?.cliConfigOptionEnabled || "Enabled" },
+              { value: 'false', label: t.settings?.cliConfigOptionDisabled || "Disabled" },
+            ]}
+          />
         ) : (
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -800,22 +797,17 @@ export function CLISettings({
           <label className="text-sm font-medium">
             {t.settings?.cliDefaultLabel || 'Default CLI'}
           </label>
-          <select
+          <Select
             value={defaultCliToolId}
-            onChange={(e) => handleDefaultChange(e.target.value)}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          >
-            <option value="">
-              {t.settings?.cliDefaultPlaceholder || 'Select default CLI'}
-            </option>
-            {tools
+            onValueChange={handleDefaultChange}
+            placeholder={t.settings?.cliDefaultPlaceholder || 'Select default CLI'}
+            options={tools
               .filter((tool) => isCliToolInstalled(tool))
-              .map((tool) => (
-                <option key={tool.id} value={tool.id}>
-                  {tool.displayName}
-                </option>
-              ))}
-          </select>
+              .map((tool) => ({
+                value: tool.id,
+                label: tool.displayName,
+              }))}
+          />
           <p className="text-muted-foreground text-xs">
             {t.settings?.cliDefaultDescription ||
               'Used as the default CLI when creating new tasks.'}

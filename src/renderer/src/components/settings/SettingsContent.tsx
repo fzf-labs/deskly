@@ -15,6 +15,7 @@ import { GitSettings } from './tabs/GitSettings';
 import { GeneralSettings } from './tabs/GeneralSettings';
 import { MCPSettings } from './tabs/MCPSettings';
 import { NotificationSettings } from './tabs/NotificationSettings';
+import { ProjectsSettings } from './tabs/ProjectsSettings';
 import { SkillsSettings } from './tabs/SkillsSettings';
 import { SoundSettings } from './tabs/SoundSettings';
 import { WorkflowTemplatesSettings } from './tabs/WorkflowTemplatesSettings';
@@ -52,6 +53,8 @@ export function SettingsContent({
         {activeCategory === 'general' && (
           <GeneralSettings settings={settings} onSettingsChange={handleSettingsChange} />
         )}
+
+        {activeCategory === 'projects' && <ProjectsSettings />}
 
         {activeCategory === 'sound' && (
           <SoundSettings settings={settings} onSettingsChange={handleSettingsChange} />

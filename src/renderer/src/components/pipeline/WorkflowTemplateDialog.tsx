@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { db, type AgentToolConfig } from '@/data';
 import {
   Dialog,
@@ -290,10 +291,9 @@ export function WorkflowTemplateDialog({
                       <label className="text-xs font-medium text-muted-foreground">
                         {t.task.createCliLabel}
                       </label>
-                      <select
+                      <Select
                         value={node.cliToolId || ''}
-                        onChange={async (e) => {
-                          const toolId = e.target.value;
+                        onValueChange={async (toolId) => {
                           let defaultConfigId = '';
                           if (toolId) {
                             const configs =
@@ -317,25 +317,22 @@ export function WorkflowTemplateDialog({
                             )
                           );
                         }}
-                        className="mt-1.5 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                      >
-                        <option value="">{t.task.createStageCliInherit}</option>
-                        {cliTools.map((tool) => (
-                          <option key={tool.id} value={tool.id}>
-                            {tool.displayName || tool.name || tool.id}
-                          </option>
-                        ))}
-                      </select>
+                        triggerClassName="mt-1.5 h-9 px-2"
+                        placeholder={t.task.createStageCliInherit}
+                        options={cliTools.map((tool) => ({
+                          value: tool.id,
+                          label: tool.displayName || tool.name || tool.id,
+                        }))}
+                      />
                     </div>
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">
                         {t.task.createCliConfigLabel}
                       </label>
-                      <select
+                      <Select
                         value={node.agentToolConfigId || ''}
                         disabled={!node.cliToolId}
-                        onChange={(e) => {
-                          const configId = e.target.value;
+                        onValueChange={(configId) => {
                           setTemplateNodes((prev) =>
                             prev.map((item, idx) =>
                               idx === index
@@ -344,22 +341,20 @@ export function WorkflowTemplateDialog({
                             )
                           );
                         }}
-                        className="mt-1.5 w-full rounded-md border bg-background px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <option value="">
-                          {!node.cliToolId
+                        triggerClassName="mt-1.5 h-9 px-2"
+                        placeholder={
+                          !node.cliToolId
                             ? t.task.createCliConfigSelectTool
-                            : t.task.createStageConfigInherit}
-                        </option>
-                        {(node.cliToolId
+                            : t.task.createStageConfigInherit
+                        }
+                        options={(node.cliToolId
                           ? cliConfigsByTool[node.cliToolId] || []
                           : []
-                        ).map((config) => (
-                          <option key={config.id} value={config.id}>
-                            {config.name}
-                          </option>
-                        ))}
-                      </select>
+                        ).map((config) => ({
+                          value: config.id,
+                          label: config.name,
+                        }))}
+                      />
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">

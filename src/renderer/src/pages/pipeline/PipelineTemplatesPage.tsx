@@ -12,6 +12,7 @@ import { db } from '@/data'
 import { useLanguage } from '@/providers/language-provider'
 import { EmptyStatePanel, PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
 import { WorkflowTemplateDialog, type WorkflowTemplateFormValues } from '@/components/pipeline'
+import { Select } from '@/components/ui/select'
 
 interface TaskNodeTemplate {
   id: string
@@ -155,18 +156,16 @@ export function PipelineTemplatesPage() {
         {currentProject && (
           <div className="surface-card flex flex-wrap items-center gap-3 rounded-[24px] border border-border/70 bg-card/92 px-4 py-4">
             <div className="text-sm font-medium">{t.task.pipelineTemplateCopyLabel}</div>
-            <select
+            <Select
               value={copyTemplateId}
-              onChange={(e) => setCopyTemplateId(e.target.value)}
-              className="min-w-[220px] rounded-full border border-border/80 bg-background px-4 py-2 text-sm"
-            >
-              <option value="">{t.task.pipelineTemplateCopyPlaceholder}</option>
-              {globalTemplates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setCopyTemplateId}
+              placeholder={t.task.pipelineTemplateCopyPlaceholder}
+              triggerClassName="min-w-[220px] rounded-full px-4"
+              options={globalTemplates.map((template) => ({
+                value: template.id,
+                label: template.name
+              }))}
+            />
             <Button variant="outline" onClick={handleCopyFromGlobal} disabled={!copyTemplateId}>
               {t.task.pipelineTemplateCopyButton}
             </Button>

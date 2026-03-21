@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import ImageLogo from '@/assets/logo.png';
 import { useLanguage } from '@/providers/language-provider';
 import { app, shell } from '@/lib/electron-api';
 import {
@@ -29,14 +28,11 @@ export function AboutSettings() {
     <div className="space-y-4">
       {/* Product Info */}
       <div className="border-border bg-muted/20 flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <img src={ImageLogo} alt="Deskly" className="size-14 rounded-xl" />
-          <div className="space-y-1">
-            <h2 className="text-foreground text-lg font-semibold">Deskly</h2>
-            <p className="text-muted-foreground text-sm">
-              {t.settings.aiPlatform}
-            </p>
-          </div>
+        <div className="space-y-1">
+          <h2 className="text-foreground text-lg font-semibold">Deskly</h2>
+          <p className="text-muted-foreground text-sm">
+            {t.settings.aiPlatform}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 sm:justify-end">
           <div className="border-border bg-muted/60 text-muted-foreground inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs">

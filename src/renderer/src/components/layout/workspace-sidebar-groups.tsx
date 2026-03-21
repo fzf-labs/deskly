@@ -29,7 +29,7 @@ export function WorkspaceSidebarGroups({
   onToggleGroup
 }: WorkspaceSidebarGroupsProps) {
   return (
-    <div className={cn('flex-1 overflow-y-auto px-3 pb-4', !leftOpen && 'px-2')}>
+    <div className={cn('flex-1 overflow-y-auto px-3 pb-3', !leftOpen && 'px-2')}>
       {loading ? (
         <div
           className={cn(

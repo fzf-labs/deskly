@@ -6,3 +6,9 @@ export type {
   MCPServerUI,
   SkillInfo,
 } from './types';
+export {
+  SETTINGS_CATEGORIES,
+  isSettingsCategory,
+  buildSettingsRoute,
+  PROJECT_SETTINGS_ROUTE,
+} from './types';

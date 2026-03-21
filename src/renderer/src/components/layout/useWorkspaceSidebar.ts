@@ -23,6 +23,10 @@ export interface WorkspaceProjectGroup {
 
 export type WorkspaceSidebarSortMode = 'recent' | 'title';
 
+interface RefreshWorkspaceSidebarOptions {
+  silent?: boolean;
+}
+
 const UNASSIGNED_GROUP_ID = '__unassigned__';
 
 function toTaskItem(task: Task): WorkspaceTaskItem {
@@ -110,8 +114,11 @@ export function useWorkspaceSidebar(
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setTasksLoading(true);
+  const refresh = useCallback(async (options: RefreshWorkspaceSidebarOptions = {}) => {
+    if (!options.silent) {
+      setTasksLoading(true);
+    }
+
     try {
       const nextTasks = await db.getAllTasks();
       setTasks(Array.isArray(nextTasks) ? nextTasks.map(toTaskItem) : []);
@@ -123,7 +130,9 @@ export function useWorkspaceSidebar(
         error instanceof Error ? error.message : 'Failed to load tasks'
       );
     } finally {
-      setTasksLoading(false);
+      if (!options.silent) {
+        setTasksLoading(false);
+      }
     }
   }, []);
 

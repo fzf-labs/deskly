@@ -1,4 +1,5 @@
 import type { Language } from '@/config/locale';
+import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/providers/language-provider';
 import { useTheme } from '@/providers/theme-provider';
@@ -83,14 +84,15 @@ export function GeneralSettings({
         <label className="text-foreground block text-sm font-medium">
           {t.settings.language}
         </label>
-        <select
+        <Select
           value={language}
-          onChange={(e) => handleLanguageChange(e.target.value as Language)}
-          className="border-input bg-background text-foreground focus:ring-ring block h-10 w-full max-w-xs cursor-pointer rounded-lg border px-3 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
-        >
-          <option value="en-US">English</option>
-          <option value="zh-CN">简体中文</option>
-        </select>
+          onValueChange={(value) => handleLanguageChange(value as Language)}
+          triggerClassName="max-w-xs"
+          options={[
+            { value: 'en-US', label: 'English' },
+            { value: 'zh-CN', label: '简体中文' },
+          ]}
+        />
       </div>
 
       <div className="flex flex-col gap-3">

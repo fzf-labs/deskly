@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Plus, Settings, FolderPlus } from 'lucide-react';
+import { PROJECT_SETTINGS_ROUTE } from '@/components/settings';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -53,7 +54,7 @@ export function ProjectRail() {
             ))}
           </div>
         ) : (
-          <EmptyProjectsHint onAddProject={() => navigate('/projects')} />
+          <EmptyProjectsHint onAddProject={() => navigate(PROJECT_SETTINGS_ROUTE)} />
         )}
       </div>
 
@@ -63,7 +64,7 @@ export function ProjectRail() {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => navigate('/projects')}
+              onClick={() => navigate(PROJECT_SETTINGS_ROUTE)}
               aria-label="新建项目"
               className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
             >

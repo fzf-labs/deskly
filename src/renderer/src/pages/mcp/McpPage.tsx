@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 import { EmptyStatePanel, PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
 import { Loader2, RefreshCw, X } from 'lucide-react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
@@ -370,16 +371,16 @@ export function McpPage() {
                   <label className="text-foreground mb-2 block text-sm font-medium">
                     {t.settings.mcpTransportType}
                   </label>
-                  <select
+                  <Select
                     value={detailTransportType}
-                    onChange={noop}
+                    onValueChange={noop}
                     disabled
-                    className="border-input bg-background text-foreground focus:ring-ring h-10 w-full cursor-pointer rounded-lg border px-3 text-sm focus:ring-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    <option value="stdio">stdio</option>
-                    <option value="http">http</option>
-                    <option value="sse">sse</option>
-                  </select>
+                    options={[
+                      { value: 'stdio', label: 'stdio' },
+                      { value: 'http', label: 'http' },
+                      { value: 'sse', label: 'sse' },
+                    ]}
+                  />
                 </div>
 
                 {detailTransportType === 'stdio' ? (
