@@ -43,8 +43,8 @@ export function WorkspaceSidebarUtilityNav({
                       : 'text-sidebar-foreground/78 hover:bg-sidebar-accent/72 hover:text-sidebar-foreground flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors',
                     item.isActive &&
                       (variant === 'standalone'
-                        ? 'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'
-                        : 'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'),
+                        ? 'bg-sidebar-accent text-sidebar-foreground shadow-xs ring-1 ring-inset ring-sidebar-border/80'
+                        : 'bg-sidebar-accent text-sidebar-foreground shadow-xs ring-1 ring-inset ring-sidebar-border/80'),
                     !leftOpen && 'w-auto justify-center px-0'
                   )}
                 >

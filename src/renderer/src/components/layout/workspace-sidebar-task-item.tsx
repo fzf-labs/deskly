@@ -60,7 +60,7 @@ export function WorkspaceSidebarTaskItem({
       className={cn(
         'hover:bg-sidebar-accent/80 flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-left transition-colors',
         isActive &&
-          'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'
+          'bg-sidebar-accent text-sidebar-foreground shadow-xs ring-1 ring-inset ring-sidebar-border/80'
       )}
     >
       <div

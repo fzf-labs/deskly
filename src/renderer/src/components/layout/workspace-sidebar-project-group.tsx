@@ -46,7 +46,7 @@ export function WorkspaceSidebarProjectGroup({
             className={cn(
               'text-sidebar-foreground/84 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-10 items-center justify-center rounded-sm transition-colors',
               isCurrentGroup &&
-                'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'
+                'bg-sidebar-accent text-sidebar-foreground shadow-xs ring-1 ring-inset ring-sidebar-border/80'
             )}
           >
             <Icon className="size-4" />
@@ -68,7 +68,7 @@ export function WorkspaceSidebarProjectGroup({
           className={cn(
             'text-sidebar-foreground/88 hover:bg-sidebar-accent/78 hover:text-sidebar-foreground flex min-w-0 flex-1 items-center gap-2.5 rounded-sm px-2.5 py-2 text-left transition-colors',
             isCurrentGroup &&
-              'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'
+              'bg-sidebar-accent text-sidebar-foreground shadow-xs ring-1 ring-inset ring-sidebar-border/80'
           )}
           aria-expanded={isExpanded}
         >

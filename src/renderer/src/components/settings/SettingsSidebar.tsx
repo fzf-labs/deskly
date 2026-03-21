@@ -46,7 +46,7 @@ export function SettingsSidebar({
               className={cn(
                 'flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left text-sm transition-colors',
                 activeCategory === id
-                  ? 'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground font-medium shadow-xs'
+                  ? 'bg-sidebar-accent text-sidebar-foreground font-medium shadow-xs ring-1 ring-inset ring-sidebar-border/80'
                   : 'text-sidebar-foreground/72 hover:bg-sidebar-accent/72 hover:text-sidebar-foreground'
               )}
             >
