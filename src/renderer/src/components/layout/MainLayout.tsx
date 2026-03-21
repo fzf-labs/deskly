@@ -22,12 +22,17 @@ function getDefaultAppShellConfig() {
 }
 
 function MainLayoutFrame() {
-  const { leftOpen, rightOpen, shellConfig } = useSidebar()
+  const { leftOpen, rightOpen, leftPanelWidth, shellConfig } = useSidebar()
   const resolvedShellConfig = resolveAppShellConfig(getDefaultAppShellConfig(), shellConfig)
+  const dragRegionWidth =
+    leftOpen && resolvedShellConfig.left?.visible ? `${leftPanelWidth}px` : '0px'
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.10),_transparent_28%),linear-gradient(180deg,#fcfdff_0%,#f5f7fb_100%)]">
-      <div className="app-drag-region absolute inset-x-0 top-0 z-20 h-12" />
+      <div
+        className="app-drag-region absolute left-0 top-0 z-20 h-12"
+        style={{ width: dragRegionWidth }}
+      />
       <ShellSidebarPanel side="left" open={leftOpen} panel={resolvedShellConfig.left} />
       <main className="min-w-0 flex-1 overflow-hidden bg-background/88">
         <Outlet />
