@@ -191,7 +191,7 @@ export function AppSidebar() {
         )}
         aria-hidden={!sidebarVisible}
       >
-        <div className="app-drag-region h-12 shrink-0" />
+        <div className="h-12 shrink-0" />
 
         <WorkspaceSidebarPrimaryNav leftOpen items={primaryItems} />
 
