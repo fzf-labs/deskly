@@ -252,10 +252,6 @@ export function ArtifactPreview({
 
     if (artifact.path) {
       try {
-        console.log(
-          '[ArtifactPreview] Opening file with system app:',
-          artifact.path
-        );
         const response = await fetch(`${API_BASE_URL}/files/open`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -357,11 +353,6 @@ export function ArtifactPreview({
       }
 
       if (editorCommand && window.api?.editor?.openProject) {
-        console.log(
-          '[ArtifactPreview] Opening in editor with command:',
-          editorCommand,
-          artifact.path
-        );
         await window.api.editor.openProject(artifact.path, editorCommand);
         return;
       }

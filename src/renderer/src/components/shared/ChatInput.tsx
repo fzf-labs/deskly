@@ -151,18 +151,8 @@ export function ChatInput({
       const fileArray = Array.from(files);
       const newAttachments: Attachment[] = [];
 
-      console.log(
-        '[ChatInput] addFiles called with',
-        fileArray.length,
-        'files, forceImage:',
-        forceImage
-      );
-
       for (const file of fileArray) {
         const isImage = forceImage || isImageFile(file);
-        console.log(
-          `[ChatInput] Processing file: name=${file.name}, type=${file.type}, size=${file.size}, isImage=${isImage}`
-        );
 
         const attachment: Attachment = {
           id: generateId(),
@@ -173,9 +163,6 @@ export function ChatInput({
         if (isImage) {
           try {
             attachment.preview = await createImagePreview(file);
-            console.log(
-              `[ChatInput] Created preview for ${file.name}, previewLength=${attachment.preview?.length || 0}`
-            );
           } catch (error) {
             console.error('[ChatInput] Failed to create image preview:', error);
             // Keep as image type but with empty preview - it will show file icon
@@ -267,14 +254,6 @@ export function ChatInput({
           mimeType,
         };
       });
-
-    // Debug logging
-    console.log('[ChatInput] Converting attachments:', result.length);
-    result.forEach((a, i) => {
-      console.log(
-        `[ChatInput] Attachment ${i}: type=${a.type}, hasData=${!!a.data}, dataLength=${a.data?.length || 0}, mimeType=${a.mimeType}`
-      );
-    });
 
     return result.length > 0 ? result : undefined;
   };
