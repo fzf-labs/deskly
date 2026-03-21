@@ -63,6 +63,10 @@ export const router = createHashRouter([
         element: <ProjectsPage />,
       },
       {
+        path: 'settings',
+        element: <SettingsPage />,
+      },
+      {
         path: 'home',
         element: <HomePage />,
       },
@@ -77,14 +81,6 @@ export const router = createHashRouter([
     element: (
       <SetupGuard>
         <SetupPage />
-      </SetupGuard>
-    ),
-  },
-  {
-    path: '/settings',
-    element: (
-      <SetupGuard>
-        <SettingsPage />
       </SetupGuard>
     ),
   },

@@ -2,12 +2,8 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
+import { isMacPlatform } from './platform'
 import { useSidebar } from './sidebar-context'
-
-function isMacPlatform() {
-  if (typeof navigator === 'undefined') return false
-  return /Mac|iPhone|iPad|iPod/.test(navigator.platform)
-}
 
 interface AppTitleBarProps {
   showSidebarToggle?: boolean
