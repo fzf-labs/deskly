@@ -52,6 +52,10 @@ function useActiveTaskId() {
 }
 
 export function AppSidebar() {
+  return <WorkspaceSidebarContent />
+}
+
+export function WorkspaceSidebarContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useLanguage()
@@ -182,14 +186,8 @@ export function AppSidebar() {
 
   return (
     <TooltipProvider delayDuration={120}>
-      <aside
-        className={cn(
-          'bg-sidebar/88 border-sidebar-border/75 flex h-full shrink-0 flex-col overflow-hidden border-r backdrop-blur-xl transition-all duration-300 ease-in-out',
-          sidebarVisible
-            ? 'w-[320px] translate-x-0 opacity-100'
-            : 'w-0 -translate-x-3 border-r-0 opacity-0 pointer-events-none'
-        )}
-        aria-hidden={!sidebarVisible}
+      <div
+        className={cn('flex h-full min-h-0 flex-col overflow-hidden', !sidebarVisible && 'hidden')}
       >
         <div className="h-12 shrink-0" />
 
@@ -254,7 +252,7 @@ export function AppSidebar() {
 
           <WorkspaceSidebarUtilityNav leftOpen items={utilityItems} />
         </div>
-      </aside>
+      </div>
 
       <CreateProjectDialog
         open={createProjectOpen}

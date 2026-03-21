@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { useAgent, type MessageAttachment } from '@/hooks/useAgent';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/providers/language-provider';
-import { useSidebar } from '@/components/layout';
+import { useAppShell, useSidebar } from '@/components/layout';
 import { ToolSelectionContext } from '@/components/task';
 
 import { ExecutionPanel } from './components/ExecutionPanel';
@@ -76,22 +76,48 @@ export function TaskDetailContainer() {
     ? detail.handleApproveCliTask
     : detail.handleStartTask;
 
+  const shellConfig = useMemo(
+    () => ({
+      right: {
+        content: (
+          <RightPanelSection
+            isVisible={detail.isPreviewVisible}
+            taskId={taskId ?? null}
+            workingDir={detail.workingDir}
+            branchName={detail.task?.branch_name || null}
+            baseBranch={detail.task?.base_branch || null}
+            selectedArtifact={detail.selectedArtifact}
+            artifacts={detail.artifacts}
+            onSelectArtifact={detail.handleSelectArtifact}
+            workspaceRefreshToken={detail.workspaceRefreshToken}
+            onClosePreview={detail.handleClosePreview}
+          />
+        ),
+        visible: detail.isPreviewVisible,
+        width: 'clamp(360px, 40vw, 920px)',
+        variant: 'detail' as const
+      }
+    }),
+    [
+      detail.artifacts,
+      detail.handleClosePreview,
+      detail.handleSelectArtifact,
+      detail.isPreviewVisible,
+      detail.selectedArtifact,
+      detail.task?.base_branch,
+      detail.task?.branch_name,
+      detail.workingDir,
+      detail.workspaceRefreshToken,
+      taskId
+    ]
+  )
+
+  useAppShell(shellConfig)
+
   return (
     <ToolSelectionContext.Provider value={detail.toolSelectionValue}>
       <div ref={containerRef} className="flex h-full min-w-0 overflow-hidden">
-        <div
-          className={cn(
-            'bg-background flex min-w-0 flex-col overflow-hidden transition-all duration-200',
-            !detail.isPreviewVisible && 'rounded-2xl',
-            detail.isPreviewVisible && 'rounded-l-2xl'
-          )}
-          style={{
-            flex: detail.isPreviewVisible ? '0 0 auto' : '1 1 0%',
-            width: detail.isPreviewVisible ? 'clamp(320px, 40%, 500px)' : undefined,
-            minWidth: '320px',
-            maxWidth: detail.isPreviewVisible ? '500px' : undefined,
-          }}
-        >
+        <div className={cn('bg-background flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl')}>
           <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
             <TaskCard
               t={t}
@@ -157,21 +183,6 @@ export function TaskDetailContainer() {
             />
           </div>
         </div>
-
-        {detail.isPreviewVisible && <div className="bg-border/50 w-px shrink-0" />}
-
-        <RightPanelSection
-          isVisible={detail.isPreviewVisible}
-          taskId={taskId ?? null}
-          workingDir={detail.workingDir}
-          branchName={detail.task?.branch_name || null}
-          baseBranch={detail.task?.base_branch || null}
-          selectedArtifact={detail.selectedArtifact}
-          artifacts={detail.artifacts}
-          onSelectArtifact={detail.handleSelectArtifact}
-          workspaceRefreshToken={detail.workspaceRefreshToken}
-          onClosePreview={detail.handleClosePreview}
-        />
       </div>
 
       <TaskDialogs

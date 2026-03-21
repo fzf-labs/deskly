@@ -17,6 +17,21 @@ import {
 
 import type { SettingsCategory } from './types';
 
+export const settingsCategories: SettingsCategory[] = [
+  'account',
+  'general',
+  'sound',
+  'notification',
+  'editor',
+  'cli',
+  'git',
+  'pipelineTemplates',
+  'mcp',
+  'skills',
+  'data',
+  'about',
+];
+
 // Category icons mapping
 export const categoryIcons: Record<
   SettingsCategory,
