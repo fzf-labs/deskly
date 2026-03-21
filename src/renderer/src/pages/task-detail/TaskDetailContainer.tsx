@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAgent, type MessageAttachment } from '@/hooks/useAgent';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/providers/language-provider';
-import { AppSidebar, useSidebar } from '@/components/layout';
+import { useSidebar } from '@/components/layout';
 import { ToolSelectionContext } from '@/components/task';
 
 import { ExecutionPanel } from './components/ExecutionPanel';
@@ -78,107 +78,100 @@ export function TaskDetailContainer() {
 
   return (
     <ToolSelectionContext.Provider value={detail.toolSelectionValue}>
-      <div className="bg-sidebar flex h-screen overflow-hidden">
-        <AppSidebar />
-
+      <div ref={containerRef} className="flex h-full min-w-0 overflow-hidden">
         <div
-          ref={containerRef}
-          className="bg-background my-2 mr-2 flex min-w-0 flex-1 overflow-hidden rounded-2xl shadow-sm"
+          className={cn(
+            'bg-background flex min-w-0 flex-col overflow-hidden transition-all duration-200',
+            !detail.isPreviewVisible && 'rounded-2xl',
+            detail.isPreviewVisible && 'rounded-l-2xl'
+          )}
+          style={{
+            flex: detail.isPreviewVisible ? '0 0 auto' : '1 1 0%',
+            width: detail.isPreviewVisible ? 'clamp(320px, 40%, 500px)' : undefined,
+            minWidth: '320px',
+            maxWidth: detail.isPreviewVisible ? '500px' : undefined,
+          }}
         >
-          <div
-            className={cn(
-              'bg-background flex min-w-0 flex-col overflow-hidden transition-all duration-200',
-              !detail.isPreviewVisible && 'rounded-2xl',
-              detail.isPreviewVisible && 'rounded-l-2xl'
+          <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+            <TaskCard
+              t={t}
+              title={detail.displayTitle || `Task ${taskId}`}
+              metaRows={detail.visibleMetaRows}
+              showActionButton={detail.showActionButton}
+              actionDisabled={detail.actionDisabled}
+              actionLabel={detail.actionLabel}
+              onAction={handleAction}
+              onToggleSidebar={toggleLeft}
+              onEdit={detail.handleOpenEdit}
+              onDelete={() => detail.setIsDeleteOpen(true)}
+              canEdit={detail.task?.status === 'todo'}
+            />
+
+            {detail.showWorkflowCard && (
+              <WorkflowCard
+                t={t}
+                nodes={detail.workflowNodesForDisplay}
+                templateNodeMap={detail.workflowTemplateNodeMap}
+                currentTaskNode={detail.currentTaskNode}
+                selectedNodeId={detail.selectedWorkflowNodeId}
+                onSelectNode={detail.handleSelectWorkflowNode}
+                onApproveCurrent={detail.handleApproveTaskNode}
+              />
             )}
-            style={{
-              flex: detail.isPreviewVisible ? '0 0 auto' : '1 1 0%',
-              width: detail.isPreviewVisible ? 'clamp(320px, 40%, 500px)' : undefined,
-              minWidth: '320px',
-              maxWidth: detail.isPreviewVisible ? '500px' : undefined,
-            }}
-          >
-            <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
-              <TaskCard
-                t={t}
-                title={detail.displayTitle || `Task ${taskId}`}
-                metaRows={detail.visibleMetaRows}
-                showActionButton={detail.showActionButton}
-                actionDisabled={detail.actionDisabled}
-                actionLabel={detail.actionLabel}
-                onAction={handleAction}
-                onToggleSidebar={toggleLeft}
-                onEdit={detail.handleOpenEdit}
-                onDelete={() => detail.setIsDeleteOpen(true)}
-                canEdit={detail.task?.status === 'todo'}
-              />
 
-              {detail.showWorkflowCard && (
-                <WorkflowCard
-                  t={t}
-                  nodes={detail.workflowNodesForDisplay}
-                  templateNodeMap={detail.workflowTemplateNodeMap}
-                  currentTaskNode={detail.currentTaskNode}
-                  selectedNodeId={detail.selectedWorkflowNodeId}
-                  onSelectNode={detail.handleSelectWorkflowNode}
-                  onApproveCurrent={detail.handleApproveTaskNode}
-                />
-              )}
+            <ExecutionPanel
+              t={t}
+              isLoading={detail.isLoading}
+              pipelineBanner={detail.pipelineBanner}
+              useCliSession={detail.useCliSessionPanel}
+              cliStatusInfo={detail.cliStatusInfo}
+              cliToolLabel={detail.cliToolLabel}
+              messages={messages}
+              phase={phase}
+              onApprovePlan={approvePlan}
+              onRejectPlan={rejectPlan}
+              isRunning={isRunning}
+              taskId={taskId ?? null}
+              taskNodeId={detail.executionTaskNodeId}
+              logTaskNodeId={detail.executionLogTaskNodeId}
+              logSource={detail.executionLogSource}
+              logToolId={detail.executionLogToolId}
+              sessionId={detail.executionSessionId}
+              toolId={detail.executionCliToolId}
+              configId={detail.agentToolConfigId}
+              workingDir={detail.workingDir}
+              prompt={detail.taskPrompt}
+              cliSessionRef={detail.cliSessionRef}
+              onCliStatusChange={detail.handleCliStatusChange}
+              messagesContainerRef={detail.messagesContainerRef}
+              messagesEndRef={detail.messagesEndRef}
+            />
 
-              <ExecutionPanel
-                t={t}
-                isLoading={detail.isLoading}
-                pipelineBanner={detail.pipelineBanner}
-                useCliSession={detail.useCliSessionPanel}
-                cliStatusInfo={detail.cliStatusInfo}
-                cliToolLabel={detail.cliToolLabel}
-                messages={messages}
-                phase={phase}
-                onApprovePlan={approvePlan}
-                onRejectPlan={rejectPlan}
-                isRunning={isRunning}
-                taskId={taskId ?? null}
-                taskNodeId={detail.executionTaskNodeId}
-                logTaskNodeId={detail.executionLogTaskNodeId}
-                logSource={detail.executionLogSource}
-                logToolId={detail.executionLogToolId}
-                sessionId={detail.executionSessionId}
-                toolId={detail.executionCliToolId}
-                configId={detail.agentToolConfigId}
-                workingDir={detail.workingDir}
-                prompt={detail.taskPrompt}
-                cliSessionRef={detail.cliSessionRef}
-                onCliStatusChange={detail.handleCliStatusChange}
-                messagesContainerRef={detail.messagesContainerRef}
-                messagesEndRef={detail.messagesEndRef}
-              />
-
-              <ReplyCard
-                t={t}
-                isRunning={detail.replyIsRunning}
-                disabled={detail.replyDisabled}
-                placeholder={detail.replyPlaceholder}
-                onStop={detail.handleStopExecution}
-                onSubmit={detail.handleReply}
-              />
-            </div>
+            <ReplyCard
+              t={t}
+              isRunning={detail.replyIsRunning}
+              disabled={detail.replyDisabled}
+              placeholder={detail.replyPlaceholder}
+              onStop={detail.handleStopExecution}
+              onSubmit={detail.handleReply}
+            />
           </div>
-
-          {detail.isPreviewVisible && <div className="bg-border/50 w-px shrink-0" />}
-
-          <RightPanelSection
-            isVisible={detail.isPreviewVisible}
-            taskId={taskId ?? null}
-            workingDir={detail.workingDir}
-            branchName={detail.task?.branch_name || null}
-            baseBranch={detail.task?.base_branch || null}
-            selectedArtifact={detail.selectedArtifact}
-            artifacts={detail.artifacts}
-            onSelectArtifact={detail.handleSelectArtifact}
-            workspaceRefreshToken={detail.workspaceRefreshToken}
-            onClosePreview={detail.handleClosePreview}
-          />
         </div>
+
+        {detail.isPreviewVisible && <div className="bg-border/50 w-px shrink-0" />}
+
+        <RightPanelSection
+          isVisible={detail.isPreviewVisible}
+          taskId={taskId ?? null}
+          workingDir={detail.workingDir}
+          branchName={detail.task?.branch_name || null}
+          baseBranch={detail.task?.base_branch || null}
+          selectedArtifact={detail.selectedArtifact}
+          artifacts={detail.artifacts}
+          onSelectArtifact={detail.handleSelectArtifact}
+          workspaceRefreshToken={detail.workspaceRefreshToken}
+          onClosePreview={detail.handleClosePreview}
+        />
       </div>
 
       <TaskDialogs

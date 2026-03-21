@@ -344,7 +344,7 @@ export function ChatInput({
       className={cn(
         'w-full',
         isHome
-          ? 'border-border/50 bg-background rounded-2xl border p-4 shadow-lg'
+          ? 'border-border/60 bg-background/96 rounded-[28px] border p-4 shadow-[0_24px_60px_rgba(15,23,42,0.10)] backdrop-blur'
           : 'border-border/60 bg-background rounded-xl border p-3 shadow-sm',
         isTaskCreateLayout && 'flex min-h-[300px] flex-col',
         className

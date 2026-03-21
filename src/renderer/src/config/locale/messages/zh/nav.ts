@@ -1,4 +1,5 @@
 export default {
+  projects: '项目',
   dashboard: '仪表盘',
   tasks: '任务',
   automations: '自动化',
@@ -7,8 +8,10 @@ export default {
   skills: 'Skill',
   mcp: 'MCP',
   newTask: '新建任务',
+  newThread: '新对话',
   allTasks: '所有任务',
   noTasksYet: '暂无任务',
+  startConversation: '开始一个对话',
   settings: '设置',
   logOut: '退出登录',
 };

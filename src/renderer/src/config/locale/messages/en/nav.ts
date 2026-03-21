@@ -1,4 +1,5 @@
 export default {
+  projects: 'Projects',
   dashboard: 'Dashboard',
   tasks: 'Tasks',
   automations: 'Automations',
@@ -7,8 +8,10 @@ export default {
   skills: 'Skills',
   mcp: 'MCP',
   newTask: 'New task',
+  newThread: 'New thread',
   allTasks: 'All tasks',
   noTasksYet: 'No tasks yet',
+  startConversation: 'Start a conversation',
   settings: 'Settings',
   logOut: 'Log out',
 };

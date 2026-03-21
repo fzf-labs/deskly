@@ -14,12 +14,13 @@ import { db, type AgentToolConfig } from '@/data'
 import { getSettings } from '@/data/settings'
 import { useProjects } from '@/hooks/useProjects'
 import { normalizeCliTools } from '@/lib/cli-tools'
+import { useLanguage } from '@/providers/language-provider'
 
 export function TasksPage() {
   const navigate = useNavigate()
   const { currentProject } = useProjects()
+  const { t } = useLanguage()
 
-  const [taskTitle, setTaskTitle] = useState('')
   const [cliTools, setCliTools] = useState<TaskMenuCliToolInfo[]>([])
   const [selectedCliToolId, setSelectedCliToolId] = useState('')
   const [cliConfigs, setCliConfigs] = useState<AgentToolConfig[]>([])
@@ -189,8 +190,6 @@ export function TasksPage() {
 
   const handleSubmit = useCallback(
     async (text: string, attachments?: MessageAttachment[]) => {
-      const trimmedTitle = taskTitle.trim()
-      if (!trimmedTitle) return
       if (!text.trim() && (!attachments || attachments.length === 0)) return
 
       const settings = getSettings()
@@ -208,12 +207,19 @@ export function TasksPage() {
       }
 
       const prompt = text.trim()
+      const title =
+        prompt
+          .split('\n')
+          .map((line) => line.trim())
+          .find(Boolean)
+          ?.slice(0, 80) || 'New thread'
+
       try {
         const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'VW-'
         const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
 
         const result = await window.api.task.create({
-          title: trimmedTitle,
+          title,
           prompt,
           taskMode,
           projectId: currentProject?.id,
@@ -228,7 +234,6 @@ export function TasksPage() {
         })
 
         if (result.success && result.data) {
-          setTaskTitle('')
           navigate(`/task/${result.data.id}`, { state: { prompt, attachments } })
         }
       } catch (error) {
@@ -246,52 +251,61 @@ export function TasksPage() {
       selectedCliToolId,
       selectedTemplateId,
       taskMode,
-      taskTitle,
     ]
   )
 
   return (
-    <div className="flex h-full flex-col overflow-auto px-6 py-8">
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center">
-        <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <div className="bg-muted flex size-11 items-center justify-center rounded-full">
-            <Sparkles className="size-5" />
-          </div>
-          <h1 className="text-foreground text-4xl font-semibold tracking-tight">我能为你做什么？</h1>
-        </div>
+    <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#f8fafc_0%,#ffffff_48%,#f8fafc_100%)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[linear-gradient(180deg,rgba(148,163,184,0.12),rgba(255,255,255,0))]" />
 
-        <div className="w-full max-w-3xl">
-          <ChatInput
-            variant="home"
-            titleValue={taskTitle}
-            onTitleChange={setTaskTitle}
-            titlePlaceholder="标题"
-            requireTitle
-            placeholder="提示词"
-            onSubmit={handleSubmit}
-            className="w-full"
-            autoFocus
-            operationBar={
-              <TaskCreateMenu
-                taskMode={taskMode}
-                onTaskModeChange={setTaskMode}
-                canUseWorkflowMode={Boolean(currentProject?.id)}
-                cliTools={cliTools}
-                selectedCliToolId={selectedCliToolId}
-                onSelectCliToolId={setSelectedCliToolId}
-                cliConfigs={cliConfigs}
-                selectedCliConfigId={selectedCliConfigId}
-                onSelectCliConfigId={setSelectedCliConfigId}
-                workflowTemplates={workflowTemplates}
-                selectedTemplateId={selectedTemplateId}
-                onSelectTemplateId={setSelectedTemplateId}
-                isGitProject={Boolean(isGitProject)}
-                branches={branches}
-                selectedBaseBranch={selectedBaseBranch}
-                onSelectBaseBranch={setSelectedBaseBranch}
-              />
-            }
-          />
+      <div className="relative flex flex-1 flex-col overflow-auto px-6 py-10">
+        <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center">
+          <div className="mb-10 flex flex-col items-center gap-4 text-center">
+            <div className="flex size-14 items-center justify-center rounded-full border border-white/80 bg-white/85 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
+              <Sparkles className="size-6" />
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-foreground text-4xl font-semibold tracking-tight md:text-5xl">
+                {t.home.welcomeTitle}
+              </h1>
+              <p className="text-muted-foreground text-xl font-medium">
+                {currentProject?.name || 'Deskly'}
+              </p>
+            </div>
+            <p className="text-muted-foreground max-w-xl text-sm leading-6">
+              {t.home.welcomeSubtitle}
+            </p>
+          </div>
+
+          <div className="w-full max-w-3xl">
+            <ChatInput
+              variant="home"
+              placeholder={t.home.inputPlaceholder}
+              onSubmit={handleSubmit}
+              className="w-full"
+              autoFocus
+              operationBar={
+                <TaskCreateMenu
+                  taskMode={taskMode}
+                  onTaskModeChange={setTaskMode}
+                  canUseWorkflowMode={Boolean(currentProject?.id)}
+                  cliTools={cliTools}
+                  selectedCliToolId={selectedCliToolId}
+                  onSelectCliToolId={setSelectedCliToolId}
+                  cliConfigs={cliConfigs}
+                  selectedCliConfigId={selectedCliConfigId}
+                  onSelectCliConfigId={setSelectedCliConfigId}
+                  workflowTemplates={workflowTemplates}
+                  selectedTemplateId={selectedTemplateId}
+                  onSelectTemplateId={setSelectedTemplateId}
+                  isGitProject={Boolean(isGitProject)}
+                  branches={branches}
+                  selectedBaseBranch={selectedBaseBranch}
+                  onSelectBaseBranch={setSelectedBaseBranch}
+                />
+              }
+            />
+          </div>
         </div>
       </div>
     </div>

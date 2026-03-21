@@ -27,7 +27,7 @@ export const router = createHashRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/dashboard" replace />,
+        element: <Navigate to="/tasks" replace />,
       },
       {
         path: 'dashboard',
@@ -65,15 +65,11 @@ export const router = createHashRouter([
         path: 'home',
         element: <HomePage />,
       },
+      {
+        path: 'task/:taskId',
+        element: <TaskDetailPage />,
+      },
     ],
-  },
-  {
-    path: '/task/:taskId',
-    element: (
-      <SetupGuard>
-        <TaskDetailPage />
-      </SetupGuard>
-    ),
   },
   {
     path: '/setup',
