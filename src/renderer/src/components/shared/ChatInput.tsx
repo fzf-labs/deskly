@@ -385,7 +385,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={() => removeAttachment(attachment.id)}
-                className="bg-foreground text-background absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
+                className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -504,7 +504,7 @@ export function ChatInput({
               className={cn(
                 'flex items-center justify-center rounded-full transition-all',
                 canSubmit
-                  ? 'bg-foreground text-background hover:bg-foreground/90 cursor-pointer'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer'
                   : 'bg-muted text-muted-foreground cursor-not-allowed',
                 isHome ? 'size-8' : 'size-7'
               )}

@@ -370,10 +370,10 @@ export function VirtualComputer({
 
         {/* Status bar */}
         <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50/50 px-4 py-2">
-          <Terminal className="size-4 text-gray-400" />
-          <span className="text-sm text-gray-500">
+          <Terminal className="text-muted-foreground size-4" />
+          <span className="text-muted-foreground text-sm">
             Agent is using{' '}
-            <span className="font-medium text-gray-700">Computer</span>
+            <span className="text-foreground font-medium">Computer</span>
           </span>
         </div>
 
@@ -381,12 +381,12 @@ export function VirtualComputer({
         <div className="flex flex-1 flex-col items-center justify-center bg-gray-50 p-8">
           <div className="flex flex-col items-center">
             <div className="mb-4 flex size-16 items-center justify-center rounded-xl border border-gray-200 bg-white">
-              <Monitor className="size-8 text-gray-300" />
+              <Monitor className="text-muted-foreground size-8" />
             </div>
-            <h3 className="text-sm font-medium text-gray-600">
+            <h3 className="text-muted-foreground text-sm font-medium">
               {isRunning ? 'Agent is starting...' : 'Ready to work'}
             </h3>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="text-muted-foreground mt-1 text-xs">
               Tool outputs will appear here
             </p>
             {isRunning && (
@@ -428,15 +428,15 @@ export function VirtualComputer({
 
       {/* Status bar */}
       <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50/50 px-4 py-2">
-        <IconComponent className="size-4 text-gray-400" />
-        <span className="text-sm text-gray-500">
+        <IconComponent className="text-muted-foreground size-4" />
+        <span className="text-muted-foreground text-sm">
           Agent is using{' '}
-          <span className="font-medium text-gray-700">
+          <span className="text-foreground font-medium">
             {getToolTypeLabel(currentStepData?.toolName || '')}
           </span>
         </span>
-        <span className="text-gray-300">|</span>
-        <span className="flex-1 truncate text-sm text-gray-500">
+        <span className="text-muted-foreground/50">|</span>
+        <span className="text-muted-foreground flex-1 truncate text-sm">
           {getToolActionText(
             currentStepData?.toolName || '',
             currentStepData?.input
@@ -448,7 +448,7 @@ export function VirtualComputer({
       <div className="flex flex-1 flex-col overflow-hidden border-b border-gray-100 bg-gray-50">
         {/* Tab Header */}
         <div className="flex items-center justify-center border-b border-gray-200 bg-white py-2">
-          <span className="text-xs font-medium text-gray-500">
+          <span className="text-muted-foreground text-xs font-medium">
             {currentStepData?.description || 'step_output'}
           </span>
         </div>
@@ -459,7 +459,7 @@ export function VirtualComputer({
             <TerminalContent content={currentStepData.content} />
           ) : (
             <div className="flex h-full flex-col items-center justify-center p-4">
-              <p className="text-sm text-gray-400 italic">
+              <p className="text-muted-foreground text-sm italic">
                 {currentStepData?.description}
               </p>
             </div>
@@ -471,7 +471,7 @@ export function VirtualComputer({
           <div className="flex justify-center border-t border-gray-100 bg-white py-3">
             <button
               onClick={jumpToLive}
-              className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50"
+              className="text-muted-foreground flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50 hover:text-foreground"
             >
               <Play className="size-3.5" />
               Jump to live
@@ -506,16 +506,16 @@ export function VirtualComputer({
 function WindowHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
-      <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
+      <h2 className="text-foreground text-sm font-semibold">{title}</h2>
       <div className="flex items-center gap-1">
-        <button className="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
+        <button className="text-muted-foreground hover:text-foreground rounded p-1.5 transition-colors hover:bg-gray-100">
           <MessageSquare className="size-4" />
         </button>
-        <button className="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
+        <button className="text-muted-foreground hover:text-foreground rounded p-1.5 transition-colors hover:bg-gray-100">
           <Maximize2 className="size-4" />
         </button>
         <div className="mx-1 h-4 w-px bg-gray-200" />
-        <button className="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
+        <button className="text-muted-foreground hover:text-foreground rounded p-1.5 transition-colors hover:bg-gray-100">
           <X className="size-4" />
         </button>
       </div>
@@ -550,8 +550,8 @@ function TimelineControl({
             className={cn(
               'flex size-7 items-center justify-center rounded transition-all',
               currentStep === 0 || totalSteps === 0
-                ? 'cursor-not-allowed text-gray-300'
-                : 'cursor-pointer text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                ? 'text-muted-foreground/40 cursor-not-allowed'
+                : 'text-muted-foreground hover:text-foreground cursor-pointer hover:bg-gray-100'
             )}
           >
             <SkipBack className="size-4" />
@@ -562,8 +562,8 @@ function TimelineControl({
             className={cn(
               'flex size-7 items-center justify-center rounded transition-all',
               currentStep === totalSteps - 1 || totalSteps === 0
-                ? 'cursor-not-allowed text-gray-300'
-                : 'cursor-pointer text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                ? 'text-muted-foreground/40 cursor-not-allowed'
+                : 'text-muted-foreground hover:text-foreground cursor-pointer hover:bg-gray-100'
             )}
           >
             <SkipForward className="size-4" />
@@ -602,7 +602,7 @@ function TimelineControl({
           <span
             className={cn(
               'text-sm',
-              isLive ? 'font-medium text-gray-700' : 'text-gray-400'
+              isLive ? 'text-foreground font-medium' : 'text-muted-foreground'
             )}
           >
             live
@@ -648,23 +648,23 @@ function TaskProgress({
         ) : isRunning ? (
           <Loader2 className="size-5 shrink-0 animate-spin text-blue-500" />
         ) : (
-          <Circle className="size-5 shrink-0 text-gray-300" />
+          <Circle className="text-muted-foreground size-5 shrink-0" />
         )}
 
         {/* Current step description */}
-        <span className="flex-1 truncate text-left text-sm text-gray-700">
+        <span className="text-foreground flex-1 truncate text-left text-sm">
           {currentDescription}
         </span>
 
         {/* Step count and expand icon */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-400 tabular-nums">
+          <span className="text-muted-foreground text-sm tabular-nums">
             {completedSteps} / {totalSteps}
           </span>
           {isExpanded ? (
-            <ChevronDown className="size-4 text-gray-400" />
+            <ChevronDown className="text-muted-foreground size-4" />
           ) : (
-            <ChevronUp className="size-4 text-gray-400" />
+            <ChevronUp className="text-muted-foreground size-4" />
           )}
         </div>
       </button>
@@ -690,14 +690,14 @@ function TaskProgress({
                   ) : isCurrent && isRunning ? (
                     <Loader2 className="size-4 shrink-0 animate-spin text-blue-500" />
                   ) : (
-                    <Circle className="size-4 shrink-0 text-gray-300" />
+                    <Circle className="text-muted-foreground size-4 shrink-0" />
                   )}
                   <span
                     className={cn(
                       'truncate text-sm',
                       isCompleted || isCurrent
-                        ? 'text-gray-700'
-                        : 'text-gray-400'
+                        ? 'text-foreground'
+                        : 'text-muted-foreground'
                     )}
                   >
                     {step.description}
@@ -734,7 +734,7 @@ function TerminalContent({
             }
             // Regular output line
             return (
-              <div key={i} className="text-gray-700">
+              <div key={i} className="text-foreground">
                 {line}
               </div>
             );
@@ -748,7 +748,7 @@ function TerminalContent({
 
     case 'markdown':
       return (
-        <article className="prose prose-sm prose-headings:text-gray-800 prose-p:text-gray-600 prose-strong:text-gray-800 prose-code:text-blue-600 prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded max-w-none p-4">
+        <article className="prose prose-sm prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-code:text-blue-600 prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded max-w-none p-4">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {content.value}
           </ReactMarkdown>
@@ -760,12 +760,12 @@ function TerminalContent({
         <div className="flex h-full flex-col">
           {content.filename && (
             <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2">
-              <FileText className="size-4 text-gray-400" />
-              <span className="text-sm font-medium text-gray-700">
+              <FileText className="text-muted-foreground size-4" />
+              <span className="text-foreground text-sm font-medium">
                 {content.filename}
               </span>
               {content.language && (
-                <span className="ml-auto rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-500">
+                <span className="text-muted-foreground ml-auto rounded bg-gray-200 px-2 py-0.5 text-xs">
                   {content.language}
                 </span>
               )}
@@ -773,7 +773,7 @@ function TerminalContent({
           )}
           <div className="flex-1 overflow-auto p-4">
             <pre className="font-mono text-sm">
-              <code className="text-gray-700">{content.value}</code>
+              <code className="text-foreground">{content.value}</code>
             </pre>
           </div>
         </div>
@@ -783,8 +783,8 @@ function TerminalContent({
       return (
         <div className="flex h-full flex-col">
           <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2">
-            <Code className="size-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">JSON</span>
+            <Code className="text-muted-foreground size-4" />
+            <span className="text-foreground text-sm font-medium">JSON</span>
           </div>
           <div className="flex-1 overflow-auto p-4">
             <pre className="font-mono text-sm">
@@ -798,7 +798,7 @@ function TerminalContent({
     default:
       return (
         <div className="p-4">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-600">
+          <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
             {content.value}
           </p>
         </div>

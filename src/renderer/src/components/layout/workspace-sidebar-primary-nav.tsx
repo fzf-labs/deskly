@@ -35,8 +35,9 @@ export function WorkspaceSidebarPrimaryNav({
                   type="button"
                   onClick={item.onClick}
                   className={cn(
-                    'text-sidebar-foreground/72 hover:bg-sidebar-accent/75 hover:text-sidebar-foreground flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[15px] font-medium transition-colors',
-                    item.isActive && 'bg-sidebar-accent/80 text-sidebar-foreground',
+                    'text-sidebar-foreground/88 hover:bg-sidebar-accent/75 hover:text-sidebar-foreground flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-[15px] font-medium transition-colors',
+                    item.isActive &&
+                      'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs',
                     !leftOpen && 'justify-center px-0'
                   )}
                 >

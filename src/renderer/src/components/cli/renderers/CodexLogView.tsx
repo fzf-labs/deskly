@@ -30,7 +30,7 @@ function renderLogIcon(type: NormalizedEntryType): React.ReactNode {
   }
   if (type === 'error') return <AlertCircle className="size-4 text-red-600" />
   if (type === 'tool_result') return <Terminal className="size-4 text-amber-600" />
-  return <MessageSquare className="size-4 text-slate-500" />
+  return <MessageSquare className="text-muted-foreground size-4" />
 }
 
 function logRowTone(type: NormalizedEntryType): string {

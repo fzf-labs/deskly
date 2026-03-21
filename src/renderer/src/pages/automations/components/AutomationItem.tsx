@@ -56,7 +56,7 @@ export function AutomationItem({
                 已启用
               </span>
             ) : (
-              <span className="rounded bg-zinc-500/10 px-1.5 py-0.5 text-[11px] text-zinc-600">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
                 已停用
               </span>
             )}
@@ -102,4 +102,3 @@ export function AutomationItem({
     </div>
   );
 }
-

@@ -17,7 +17,7 @@ const statusClassName: Record<AutomationRun['status'], string> = {
   running: 'bg-blue-500/10 text-blue-600',
   success: 'bg-emerald-500/10 text-emerald-600',
   failed: 'bg-red-500/10 text-red-600',
-  skipped: 'bg-zinc-500/10 text-zinc-600',
+  skipped: 'bg-muted text-muted-foreground',
 };
 
 const formatTime = (value: string | null): string => {
@@ -79,4 +79,3 @@ export function AutomationRunList({ runs, loading = false, onOpenTask }: Automat
     </div>
   );
 }
-

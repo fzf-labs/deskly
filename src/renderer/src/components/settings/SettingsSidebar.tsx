@@ -44,9 +44,9 @@ export function SettingsSidebar({
               type="button"
               onClick={() => onSelectCategory(id)}
               className={cn(
-                'flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm transition-colors',
+                'flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left text-sm transition-colors',
                 activeCategory === id
-                  ? 'bg-sidebar-accent/80 text-sidebar-accent-foreground font-medium'
+                  ? 'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground font-medium shadow-xs'
                   : 'text-sidebar-foreground/72 hover:bg-sidebar-accent/72 hover:text-sidebar-foreground'
               )}
             >
@@ -62,7 +62,7 @@ export function SettingsSidebar({
           <button
             type="button"
             onClick={onBack}
-            className="text-sidebar-foreground/72 hover:bg-sidebar-accent/72 hover:text-sidebar-foreground flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm transition-colors"
+            className="text-sidebar-foreground/72 hover:bg-sidebar-accent/72 hover:text-sidebar-foreground flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left text-sm transition-colors"
           >
             <ArrowLeft className="size-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate">{t.settings.back}</span>

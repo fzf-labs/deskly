@@ -59,7 +59,7 @@ function TaskNodeStatusBadge({ node, isCurrent }: TaskNodeStatusBadgeProps) {
     todo: {
       icon: Circle,
       bg: 'bg-gray-100 dark:bg-gray-800',
-      text: 'text-gray-500',
+      text: 'text-muted-foreground',
       ring: '',
     },
     in_progress: {

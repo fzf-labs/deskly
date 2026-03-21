@@ -19,7 +19,7 @@ const statusCards: Array<{
     id: 'todo',
     label: '待办',
     icon: Clock,
-    tone: 'text-zinc-500',
+    tone: 'text-muted-foreground',
     iconBg: 'bg-zinc-100'
   },
   {

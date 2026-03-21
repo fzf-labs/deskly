@@ -505,7 +505,7 @@ export function McpPage() {
             </div>
 
             <div className="border-border shrink-0 border-t px-6 py-4">
-              <DialogPrimitive.Close className="bg-foreground text-background hover:bg-foreground/90 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors">
+              <DialogPrimitive.Close className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors">
                 {t.common.close || 'Close'}
               </DialogPrimitive.Close>
             </div>

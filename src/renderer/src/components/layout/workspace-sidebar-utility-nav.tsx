@@ -39,12 +39,12 @@ export function WorkspaceSidebarUtilityNav({
                   onClick={item.onClick}
                   className={cn(
                     variant === 'standalone'
-                      ? 'text-sidebar-foreground/62 hover:bg-sidebar-accent/72 hover:text-sidebar-foreground flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-colors'
-                      : 'text-sidebar-foreground/52 hover:bg-sidebar-accent/72 hover:text-sidebar-foreground flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm transition-colors',
+                      ? 'text-sidebar-foreground/82 hover:bg-sidebar-accent/72 hover:text-sidebar-foreground flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors'
+                      : 'text-sidebar-foreground/78 hover:bg-sidebar-accent/72 hover:text-sidebar-foreground flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors',
                     item.isActive &&
                       (variant === 'standalone'
-                        ? 'bg-sidebar-accent/75 text-sidebar-accent-foreground'
-                        : 'bg-sidebar-accent/75 text-sidebar-accent-foreground'),
+                        ? 'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'
+                        : 'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'),
                     !leftOpen && 'w-auto justify-center px-0'
                   )}
                 >

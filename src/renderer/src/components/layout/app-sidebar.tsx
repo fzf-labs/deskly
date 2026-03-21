@@ -206,14 +206,14 @@ export function WorkspaceSidebarContent() {
           </div>
 
           <div className={cn('flex items-center justify-between', APP_SHELL_SIDEBAR_SECTION_HEADER_CLASS)}>
-            <div className="text-sidebar-foreground/48 text-[13px] font-medium tracking-wide">
+            <div className="text-sidebar-foreground/66 text-[13px] font-medium tracking-wide">
               {t.nav.threads}
             </div>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setCreateProjectOpen(true)}
-                className="text-sidebar-foreground/48 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-7 items-center justify-center rounded-lg transition-colors"
+                className="text-sidebar-foreground/66 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-7 items-center justify-center rounded-lg transition-colors"
                 aria-label={t.nav.addProject}
                 title={t.nav.addProject}
               >
@@ -223,7 +223,7 @@ export function WorkspaceSidebarContent() {
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="text-sidebar-foreground/48 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-7 items-center justify-center rounded-lg transition-colors"
+                    className="text-sidebar-foreground/66 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-7 items-center justify-center rounded-lg transition-colors"
                     aria-label={t.nav.sortThreads}
                     title={t.nav.sortThreads}
                   >

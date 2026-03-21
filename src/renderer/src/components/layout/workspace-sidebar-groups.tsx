@@ -33,7 +33,7 @@ export function WorkspaceSidebarGroups({
       {loading ? (
         <div
           className={cn(
-            'text-sidebar-foreground/55 rounded-2xl px-3 py-4 text-sm',
+            'text-sidebar-foreground/72 rounded-2xl px-3 py-4 text-sm',
             !leftOpen && 'px-0 text-center'
           )}
         >
@@ -42,7 +42,7 @@ export function WorkspaceSidebarGroups({
       ) : projectGroups.length === 0 ? (
         <div
           className={cn(
-            'text-sidebar-foreground/55 rounded-2xl px-3 py-4 text-sm',
+            'text-sidebar-foreground/72 rounded-2xl px-3 py-4 text-sm',
             !leftOpen && 'px-0 text-center'
           )}
         >

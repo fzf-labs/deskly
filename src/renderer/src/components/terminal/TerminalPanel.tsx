@@ -153,7 +153,7 @@ export function TerminalPanel({ taskId, workingDir, isActive, openRequestId }: T
                   className={cn(
                     'group flex items-center overflow-hidden rounded-md border',
                     isTerminalActive
-                      ? 'border-border bg-foreground text-background'
+                      ? 'border-primary/20 bg-primary text-primary-foreground'
                       : 'border-border/50 bg-muted/20 text-foreground'
                   )}
                 >
@@ -162,7 +162,7 @@ export function TerminalPanel({ taskId, workingDir, isActive, openRequestId }: T
                     onClick={() => setActiveTerminalId(terminal.id)}
                     className={cn(
                       'flex h-7 items-center gap-2 px-2 text-xs',
-                      isTerminalActive ? 'text-background' : 'text-foreground'
+                      isTerminalActive ? 'text-primary-foreground' : 'text-foreground'
                     )}
                   >
                     <span className="max-w-[140px] truncate">{terminal.name}</span>
@@ -176,7 +176,7 @@ export function TerminalPanel({ taskId, workingDir, isActive, openRequestId }: T
                     className={cn(
                       'flex h-7 w-7 items-center justify-center transition-opacity',
                       isTerminalActive
-                        ? 'text-background/70 hover:text-background opacity-100'
+                        ? 'text-primary-foreground/70 hover:text-primary-foreground opacity-100'
                         : 'text-foreground/70 hover:text-foreground opacity-0 group-hover:opacity-100'
                     )}
                     aria-label="Close terminal"

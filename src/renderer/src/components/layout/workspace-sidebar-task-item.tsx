@@ -58,8 +58,9 @@ export function WorkspaceSidebarTaskItem({
       onClick={() => onClick(task.id, task.projectId)}
       aria-label={`${formatTaskLabel(task.title, task.prompt)} · ${statusInfo.label}`}
       className={cn(
-        'hover:bg-sidebar-accent/80 flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors',
-        isActive && 'bg-background/92 text-foreground shadow-sm'
+        'hover:bg-sidebar-accent/80 flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-left transition-colors',
+        isActive &&
+          'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'
       )}
     >
       <div
@@ -72,13 +73,18 @@ export function WorkspaceSidebarTaskItem({
         <span
           className={cn(
             'truncate text-[13px] font-medium',
-            isActive ? 'text-foreground' : 'text-sidebar-foreground'
+            isActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground'
           )}
         >
           {formatTaskLabel(task.title, task.prompt)}
         </span>
       </div>
-      <div className="text-sidebar-foreground/44 shrink-0 text-[11px] font-medium tabular-nums">
+      <div
+        className={cn(
+          'text-sidebar-foreground/64 shrink-0 text-[11px] font-medium tabular-nums',
+          isActive && 'text-sidebar-foreground/78'
+        )}
+      >
         {formatTaskMeta(task.updatedAt)}
       </div>
     </button>

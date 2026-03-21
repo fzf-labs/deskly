@@ -17,7 +17,7 @@ const statusLabels: Record<TaskStatus, string> = {
 }
 
 const statusStyles: Record<TaskStatus, string> = {
-  todo: 'bg-zinc-100 text-zinc-700',
+  todo: 'bg-muted text-muted-foreground',
   in_progress: 'bg-blue-100 text-blue-700',
   in_review: 'bg-amber-100 text-amber-700',
   done: 'bg-green-100 text-green-700'

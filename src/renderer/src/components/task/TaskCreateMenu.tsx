@@ -99,7 +99,7 @@ export function TaskCreateMenu({
           onClick={() => onTaskModeChange('conversation')}
           className={
             taskMode === 'conversation'
-              ? 'bg-foreground text-background px-3 py-1.5 text-xs shadow-sm'
+              ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-sm'
               : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs'
           }
         >
@@ -111,7 +111,7 @@ export function TaskCreateMenu({
           disabled={!canUseWorkflowMode}
           className={
             taskMode === 'workflow'
-              ? 'bg-foreground text-background px-3 py-1.5 text-xs shadow-sm disabled:opacity-50'
+              ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-sm disabled:opacity-50'
               : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50'
           }
         >

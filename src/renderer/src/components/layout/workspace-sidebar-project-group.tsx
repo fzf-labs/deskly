@@ -44,8 +44,9 @@ export function WorkspaceSidebarProjectGroup({
             type="button"
             onClick={() => onSelectProject(group.kind === 'project' ? group.id : null)}
             className={cn(
-              'text-sidebar-foreground/62 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-10 items-center justify-center rounded-2xl transition-colors',
-              isCurrentGroup && 'bg-sidebar-accent/85 text-sidebar-foreground'
+              'text-sidebar-foreground/84 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-10 items-center justify-center rounded-sm transition-colors',
+              isCurrentGroup &&
+                'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'
             )}
           >
             <Icon className="size-4" />
@@ -65,12 +66,18 @@ export function WorkspaceSidebarProjectGroup({
           type="button"
           onClick={handleToggleProjectGroup}
           className={cn(
-            'text-sidebar-foreground/78 hover:bg-sidebar-accent/78 hover:text-sidebar-foreground flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-2.5 py-2 text-left transition-colors',
-            isCurrentGroup && 'bg-sidebar-accent/72 text-sidebar-foreground'
+            'text-sidebar-foreground/88 hover:bg-sidebar-accent/78 hover:text-sidebar-foreground flex min-w-0 flex-1 items-center gap-2.5 rounded-sm px-2.5 py-2 text-left transition-colors',
+            isCurrentGroup &&
+              'border border-sidebar-border/80 bg-sidebar-accent text-sidebar-foreground shadow-xs'
           )}
           aria-expanded={isExpanded}
         >
-          <Icon className="text-sidebar-foreground/55 size-4 shrink-0" />
+          <Icon
+            className={cn(
+              'text-sidebar-foreground/72 size-4 shrink-0',
+              isCurrentGroup && 'text-sidebar-foreground'
+            )}
+          />
           <div className="min-w-0 flex-1 truncate text-[13px] font-medium">{group.name}</div>
           <ChevronDown className={cn('size-3.5 transition-transform', !isExpanded && '-rotate-90')} />
         </button>
@@ -82,7 +89,7 @@ export function WorkspaceSidebarProjectGroup({
             <button
               type="button"
               onClick={() => onSelectProject(group.kind === 'project' ? group.id : null)}
-              className="text-sidebar-foreground/40 hover:text-sidebar-foreground flex w-full items-center rounded-xl px-2 py-2 text-xs transition-colors"
+              className="text-sidebar-foreground/68 hover:text-sidebar-foreground flex w-full items-center rounded-sm px-2 py-2 text-xs transition-colors"
             >
               {startConversationLabel}
             </button>

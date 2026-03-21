@@ -1262,7 +1262,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="bg-foreground text-background hover:bg-foreground/90 flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
+                          className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
                         >
                           <Plus className="size-4" />
                           {t.common.add}
@@ -1461,7 +1461,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
                 <button
                   onClick={handleExportToCli}
                   disabled={selectedCliTargets.length === 0 || exporting}
-                  className="bg-foreground text-background hover:bg-foreground/90 mt-4 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 mt-4 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {exporting ? t.settings.mcpExporting : t.settings.mcpExportApply}
                 </button>
@@ -1500,7 +1500,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
             <button
               onClick={handleImportJson}
               disabled={!importJson.trim()}
-              className="bg-foreground text-background hover:bg-foreground/90 mt-4 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 mt-4 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t.settings.mcpImportButton}
             </button>
@@ -1796,14 +1796,14 @@ export function MCPSettings({ settings }: SettingsTabProps) {
             {/* Footer */}
             <div className="border-border shrink-0 border-t px-6 py-4">
               {isViewMode ? (
-                <DialogPrimitive.Close className="bg-foreground text-background hover:bg-foreground/90 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors">
+                <DialogPrimitive.Close className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors">
                   {t.common.close || 'Close'}
                 </DialogPrimitive.Close>
               ) : (
                 <button
                   onClick={handleSaveConfigDialog}
                   disabled={!configDialog.serverName}
-                  className="bg-foreground text-background hover:bg-foreground/90 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t.settings.mcpSave}
                 </button>

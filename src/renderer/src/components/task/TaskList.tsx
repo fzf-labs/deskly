@@ -29,7 +29,7 @@ const statusIcons = {
 }
 
 const statusColors = {
-  todo: 'text-zinc-400',
+  todo: 'text-muted-foreground',
   in_progress: 'text-blue-500',
   in_review: 'text-amber-500',
   done: 'text-green-500'
@@ -95,7 +95,7 @@ export function TaskList({ projectId, onTaskSelect, className }: TaskListProps) 
       {tasks.map((task) => {
         const normalizedStatus = normalizeTaskStatus(task.status)
         const StatusIcon = statusIcons[normalizedStatus] || Clock
-        const statusColor = statusColors[normalizedStatus] || 'text-zinc-400'
+        const statusColor = statusColors[normalizedStatus] || 'text-muted-foreground'
 
         return (
           <div
