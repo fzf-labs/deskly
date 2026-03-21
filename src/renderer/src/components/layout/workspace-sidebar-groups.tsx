@@ -9,6 +9,7 @@ interface WorkspaceSidebarGroupsProps {
   emptyLabel: string
   startConversationLabel: string
   activeTaskId: string | null
+  activeProjectGroupId: string | null
   projectGroups: WorkspaceProjectGroup[]
   expandedGroups: Record<string, boolean>
   onSelectProject: (projectId: string | null) => void
@@ -22,6 +23,7 @@ export function WorkspaceSidebarGroups({
   emptyLabel,
   startConversationLabel,
   activeTaskId,
+  activeProjectGroupId,
   projectGroups,
   expandedGroups,
   onSelectProject,
@@ -52,8 +54,7 @@ export function WorkspaceSidebarGroups({
         <div className="space-y-1">
           {projectGroups.map((group) => {
             const isExpanded = expandedGroups[group.id] ?? true
-            const isCurrentGroup =
-              group.isCurrent || group.tasks.some((task) => task.id === activeTaskId)
+            const isCurrentGroup = activeProjectGroupId === group.id
             return (
               <WorkspaceSidebarProjectGroup
                 key={group.id}

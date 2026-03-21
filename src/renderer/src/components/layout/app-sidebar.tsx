@@ -67,11 +67,21 @@ export function WorkspaceSidebarContent() {
   const { leftOpen } = useSidebar()
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+  const [selectedProjectGroupId, setSelectedProjectGroupId] = useState<string | null>(null)
   const [sortMode, setSortMode] = useState<WorkspaceSidebarSortMode>(getInitialSidebarSortMode)
   const hasMountedRef = useRef(false)
   const activeTaskId = useActiveTaskId()
-  const { addProject, projectGroups, loading, refresh, setCurrentProjectId } =
+  const { addProject, currentProjectId, projectGroups, loading, refresh, setCurrentProjectId } =
     useWorkspaceSidebar(sortMode)
+  const isWorkspaceRoute =
+    location.pathname.startsWith('/tasks') || location.pathname.startsWith('/home')
+  const isComposerRoute = isWorkspaceRoute && activeTaskId === null
+
+  useEffect(() => {
+    if (isComposerRoute && selectedProjectGroupId === null && currentProjectId !== null) {
+      setCurrentProjectId(null)
+    }
+  }, [currentProjectId, isComposerRoute, selectedProjectGroupId, setCurrentProjectId])
 
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_SORT_MODE_KEY, sortMode)
@@ -97,20 +107,25 @@ export function WorkspaceSidebarContent() {
   }, [location.pathname, refresh])
 
   const handleOpenWorkspace = () => {
+    setSelectedProjectGroupId(null)
+    setCurrentProjectId(null)
     navigate('/tasks')
   }
 
   const handleSelectProject = (projectId: string | null) => {
+    setSelectedProjectGroupId(projectId)
     setCurrentProjectId(projectId)
     navigate('/tasks')
   }
 
   const handleSetCurrentProject = (projectId: string) => {
+    setSelectedProjectGroupId(projectId)
     setCurrentProjectId(projectId)
     navigate('/tasks')
   }
 
   const handleSelectTask = (taskId: string, projectId: string | null) => {
+    setSelectedProjectGroupId(projectId)
     if (projectId) {
       setCurrentProjectId(projectId)
     }
@@ -127,10 +142,7 @@ export function WorkspaceSidebarContent() {
       label: t.nav.newThread,
       icon: PenSquare,
       onClick: handleOpenWorkspace,
-      isActive:
-        location.pathname.startsWith('/tasks') ||
-        location.pathname.startsWith('/task/') ||
-        location.pathname.startsWith('/home')
+      isActive: isComposerRoute && selectedProjectGroupId === null
     }
   ]
 
@@ -250,6 +262,7 @@ export function WorkspaceSidebarContent() {
             emptyLabel={t.nav.noTasksYet}
             startConversationLabel={t.nav.startConversation}
             activeTaskId={activeTaskId}
+            activeProjectGroupId={isComposerRoute ? selectedProjectGroupId : null}
             projectGroups={projectGroups}
             expandedGroups={expandedGroups}
             onSelectProject={handleSelectProject}

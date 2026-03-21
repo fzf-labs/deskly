@@ -167,7 +167,7 @@ export function useWorkspaceSidebar(
         id: UNASSIGNED_GROUP_ID,
         name: 'Unassigned',
         tasks: sortTasks(unassignedTasks, sortMode),
-        isCurrent: currentProjectId === null,
+        isCurrent: false,
         kind: 'unassigned',
       });
     }
