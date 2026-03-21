@@ -2,6 +2,7 @@ import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliAdapter } from './ProcessCliAdapter'
 import { parseJsonLine, successSignal } from './completion'
 import { asBoolean, asString, asStringArray, pushFlag, pushFlagWithValue, pushRepeatableFlag } from './config-utils'
+import { ProcessCommandSpec } from '../ProcessCliSession'
 
 type RecordLike = Record<string, unknown>
 
@@ -36,71 +37,7 @@ export class CodexCliAdapter implements CliAdapter {
     this.adapter = new ProcessCliAdapter(
       {
         id: this.id,
-        buildCommand: (options: CliStartOptions) => {
-          const command = options.executablePath || 'codex'
-          const toolConfig = options.toolConfig ?? {}
-          const model = options.model || asString((toolConfig as Record<string, unknown>).model)
-          const prompt = options.prompt
-          const resumeThreadId = this.getResumeThreadId(options)
-          const hasPrompt = typeof prompt === 'string' && prompt.trim().length > 0
-          const args: string[] = []
-
-          pushRepeatableFlag(args, '-c', (toolConfig as Record<string, unknown>).configOverrides)
-          pushRepeatableFlag(args, '--enable', (toolConfig as Record<string, unknown>).enableFeatures)
-          pushRepeatableFlag(args, '--disable', (toolConfig as Record<string, unknown>).disableFeatures)
-          pushRepeatableFlag(args, '-i', (toolConfig as Record<string, unknown>).imagePaths)
-
-          pushFlagWithValue(args, '--profile', (toolConfig as Record<string, unknown>).profile)
-          pushFlagWithValue(args, '--sandbox', (toolConfig as Record<string, unknown>).sandbox)
-          pushFlagWithValue(args, '--ask-for-approval', (toolConfig as Record<string, unknown>).ask_for_approval)
-          pushFlag(args, '--full-auto', asBoolean((toolConfig as Record<string, unknown>).fullAuto))
-          pushFlag(args, '--dangerously-bypass-approvals-and-sandbox', asBoolean((toolConfig as Record<string, unknown>).dangerouslyBypassApprovalsAndSandbox))
-          pushFlag(args, '--oss', asBoolean((toolConfig as Record<string, unknown>).oss))
-          pushFlagWithValue(args, '--local-provider', (toolConfig as Record<string, unknown>).localProvider)
-          pushFlag(args, '--search', asBoolean((toolConfig as Record<string, unknown>).search))
-          pushRepeatableFlag(args, '--add-dir', (toolConfig as Record<string, unknown>).addDir)
-          pushFlagWithValue(args, '--cd', (toolConfig as Record<string, unknown>).cd)
-          pushFlag(args, '--no-alt-screen', asBoolean((toolConfig as Record<string, unknown>).noAltScreen))
-
-          const additionalArgs = asStringArray((toolConfig as Record<string, unknown>).additional_params)
-          if (additionalArgs) {
-            args.push(...additionalArgs)
-          }
-
-          args.push('exec')
-          if (resumeThreadId) {
-            args.push('resume', '--json')
-          } else {
-            args.push('--json')
-          }
-          if (model) {
-            args.push('-m', model)
-          }
-          if (resumeThreadId) {
-            args.push(resumeThreadId)
-          }
-          if (hasPrompt) {
-            args.push('-')
-          }
-          this.log('buildCommand', {
-            sessionId: options.sessionId,
-            workdir: options.workdir,
-            resumeThreadId: resumeThreadId ?? null,
-            model: model ?? null,
-            hasPrompt,
-            promptLength: typeof prompt === 'string' ? prompt.length : 0,
-            command,
-            args
-          })
-          return {
-            command,
-            args,
-            cwd: options.workdir,
-            env: options.env,
-            initialInput: prompt,
-            closeStdinAfterInput: true
-          }
-        },
+        buildCommand: (options: CliStartOptions) => this.buildCommandSpec(options),
         detectCompletion: detectCodexCompletion
       }
     )
@@ -118,9 +55,82 @@ export class CodexCliAdapter implements CliAdapter {
     return handle
   }
 
+  buildCommandSpec(options: CliStartOptions): ProcessCommandSpec {
+    const command = options.executablePath || 'codex'
+    const toolConfig = options.toolConfig ?? {}
+    const model = options.model || asString((toolConfig as Record<string, unknown>).model)
+    const prompt = options.prompt
+    const resumeThreadId = this.getResumeThreadId(options)
+    const hasPrompt = typeof prompt === 'string' && prompt.trim().length > 0
+    const args: string[] = []
+
+    pushRepeatableFlag(args, '-c', (toolConfig as Record<string, unknown>).config_overrides)
+    pushRepeatableFlag(args, '--enable', (toolConfig as Record<string, unknown>).enable_features)
+    pushRepeatableFlag(args, '--disable', (toolConfig as Record<string, unknown>).disable_features)
+    pushRepeatableFlag(args, '-i', (toolConfig as Record<string, unknown>).image_paths)
+    pushFlagWithValue(args, '--profile', (toolConfig as Record<string, unknown>).profile)
+    pushFlagWithValue(args, '--sandbox', (toolConfig as Record<string, unknown>).sandbox)
+    pushFlagWithValue(args, '--ask-for-approval', (toolConfig as Record<string, unknown>).ask_for_approval)
+    pushFlag(args, '--full-auto', asBoolean((toolConfig as Record<string, unknown>).full_auto))
+    pushFlag(args, '--dangerously-bypass-approvals-and-sandbox', asBoolean((toolConfig as Record<string, unknown>).dangerously_bypass_approvals_and_sandbox))
+    pushFlag(args, '--oss', asBoolean((toolConfig as Record<string, unknown>).oss))
+    pushFlagWithValue(args, '--local-provider', (toolConfig as Record<string, unknown>).local_provider)
+    pushFlag(args, '--search', asBoolean((toolConfig as Record<string, unknown>).search))
+    pushRepeatableFlag(args, '--add-dir', (toolConfig as Record<string, unknown>).add_dir)
+    pushFlagWithValue(args, '--cd', (toolConfig as Record<string, unknown>).cd)
+    pushFlag(args, '--no-alt-screen', asBoolean((toolConfig as Record<string, unknown>).no_alt_screen))
+
+    const additionalArgs = asStringArray((toolConfig as Record<string, unknown>).additional_params)
+    if (additionalArgs) {
+      args.push(...additionalArgs)
+    }
+
+    args.push('exec')
+    if (resumeThreadId) {
+      args.push('resume')
+    }
+    pushFlag(args, '--skip-git-repo-check', asBoolean((toolConfig as Record<string, unknown>).skip_git_repo_check))
+    pushFlag(args, '--ephemeral', asBoolean((toolConfig as Record<string, unknown>).ephemeral))
+    pushFlagWithValue(args, '--output-schema', (toolConfig as Record<string, unknown>).output_schema)
+    pushFlagWithValue(args, '--color', (toolConfig as Record<string, unknown>).color)
+    pushFlag(args, '--progress-cursor', asBoolean((toolConfig as Record<string, unknown>).progress_cursor))
+    args.push('--json')
+    pushFlagWithValue(args, '--output-last-message', (toolConfig as Record<string, unknown>).output_last_message)
+    if (model) {
+      args.push('-m', model)
+    }
+    if (resumeThreadId) {
+      args.push(resumeThreadId)
+    }
+    if (hasPrompt) {
+      args.push('-')
+    }
+
+    this.log('buildCommand', {
+      sessionId: options.sessionId,
+      workdir: options.workdir,
+      resumeThreadId: resumeThreadId ?? null,
+      model: model ?? null,
+      hasPrompt,
+      promptLength: typeof prompt === 'string' ? prompt.length : 0,
+      command,
+      args
+    })
+
+    return {
+      command,
+      args,
+      cwd: options.workdir,
+      env: options.env,
+      initialInput: prompt,
+      closeStdinAfterInput: true
+    }
+  }
+
   private getResumeThreadId(options: CliStartOptions): string | undefined {
     const config = options.toolConfig as RecordLike | undefined
     const configured =
+      this.getString(config?.thread_id) ||
       this.getString(config?.threadId) ||
       this.getString(config?.sessionId) ||
       this.getString(config?.resumeSessionId)

@@ -1,7 +1,8 @@
 import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliAdapter } from './ProcessCliAdapter'
 import { failureSignal, parseJsonLine, successSignal } from './completion'
-import { asBoolean, asStringArray, pushFlag, pushFlagWithValue } from './config-utils'
+import { asBoolean, asStringArray, pushFlag, pushFlagWithValue, pushRepeatableFlag } from './config-utils'
+import { ProcessCommandSpec } from '../ProcessCliSession'
 
 type RecordLike = Record<string, unknown>
 
@@ -51,59 +52,7 @@ export class CursorAgentAdapter implements CliAdapter {
   constructor() {
     this.adapter = new ProcessCliAdapter({
       id: this.id,
-      buildCommand: (options: CliStartOptions) => {
-        const command = options.executablePath || 'cursor-agent'
-        const toolConfig = options.toolConfig ?? {}
-        const resumeId = this.getResumeId(options)
-        const args: string[] = []
-
-        // Keep stable machine-readable output format.
-        args.push('-p')
-        args.push('--output-format=stream-json')
-        if (resumeId) {
-          args.push('--resume', resumeId)
-        }
-
-        pushFlagWithValue(args, '--api-key', (toolConfig as Record<string, unknown>).api_key)
-        pushFlag(args, '--force', asBoolean((toolConfig as Record<string, unknown>).force))
-        pushFlagWithValue(args, '--model', (toolConfig as Record<string, unknown>).model)
-
-        const additionalParams = asStringArray(
-          (toolConfig as Record<string, unknown>).additional_params
-        )
-        if (additionalParams) {
-          args.push(...additionalParams)
-        }
-
-        const env = {
-          ...(options.env ?? {})
-        } as Record<string, string>
-
-        const prompt = options.prompt?.trim()
-        if (prompt) {
-          args.push(prompt)
-        }
-
-        this.log('buildCommand', {
-          sessionId: options.sessionId,
-          workdir: options.workdir,
-          command,
-          args: this.redactArgs(args),
-          resumeId: resumeId ?? null,
-          toolConfigKeys: Object.keys(toolConfig as Record<string, unknown>),
-          envCursorKey: Boolean(env.CURSOR_API_KEY),
-          promptLength: options.prompt ? options.prompt.length : 0
-        })
-
-        return {
-          command,
-          args,
-          cwd: options.workdir,
-          env,
-          initialInput: undefined,
-          closeStdinAfterInput: true
-        }
-      },
+      buildCommand: (options: CliStartOptions) => this.buildCommandSpec(options),
       detectCompletion: (line) => {
         const msg = parseJsonLine(line)
         if (!msg) return null
@@ -129,6 +78,73 @@ export class CursorAgentAdapter implements CliAdapter {
     const handle = await this.adapter.startSession(options)
     this.attachResumeTracking(handle, options.sessionId, options.onResumeIdCaptured)
     return handle
+  }
+
+  buildCommandSpec(options: CliStartOptions): ProcessCommandSpec {
+    const command = options.executablePath || 'cursor-agent'
+    const toolConfig = options.toolConfig ?? {}
+    const resumeId = this.getResumeId(options)
+    const args: string[] = []
+
+    // Keep stable machine-readable output format.
+    args.push('-p')
+    args.push('--output-format=stream-json')
+    if (resumeId) {
+      args.push('--resume', resumeId)
+    } else {
+      pushFlag(args, '--continue', asBoolean((toolConfig as Record<string, unknown>).continue))
+    }
+
+    pushFlagWithValue(args, '--api-key', (toolConfig as Record<string, unknown>).api_key)
+    pushFlag(args, '--force', asBoolean((toolConfig as Record<string, unknown>).force))
+    pushFlag(args, '--yolo', asBoolean((toolConfig as Record<string, unknown>).yolo))
+    pushFlagWithValue(args, '--model', (toolConfig as Record<string, unknown>).model)
+    pushFlagWithValue(args, '--mode', (toolConfig as Record<string, unknown>).mode)
+    pushFlag(args, '--plan', asBoolean((toolConfig as Record<string, unknown>).plan))
+    pushFlagWithValue(args, '--sandbox', (toolConfig as Record<string, unknown>).sandbox)
+    pushFlag(args, '--trust', asBoolean((toolConfig as Record<string, unknown>).trust))
+    pushFlagWithValue(args, '--workspace', (toolConfig as Record<string, unknown>).workspace)
+    pushRepeatableFlag(args, '--header', (toolConfig as Record<string, unknown>).header)
+    pushFlag(args, '--approve-mcps', asBoolean((toolConfig as Record<string, unknown>).approve_mcps))
+    pushFlagWithValue(args, '--worktree', (toolConfig as Record<string, unknown>).worktree)
+    pushFlagWithValue(args, '--worktree-base', (toolConfig as Record<string, unknown>).worktree_base)
+    pushFlag(args, '--skip-worktree-setup', asBoolean((toolConfig as Record<string, unknown>).skip_worktree_setup))
+
+    const additionalParams = asStringArray(
+      (toolConfig as Record<string, unknown>).additional_params
+    )
+    if (additionalParams) {
+      args.push(...additionalParams)
+    }
+
+    const env = {
+      ...(options.env ?? {})
+    } as Record<string, string>
+
+    const prompt = options.prompt?.trim()
+    if (prompt) {
+      args.push(prompt)
+    }
+
+    this.log('buildCommand', {
+      sessionId: options.sessionId,
+      workdir: options.workdir,
+      command,
+      args: this.redactArgs(args),
+      resumeId: resumeId ?? null,
+      toolConfigKeys: Object.keys(toolConfig as Record<string, unknown>),
+      envCursorKey: Boolean(env.CURSOR_API_KEY),
+      promptLength: options.prompt ? options.prompt.length : 0
+    })
+
+    return {
+      command,
+      args,
+      cwd: options.workdir,
+      env,
+      initialInput: undefined,
+      closeStdinAfterInput: true
+    }
   }
 
   private getResumeId(options: CliStartOptions): string | undefined {

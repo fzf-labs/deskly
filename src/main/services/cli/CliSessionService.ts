@@ -9,91 +9,7 @@ import { MsgStoreService } from '../MsgStoreService'
 import { CLIToolConfigService } from '../CLIToolConfigService'
 import { DatabaseService } from '../DatabaseService'
 import { LogMsg } from '../../types/log'
-
-const TOOL_CONFIG_ALLOWED_KEYS: Record<string, Set<string>> = {
-  'claude-code': new Set([
-    'append_prompt',
-    'claude_code_router',
-    'plan',
-    'approvals',
-    'model',
-    'dangerously_skip_permissions',
-    'disable_api_key',
-    'base_command_override',
-    'additional_params',
-    'env'
-  ]),
-  codex: new Set([
-    'append_prompt',
-    'sandbox',
-    'ask_for_approval',
-    'oss',
-    'model',
-    'model_reasoning_effort',
-    'model_reasoning_summary',
-    'model_reasoning_summary_format',
-    'profile',
-    'base_instructions',
-    'include_apply_patch_tool',
-    'model_provider',
-    'compact_prompt',
-    'developer_instructions',
-    'base_command_override',
-    'additional_params',
-    'env'
-  ]),
-  'codex-cli': new Set([
-    'append_prompt',
-    'sandbox',
-    'ask_for_approval',
-    'oss',
-    'model',
-    'model_reasoning_effort',
-    'model_reasoning_summary',
-    'model_reasoning_summary_format',
-    'profile',
-    'base_instructions',
-    'include_apply_patch_tool',
-    'model_provider',
-    'compact_prompt',
-    'developer_instructions',
-    'base_command_override',
-    'additional_params',
-    'env'
-  ]),
-  'cursor-agent': new Set([
-    'append_prompt',
-    'api_key',
-    'force',
-    'model',
-    'resume',
-    'base_command_override',
-    'additional_params',
-    'env'
-  ]),
-  'gemini-cli': new Set([
-    'append_prompt',
-    'model',
-    'yolo',
-    'resume',
-    'base_command_override',
-    'additional_params',
-    'env'
-  ]),
-  opencode: new Set([
-    'append_prompt',
-    'model',
-    'variant',
-    'agent',
-    'continue',
-    'session',
-    'auto_approve',
-    'auto_compact',
-    'base_command_override',
-    'additional_params',
-    'env'
-  ])
-}
+import { normalizeCliToolConfig } from '../../../shared/cli-config-spec'
 
 interface SessionRecord {
   handle: CliSessionHandle
@@ -136,19 +52,7 @@ export class CliSessionService extends EventEmitter {
     toolId: string,
     config: Record<string, unknown>
   ): Record<string, unknown> {
-    const allowedKeys = TOOL_CONFIG_ALLOWED_KEYS[toolId]
-    if (!allowedKeys) {
-      return config
-    }
-
-    const sanitized: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(config)) {
-      if (allowedKeys.has(key)) {
-        sanitized[key] = value
-      }
-    }
-
-    return sanitized
+    return normalizeCliToolConfig(toolId, config)
   }
 
   async startSession(
@@ -253,6 +157,18 @@ export class CliSessionService extends EventEmitter {
         taskNode.resume_session_id.trim()
       ) {
         toolConfig.session = taskNode.resume_session_id
+      }
+    }
+
+    if (toolId === 'codex') {
+      const configuredThreadId =
+        typeof toolConfig.thread_id === 'string' ? toolConfig.thread_id.trim() : ''
+      if (
+        !configuredThreadId &&
+        typeof taskNode?.resume_session_id === 'string' &&
+        taskNode.resume_session_id.trim()
+      ) {
+        toolConfig.thread_id = taskNode.resume_session_id
       }
     }
 

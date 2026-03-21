@@ -2,6 +2,7 @@ import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliAdapter } from './ProcessCliAdapter'
 import { failureSignal, parseJsonLine, successSignal } from './completion'
 import { asBoolean, asStringArray, pushFlag, pushFlagWithValue, pushRepeatableFlag } from './config-utils'
+import { ProcessCommandSpec } from '../ProcessCliSession'
 
 type RecordLike = Record<string, unknown>
 
@@ -15,38 +16,7 @@ export class OpencodeAdapter implements CliAdapter {
     this.adapter = new ProcessCliAdapter(
       {
         id: this.id,
-        buildCommand: (options: CliStartOptions) => {
-          const command = options.executablePath || 'opencode'
-          const toolConfig = options.toolConfig ?? {}
-          const resumeId = this.getResumeId(options)
-          const args: string[] = []
-
-          pushFlagWithValue(args, '--model', (toolConfig as Record<string, unknown>).model)
-          const continueFlag = asBoolean((toolConfig as Record<string, unknown>).continue)
-          pushFlag(args, '--continue', resumeId ? undefined : continueFlag)
-          pushFlagWithValue(args, '--session', resumeId)
-          pushFlagWithValue(args, '--prompt', (toolConfig as Record<string, unknown>).prompt)
-          pushFlagWithValue(args, '--agent', (toolConfig as Record<string, unknown>).agent)
-          pushFlag(args, '--print-logs', asBoolean((toolConfig as Record<string, unknown>).printLogs))
-          pushFlagWithValue(args, '--log-level', (toolConfig as Record<string, unknown>).logLevel)
-          pushFlagWithValue(args, '--port', (toolConfig as Record<string, unknown>).port)
-          pushFlagWithValue(args, '--hostname', (toolConfig as Record<string, unknown>).hostname)
-          pushFlag(args, '--mdns', asBoolean((toolConfig as Record<string, unknown>).mdns))
-          pushFlagWithValue(args, '--mdns-domain', (toolConfig as Record<string, unknown>).mdnsDomain)
-          pushRepeatableFlag(args, '--cors', (toolConfig as Record<string, unknown>).cors)
-
-          const additionalArgs = asStringArray((toolConfig as Record<string, unknown>).additional_params)
-          if (additionalArgs) {
-            args.push(...additionalArgs)
-          }
-          return {
-            command,
-            args,
-            cwd: options.workdir,
-            env: options.env,
-            initialInput: options.prompt
-          }
-        },
+        buildCommand: (options: CliStartOptions) => this.buildCommandSpec(options),
         detectCompletion: (line) => {
           const msg = parseJsonLine(line)
           if (!msg) return null
@@ -70,6 +40,38 @@ export class OpencodeAdapter implements CliAdapter {
     const handle = await this.adapter.startSession(options)
     this.attachResumeTracking(handle, options.sessionId, options.onResumeIdCaptured)
     return handle
+  }
+
+  buildCommandSpec(options: CliStartOptions): ProcessCommandSpec {
+    const command = options.executablePath || 'opencode'
+    const toolConfig = options.toolConfig ?? {}
+    const resumeId = this.getResumeId(options)
+    const args: string[] = []
+
+    pushFlagWithValue(args, '--model', (toolConfig as Record<string, unknown>).model)
+    const continueFlag = asBoolean((toolConfig as Record<string, unknown>).continue)
+    pushFlag(args, '--continue', resumeId ? undefined : continueFlag)
+    pushFlagWithValue(args, '--session', resumeId)
+    pushFlagWithValue(args, '--agent', (toolConfig as Record<string, unknown>).agent)
+    pushFlag(args, '--print-logs', asBoolean((toolConfig as Record<string, unknown>).print_logs))
+    pushFlagWithValue(args, '--log-level', (toolConfig as Record<string, unknown>).log_level)
+    pushFlagWithValue(args, '--port', (toolConfig as Record<string, unknown>).port)
+    pushFlagWithValue(args, '--hostname', (toolConfig as Record<string, unknown>).hostname)
+    pushFlag(args, '--mdns', asBoolean((toolConfig as Record<string, unknown>).mdns))
+    pushFlagWithValue(args, '--mdns-domain', (toolConfig as Record<string, unknown>).mdns_domain)
+    pushRepeatableFlag(args, '--cors', (toolConfig as Record<string, unknown>).cors)
+
+    const additionalArgs = asStringArray((toolConfig as Record<string, unknown>).additional_params)
+    if (additionalArgs) {
+      args.push(...additionalArgs)
+    }
+    return {
+      command,
+      args,
+      cwd: options.workdir,
+      env: options.env,
+      initialInput: options.prompt
+    }
   }
 
   private getResumeId(options: CliStartOptions): string | undefined {

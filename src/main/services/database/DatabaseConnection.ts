@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
+import { normalizeCliToolConfig } from '../../../shared/cli-config-spec'
 
-const TARGET_SCHEMA_VERSION = 5
+const TARGET_SCHEMA_VERSION = 6
 
 export class DatabaseConnection {
   private dbPath: string
@@ -321,6 +322,17 @@ export class DatabaseConnection {
       console.log('[DatabaseService] Migrated schema to v5')
     }
 
+    if (currentVersion < 6) {
+      const migrateToV6 = db.transaction(() => {
+        this.normalizeAgentToolConfigs(db)
+        db.pragma('user_version = 6')
+      })
+
+      migrateToV6()
+      currentVersion = 6
+      console.log('[DatabaseService] Migrated schema to v6')
+    }
+
     if (currentVersion < TARGET_SCHEMA_VERSION) {
       db.pragma(`user_version = ${TARGET_SCHEMA_VERSION}`)
     }
@@ -329,5 +341,36 @@ export class DatabaseConnection {
   private tableHasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
     const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name?: string }>
     return columns.some((column) => column.name === columnName)
+  }
+
+  private normalizeAgentToolConfigs(db: Database.Database): void {
+    const rows = db
+      .prepare('SELECT id, tool_id, config_json FROM agent_tool_configs')
+      .all() as Array<{ id: string; tool_id: string; config_json: string }>
+
+    const updateStmt = db.prepare(
+      'UPDATE agent_tool_configs SET config_json = ?, updated_at = ? WHERE id = ?'
+    )
+
+    for (const row of rows) {
+      let parsed: Record<string, unknown>
+      try {
+        const value = JSON.parse(row.config_json)
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+          continue
+        }
+        parsed = value as Record<string, unknown>
+      } catch {
+        continue
+      }
+
+      const normalized = normalizeCliToolConfig(row.tool_id, parsed)
+      const nextJson = JSON.stringify(normalized, null, 2)
+      if (nextJson === row.config_json) {
+        continue
+      }
+
+      updateStmt.run(nextJson, new Date().toISOString(), row.id)
+    }
   }
 }

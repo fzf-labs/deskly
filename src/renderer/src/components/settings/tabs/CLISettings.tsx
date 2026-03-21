@@ -20,168 +20,59 @@ import {
   isCliToolInstalled,
   type CLIToolInfo,
 } from '@/lib/cli-tools';
+import {
+  createCliToolConfigTemplate,
+  getCliToolConfigSpec,
+  normalizeCliToolConfig,
+  normalizeCliToolConfigWithDefaults,
+  type CliConfigFieldSpec as ConfigFieldSchema,
+} from '../../../../../shared/cli-config-spec';
 
 const TOOL_CACHE = {
   tools: null as CLIToolInfo[] | null,
 };
 
-type ConfigFieldType =
-  | 'string'
-  | 'stringArray'
-  | 'stringMap'
-  | 'boolean'
-  | 'booleanNullable';
+const TOOL_IDS = ['claude-code', 'codex', 'cursor-agent', 'gemini-cli', 'opencode'];
 
-type ConfigFieldOption = {
-  value: string;
-  label: string;
+const TOOL_CONFIG_SCHEMAS: Record<string, Record<string, ConfigFieldSchema>> = TOOL_IDS.reduce(
+  (acc, toolId) => {
+    acc[toolId] = getCliToolConfigSpec(toolId)?.fields ?? {};
+    return acc;
+  },
+  {} as Record<string, Record<string, ConfigFieldSchema>>
+);
+
+const ADVANCED_FIELDS_BY_TOOL: Record<string, Set<string>> = TOOL_IDS.reduce((acc, toolId) => {
+  const fields = getCliToolConfigSpec(toolId)?.fields ?? {};
+  acc[toolId] = new Set(
+    Object.entries(fields)
+      .filter(([, field]) => field.advanced)
+      .map(([fieldKey]) => fieldKey)
+  );
+  return acc;
+}, {} as Record<string, Set<string>>);
+
+const formatFieldLabel = (key: string): string =>
+  key
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const parseStringArrayInput = (value: string): string[] =>
+  value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+const sanitizeStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === 'string');
 };
 
-type ConfigFieldSchema = {
-  type: ConfigFieldType;
-  required?: boolean;
-  defaultValue?: unknown;
-  multiline?: boolean;
-  options?: ConfigFieldOption[];
-  description?: string;
-};
-
-const CODEX_SANDBOX_OPTIONS: ConfigFieldOption[] = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'read-only', label: 'Read Only' },
-  { value: 'workspace-write', label: 'Workspace Write' },
-  { value: 'danger-full-access', label: 'Danger Full Access' },
-];
-
-const CODEX_APPROVAL_OPTIONS: ConfigFieldOption[] = [
-  { value: 'unless-trusted', label: 'Unless Trusted' },
-  { value: 'on-failure', label: 'On Failure' },
-  { value: 'on-request', label: 'On Request' },
-  { value: 'never', label: 'Never' },
-];
-
-const CODEX_REASONING_EFFORT_OPTIONS: ConfigFieldOption[] = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'xhigh', label: 'XHigh' },
-];
-
-const CODEX_REASONING_SUMMARY_OPTIONS: ConfigFieldOption[] = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'concise', label: 'Concise' },
-  { value: 'detailed', label: 'Detailed' },
-  { value: 'none', label: 'None' },
-];
-
-const CODEX_REASONING_SUMMARY_FORMAT_OPTIONS: ConfigFieldOption[] = [
-  { value: 'none', label: 'None' },
-  { value: 'experimental', label: 'Experimental' },
-];
-
-const TOOL_CONFIG_SCHEMAS: Record<string, Record<string, ConfigFieldSchema>> = {
-  'claude-code': {
-    append_prompt: { type: 'string', multiline: true },
-    claude_code_router: { type: 'booleanNullable' },
-    plan: { type: 'booleanNullable' },
-    approvals: { type: 'booleanNullable' },
-    model: { type: 'string' },
-    dangerously_skip_permissions: { type: 'booleanNullable' },
-    disable_api_key: { type: 'booleanNullable' },
-    base_command_override: { type: 'string' },
-    additional_params: { type: 'stringArray' },
-    env: { type: 'stringMap' },
-  },
-  codex: {
-    append_prompt: { type: 'string', multiline: true },
-    sandbox: { type: 'string', options: CODEX_SANDBOX_OPTIONS },
-    ask_for_approval: { type: 'string', options: CODEX_APPROVAL_OPTIONS },
-    oss: { type: 'booleanNullable' },
-    model: { type: 'string' },
-    model_reasoning_effort: { type: 'string', options: CODEX_REASONING_EFFORT_OPTIONS },
-    model_reasoning_summary: { type: 'string', options: CODEX_REASONING_SUMMARY_OPTIONS },
-    model_reasoning_summary_format: {
-      type: 'string',
-      options: CODEX_REASONING_SUMMARY_FORMAT_OPTIONS,
-    },
-    profile: { type: 'string' },
-    base_instructions: { type: 'string', multiline: true },
-    include_apply_patch_tool: { type: 'booleanNullable' },
-    model_provider: { type: 'string' },
-    compact_prompt: { type: 'string', multiline: true },
-    developer_instructions: { type: 'string', multiline: true },
-    base_command_override: { type: 'string' },
-    additional_params: { type: 'stringArray' },
-    env: { type: 'stringMap' },
-  },
-  'cursor-agent': {
-    append_prompt: { type: 'string', multiline: true },
-    api_key: { type: 'string' },
-    force: { type: 'booleanNullable' },
-    model: { type: 'string', defaultValue: 'auto' },
-    base_command_override: { type: 'string' },
-    additional_params: { type: 'stringArray' },
-    env: { type: 'stringMap' },
-  },
-  'gemini-cli': {
-    append_prompt: { type: 'string', multiline: true },
-    model: { type: 'string' },
-    yolo: { type: 'booleanNullable' },
-    resume: { type: 'string' },
-    base_command_override: { type: 'string' },
-    additional_params: { type: 'stringArray' },
-    env: { type: 'stringMap' },
-  },
-  opencode: {
-    append_prompt: { type: 'string', multiline: true },
-    model: { type: 'string' },
-    variant: { type: 'string' },
-    agent: { type: 'string' },
-    continue: { type: 'booleanNullable' },
-    session: { type: 'string' },
-    auto_approve: { type: 'boolean', defaultValue: true },
-    auto_compact: { type: 'boolean', defaultValue: true },
-    base_command_override: { type: 'string' },
-    additional_params: { type: 'stringArray' },
-    env: { type: 'stringMap' },
-  },
-};
-
-const ADVANCED_FIELDS_BY_TOOL: Record<string, Set<string>> = {
-  'claude-code': new Set([
-    'claude_code_router',
-    'approvals',
-    'dangerously_skip_permissions',
-    'disable_api_key',
-    'base_command_override',
-    'additional_params',
-    'env',
-  ]),
-  codex: new Set([
-    'model_reasoning_effort',
-    'model_reasoning_summary',
-    'model_reasoning_summary_format',
-    'base_instructions',
-    'include_apply_patch_tool',
-    'model_provider',
-    'compact_prompt',
-    'developer_instructions',
-    'base_command_override',
-    'additional_params',
-    'env',
-  ]),
-  'cursor-agent': new Set(['base_command_override', 'additional_params', 'env']),
-  'gemini-cli': new Set(['resume', 'base_command_override', 'additional_params', 'env']),
-  opencode: new Set([
-    'variant',
-    'continue',
-    'session',
-    'auto_compact',
-    'base_command_override',
-    'additional_params',
-    'env'
-  ]),
-};
+const toStringArrayInput = (value: unknown): string =>
+  sanitizeStringArray(value).join('\n');
 
 const sanitizeStringMap = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -197,28 +88,6 @@ const sanitizeStringMap = (value: unknown): Record<string, string> => {
     {}
   );
 };
-
-const sanitizeStringArray = (value: unknown): string[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter((item): item is string => typeof item === 'string');
-};
-
-const formatFieldLabel = (key: string): string =>
-  key
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-
-const parseStringArrayInput = (value: string): string[] =>
-  value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-const toStringArrayInput = (value: unknown): string =>
-  sanitizeStringArray(value).join('\n');
 
 const parseStringMapInput = (value: string): Record<string, string> => {
   const result: Record<string, string> = {};
@@ -248,67 +117,13 @@ const toStringMapInput = (value: unknown): string =>
     .map(([key, item]) => `${key}=${item}`)
     .join('\n');
 
-const sanitizeFieldByType = (
-  type: ConfigFieldType,
-  value: unknown,
-  defaultValue?: unknown
-): unknown => {
-  switch (type) {
-    case 'string':
-      return typeof value === 'string' ? value : typeof defaultValue === 'string' ? defaultValue : '';
-    case 'stringArray':
-      return sanitizeStringArray(value);
-    case 'stringMap':
-      return sanitizeStringMap(value);
-    case 'boolean': {
-      if (typeof value === 'boolean') {
-        return value;
-      }
-      if (typeof defaultValue === 'boolean') {
-        return defaultValue;
-      }
-      return false;
-    }
-    case 'booleanNullable':
-      return typeof value === 'boolean' ? value : null;
-    default:
-      return value;
-  }
-};
-
-const createConfigTemplate = (toolId: string): Record<string, unknown> => {
-  const schema = TOOL_CONFIG_SCHEMAS[toolId];
-  if (!schema) {
-    return {};
-  }
-
-  return Object.entries(schema).reduce<Record<string, unknown>>(
-    (acc, [key, field]) => {
-      acc[key] = sanitizeFieldByType(field.type, undefined, field.defaultValue);
-      return acc;
-    },
-    {}
-  );
-};
+const createConfigTemplate = (toolId: string): Record<string, unknown> =>
+  createCliToolConfigTemplate(toolId);
 
 const sanitizeConfigBySchema = (
   toolId: string,
   parsed: Record<string, unknown>
-): Record<string, unknown> => {
-  const schema = TOOL_CONFIG_SCHEMAS[toolId];
-  if (!schema) {
-    return parsed;
-  }
-
-  return Object.entries(schema).reduce<Record<string, unknown>>(
-    (acc, [key, field]) => {
-      const rawValue = parsed[key];
-      acc[key] = sanitizeFieldByType(field.type, rawValue, field.defaultValue);
-      return acc;
-    },
-    {}
-  );
-};
+): Record<string, unknown> => normalizeCliToolConfigWithDefaults(toolId, parsed);
 
 export function CLISettings({
   settings,
@@ -426,32 +241,27 @@ export function CLISettings({
   }, [configToolId, loadConfigs]);
 
   const normalizeSeedConfig = useCallback((toolId: string, base: Record<string, unknown>) => {
-    const schema = TOOL_CONFIG_SCHEMAS[toolId];
     const seed = createConfigTemplate(toolId);
-    if (!schema) {
-      return seed;
-    }
-
-    return Object.entries(schema).reduce<Record<string, unknown>>(
-      (acc, [key, field]) => {
-        const rawValue =
-          key === 'model' &&
-          (base[key] === undefined || base[key] === null || base[key] === '') &&
-          typeof base.defaultModel === 'string' &&
-          base.defaultModel.trim()
+    const normalized = normalizeCliToolConfig(toolId, {
+      ...base,
+      model:
+        typeof base.model === 'string' && base.model.trim()
+          ? base.model
+          : typeof base.defaultModel === 'string' && base.defaultModel.trim()
             ? base.defaultModel
-            : key === 'base_command_override' &&
-                (base[key] === undefined || base[key] === null || base[key] === '') &&
-                typeof base.executablePath === 'string' &&
-                base.executablePath.trim()
-              ? base.executablePath
-              : base[key];
+            : base.model,
+      base_command_override:
+        typeof base.base_command_override === 'string' && base.base_command_override.trim()
+          ? base.base_command_override
+          : typeof base.executablePath === 'string' && base.executablePath.trim()
+            ? base.executablePath
+            : base.base_command_override
+    });
 
-        acc[key] = sanitizeFieldByType(field.type, rawValue, field.defaultValue);
-        return acc;
-      },
-      seed
-    );
+    return {
+      ...seed,
+      ...normalized
+    };
   }, []);
 
   const openCreateConfig = useCallback(async () => {
@@ -527,7 +337,7 @@ export function CLISettings({
   const saveConfigDraft = useCallback(async () => {
     if (!configToolId) return;
 
-    const normalized = sanitizeConfigDraft(configToolId, configDraftConfig);
+    const normalized = normalizeCliToolConfig(configToolId, configDraftConfig);
     const formatted = JSON.stringify(normalized, null, 2);
     const validationError = validateConfig(configToolId, normalized);
     if (validationError) {
@@ -536,7 +346,7 @@ export function CLISettings({
     }
 
     setConfigDraftError(null);
-    setConfigDraftConfig(normalized);
+    setConfigDraftConfig(sanitizeConfigDraft(configToolId, normalized));
     try {
       if (configDialogMode === 'create') {
         const created = await db.createAgentToolConfig({

@@ -12,6 +12,7 @@ import {
   pushFlagWithValue,
   pushRepeatableFlag
 } from './config-utils'
+import { ProcessCommandSpec } from '../ProcessCliSession'
 
 function detectClaudeCompletion(line: string) {
   const msg = parseJsonLine(line)
@@ -53,6 +54,20 @@ export class ClaudeCodeAdapter implements CliAdapter {
   }
 
   async startSession(options: CliStartOptions): Promise<CliSessionHandle> {
+    return new ProcessCliSession(
+      options.sessionId,
+      options.toolId,
+      this.buildCommandSpec(options),
+      detectClaudeCompletion,
+      undefined,
+      options.taskId,
+      options.projectId,
+      options.taskNodeId,
+      options.msgStore
+    )
+  }
+
+  buildCommandSpec(options: CliStartOptions): ProcessCommandSpec {
     const config = this.configService.getConfig('claude-code')
     const toolConfig = options.toolConfig ?? {}
     const model =
@@ -70,7 +85,7 @@ export class ClaudeCodeAdapter implements CliAdapter {
     ]
 
     const allowDangerouslySkipPermissions = asBoolean(
-      (toolConfig as Record<string, unknown>).allowDangerouslySkipPermissions
+      (toolConfig as Record<string, unknown>).allow_dangerously_skip_permissions
     )
     if (allowDangerouslySkipPermissions) {
       args.push('--allow-dangerously-skip-permissions')
@@ -88,53 +103,50 @@ export class ClaudeCodeAdapter implements CliAdapter {
     }
 
     pushFlagWithValue(args, '--agent', (toolConfig as Record<string, unknown>).agent)
-    pushFlagWithValue(args, '--agents', (toolConfig as Record<string, unknown>).agentsJson)
-    pushRepeatableFlag(args, '--add-dir', (toolConfig as Record<string, unknown>).addDir)
+    pushFlagWithValue(args, '--agents', (toolConfig as Record<string, unknown>).agents)
+    pushRepeatableFlag(args, '--add-dir', (toolConfig as Record<string, unknown>).add_dir)
 
-    const allowedTools = asStringArray((toolConfig as Record<string, unknown>).allowedTools)
+    const allowedTools = asStringArray((toolConfig as Record<string, unknown>).allowed_tools)
     if (allowedTools) {
       args.push('--allowed-tools', allowedTools.join(','))
     }
-    const disallowedTools = asStringArray((toolConfig as Record<string, unknown>).disallowedTools)
+    const disallowedTools = asStringArray((toolConfig as Record<string, unknown>).disallowed_tools)
     if (disallowedTools) {
       args.push('--disallowed-tools', disallowedTools.join(','))
     }
 
-    pushFlagWithValue(args, '--append-system-prompt', (toolConfig as Record<string, unknown>).appendSystemPrompt)
-    pushFlagWithValue(args, '--system-prompt', (toolConfig as Record<string, unknown>).systemPrompt)
-    const permissionMode = asBoolean((toolConfig as Record<string, unknown>).plan)
-      ? 'plan'
-      : undefined
-    pushFlagWithValue(args, '--permission-mode', permissionMode)
-    pushRepeatableFlag(args, '--mcp-config', (toolConfig as Record<string, unknown>).mcpConfig)
-    pushFlag(args, '--strict-mcp-config', asBoolean((toolConfig as Record<string, unknown>).strictMcpConfig))
+    pushFlagWithValue(args, '--append-system-prompt', (toolConfig as Record<string, unknown>).append_system_prompt)
+    pushFlagWithValue(args, '--system-prompt', (toolConfig as Record<string, unknown>).system_prompt)
+    pushFlagWithValue(args, '--permission-mode', (toolConfig as Record<string, unknown>).permission_mode)
+    pushRepeatableFlag(args, '--mcp-config', (toolConfig as Record<string, unknown>).mcp_config)
+    pushFlag(args, '--strict-mcp-config', asBoolean((toolConfig as Record<string, unknown>).strict_mcp_config))
     pushFlagWithValue(args, '--settings', (toolConfig as Record<string, unknown>).settings)
-    pushFlagWithValue(args, '--setting-sources', (toolConfig as Record<string, unknown>).settingSources)
+    pushFlagWithValue(args, '--setting-sources', (toolConfig as Record<string, unknown>).setting_sources)
     pushFlag(args, '--continue', asBoolean((toolConfig as Record<string, unknown>).continue))
     pushFlagWithValue(args, '--resume', (toolConfig as Record<string, unknown>).resume)
-    pushFlagWithValue(args, '--output-format', (toolConfig as Record<string, unknown>).outputFormat)
-    pushFlagWithValue(args, '--input-format', (toolConfig as Record<string, unknown>).inputFormat)
-    pushFlag(args, '--include-partial-messages', asBoolean((toolConfig as Record<string, unknown>).includePartialMessages))
-    pushFlag(args, '--replay-user-messages', asBoolean((toolConfig as Record<string, unknown>).replayUserMessages))
-    pushFlag(args, '--no-session-persistence', asBoolean((toolConfig as Record<string, unknown>).noSessionPersistence))
+    pushFlagWithValue(args, '--output-format', (toolConfig as Record<string, unknown>).output_format)
+    pushFlagWithValue(args, '--input-format', (toolConfig as Record<string, unknown>).input_format)
+    pushFlag(args, '--include-partial-messages', asBoolean((toolConfig as Record<string, unknown>).include_partial_messages))
+    pushFlag(args, '--replay-user-messages', asBoolean((toolConfig as Record<string, unknown>).replay_user_messages))
+    pushFlag(args, '--no-session-persistence', asBoolean((toolConfig as Record<string, unknown>).no_session_persistence))
     const debugValue = (toolConfig as Record<string, unknown>).debug
     if (typeof debugValue === 'string' && debugValue.trim()) {
       args.push('--debug', debugValue.trim())
     } else {
       pushFlag(args, '--debug', asBoolean(debugValue))
     }
-    pushFlagWithValue(args, '--debug-file', (toolConfig as Record<string, unknown>).debugFile)
+    pushFlagWithValue(args, '--debug-file', (toolConfig as Record<string, unknown>).debug_file)
     pushFlag(args, '--verbose', asBoolean((toolConfig as Record<string, unknown>).verbose))
     pushRepeatableFlag(args, '--betas', (toolConfig as Record<string, unknown>).betas)
-    pushFlagWithValue(args, '--fallback-model', (toolConfig as Record<string, unknown>).fallbackModel)
-    pushFlagWithValue(args, '--max-budget-usd', (toolConfig as Record<string, unknown>).maxBudgetUsd)
-    pushFlagWithValue(args, '--json-schema', (toolConfig as Record<string, unknown>).jsonSchema)
+    pushFlagWithValue(args, '--fallback-model', (toolConfig as Record<string, unknown>).fallback_model)
+    pushFlagWithValue(args, '--max-budget-usd', (toolConfig as Record<string, unknown>).max_budget_usd)
+    pushFlagWithValue(args, '--json-schema', (toolConfig as Record<string, unknown>).json_schema)
     pushFlagWithValue(args, '--tools', (toolConfig as Record<string, unknown>).tools)
-    pushRepeatableFlag(args, '--file', (toolConfig as Record<string, unknown>).fileResources)
+    pushRepeatableFlag(args, '--file', (toolConfig as Record<string, unknown>).file_resources)
     pushFlag(args, '--chrome', asBoolean((toolConfig as Record<string, unknown>).chrome))
-    pushFlag(args, '--no-chrome', asBoolean((toolConfig as Record<string, unknown>).noChrome))
+    pushFlag(args, '--no-chrome', asBoolean((toolConfig as Record<string, unknown>).no_chrome))
     pushFlag(args, '--ide', asBoolean((toolConfig as Record<string, unknown>).ide))
-    pushRepeatableFlag(args, '--plugin-dir', (toolConfig as Record<string, unknown>).pluginDir)
+    pushRepeatableFlag(args, '--plugin-dir', (toolConfig as Record<string, unknown>).plugin_dir)
 
     const additionalArgs = asStringArray((toolConfig as Record<string, unknown>).additional_params)
     if (additionalArgs) {
@@ -161,26 +173,16 @@ export class ClaudeCodeAdapter implements CliAdapter {
       })
     }
 
-    return new ProcessCliSession(
-      options.sessionId,
-      options.toolId,
-      {
-        command: this.getExecutablePath(options.executablePath, toolConfig as Record<string, unknown>),
-        args,
-        cwd: options.workdir,
-        env: {
-          ...process.env,
-          ...(options.env ?? {}),
-          PATH: `${homeDir}/.local/bin:/opt/homebrew/bin:${process.env.PATH || ''}`
-        },
-        initSequence
+    return {
+      command: this.getExecutablePath(options.executablePath, toolConfig as Record<string, unknown>),
+      args,
+      cwd: options.workdir,
+      env: {
+        ...process.env,
+        ...(options.env ?? {}),
+        PATH: `${homeDir}/.local/bin:/opt/homebrew/bin:${process.env.PATH || ''}`
       },
-      detectClaudeCompletion,
-      undefined,
-      options.taskId,
-      options.projectId,
-      options.taskNodeId,
-      options.msgStore
-    )
+      initSequence
+    }
   }
 }
