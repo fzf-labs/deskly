@@ -3,93 +3,79 @@ import { newUuid } from '@/lib/ids'
 
 import type { WorkflowTemplateFormValues } from './WorkflowTemplateDialog'
 
-const getLinearNodeOrder = (
+const getTopologicalNodeOrder = (
   definition: WorkflowDefinitionDocument
-): Array<WorkflowDefinitionDocument['nodes'][number]> | null => {
-  const { nodes, edges } = definition
+): Array<WorkflowDefinitionDocument['nodes'][number]> => {
+  const nodesById = new Map(definition.nodes.map((node) => [node.id, node]))
+  const incomingCount = new Map<string, number>()
+  const outgoing = new Map<string, string[]>()
 
-  if (nodes.length === 0) {
-    return []
-  }
-
-  if (nodes.some((node) => node.type !== 'agent')) {
-    return null
-  }
-
-  if (edges.length !== Math.max(0, nodes.length - 1)) {
-    return null
-  }
-
-  const nodesById = new Map(nodes.map((node) => [node.id, node]))
-  const incoming = new Map<string, number>()
-  const outgoing = new Map<string, string | null>()
-
-  nodes.forEach((node) => {
-    incoming.set(node.id, 0)
-    outgoing.set(node.id, null)
+  definition.nodes.forEach((node) => {
+    incomingCount.set(node.id, 0)
+    outgoing.set(node.id, [])
   })
 
-  for (const edge of edges) {
+  definition.edges.forEach((edge) => {
     if (!nodesById.has(edge.from) || !nodesById.has(edge.to)) {
-      return null
+      return
     }
 
-    incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1)
-    if ((incoming.get(edge.to) ?? 0) > 1) {
-      return null
-    }
+    incomingCount.set(edge.to, (incomingCount.get(edge.to) ?? 0) + 1)
+    outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge.to])
+  })
 
-    if (outgoing.get(edge.from)) {
-      return null
-    }
-    outgoing.set(edge.from, edge.to)
-  }
-
-  const roots = nodes.filter((node) => (incoming.get(node.id) ?? 0) === 0)
-  if (roots.length !== 1) {
-    return null
-  }
+  const queue = definition.nodes
+    .filter((node) => (incomingCount.get(node.id) ?? 0) === 0)
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((node) => node.id)
 
   const ordered: Array<WorkflowDefinitionDocument['nodes'][number]> = []
-  const visited = new Set<string>()
-  let current: WorkflowDefinitionDocument['nodes'][number] | null = roots[0] ?? null
 
-  while (current) {
-    if (visited.has(current.id)) {
-      return null
+  while (queue.length > 0) {
+    const currentId = queue.shift()!
+    const currentNode = nodesById.get(currentId)
+    if (!currentNode) {
+      continue
     }
-    visited.add(current.id)
-    ordered.push(current)
-    const nextId = outgoing.get(current.id)
-    current = nextId ? nodesById.get(nextId) ?? null : null
+
+    ordered.push(currentNode)
+
+    for (const nextId of outgoing.get(currentId) ?? []) {
+      const nextIncomingCount = (incomingCount.get(nextId) ?? 0) - 1
+      incomingCount.set(nextId, nextIncomingCount)
+      if (nextIncomingCount === 0) {
+        queue.push(nextId)
+      }
+    }
   }
 
-  return visited.size === nodes.length ? ordered : null
-}
-
-export const canEditWorkflowDefinitionInLinearDialog = (
-  definition: WorkflowDefinitionDocument
-): boolean => {
-  return getLinearNodeOrder(definition) !== null
+  return ordered.length === definition.nodes.length ? ordered : definition.nodes
 }
 
 export const workflowDefinitionToFormValues = (
   definition: WorkflowDefinition
-): WorkflowTemplateFormValues | null => {
-  const orderedNodes = getLinearNodeOrder(definition.definition)
-  if (!orderedNodes) {
-    return null
-  }
+): WorkflowTemplateFormValues => {
+  const orderedNodes = getTopologicalNodeOrder(definition.definition)
+  const dependencyMap = new Map<string, string[]>()
+
+  definition.definition.edges.forEach((edge) => {
+    dependencyMap.set(edge.to, [...(dependencyMap.get(edge.to) ?? []), edge.from])
+  })
 
   return {
     name: definition.name,
     description: definition.description ?? undefined,
-    nodes: orderedNodes.map((node) => ({
+    nodes: orderedNodes.map((node, index) => ({
+      id: node.id,
+      key: node.key || `workflow-node-${index + 1}`,
+      type: node.type,
       name: node.name,
       prompt: node.prompt ?? '',
+      command: node.command ?? '',
       cliToolId: node.cliToolId ?? '',
       agentToolConfigId: node.agentToolConfigId ?? '',
-      requiresApproval: Boolean(node.requiresApprovalAfterRun)
+      requiresApproval: Boolean(node.requiresApprovalAfterRun),
+      dependsOnIds: dependencyMap.get(node.id) ?? []
     }))
   }
 }
@@ -97,25 +83,37 @@ export const workflowDefinitionToFormValues = (
 export const buildWorkflowDefinitionFromForm = (
   values: WorkflowTemplateFormValues
 ): WorkflowDefinitionDocument => {
-  const nodes = values.nodes.map((node, index) => ({
-    id: newUuid(),
-    key: `linear-node-${index + 1}`,
-    type: 'agent' as const,
-    name: node.name,
-    prompt: node.prompt,
-    command: null,
-    cliToolId: node.cliToolId || null,
-    agentToolConfigId: node.agentToolConfigId || null,
-    requiresApprovalAfterRun: Boolean(node.requiresApproval),
-    position: null
-  }))
+  const nodes = values.nodes.map((node, index) => {
+    const id = node.id || newUuid()
+
+    return {
+      id,
+      key: node.key?.trim() || `workflow-node-${index + 1}`,
+      type: node.type,
+      name: node.name,
+      prompt: node.type === 'agent' ? node.prompt : null,
+      command: node.type === 'command' ? node.command : null,
+      cliToolId: node.type === 'agent' ? node.cliToolId || null : null,
+      agentToolConfigId: node.type === 'agent' ? node.agentToolConfigId || null : null,
+      requiresApprovalAfterRun: Boolean(node.requiresApproval),
+      position: {
+        x: index * 280,
+        y: 0
+      }
+    }
+  })
+
+  const nodeIds = new Set(nodes.map((node) => node.id))
+  const edges = values.nodes.flatMap((node, index) => {
+    const to = nodes[index]!.id
+    return (node.dependsOnIds ?? [])
+      .filter((from) => from !== to && nodeIds.has(from))
+      .map((from) => ({ from, to }))
+  })
 
   return {
     version: 1,
     nodes,
-    edges: nodes.slice(1).map((node, index) => ({
-      from: nodes[index]!.id,
-      to: node.id
-    }))
+    edges
   }
 }

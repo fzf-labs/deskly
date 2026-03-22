@@ -5,6 +5,5 @@ export type {
 } from './WorkflowTemplateDialog';
 export {
   buildWorkflowDefinitionFromForm,
-  canEditWorkflowDefinitionInLinearDialog,
   workflowDefinitionToFormValues
 } from './workflow-definition-form';

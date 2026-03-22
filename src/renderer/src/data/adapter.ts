@@ -5,6 +5,8 @@ import {
 } from '@/lib/notifications'
 import type {
   CreateTaskInput,
+  GeneratedWorkflowDefinitionResult,
+  GenerateWorkflowDefinitionInput,
   Task,
   TaskNode,
   UpdateTaskInput,
@@ -188,6 +190,12 @@ export const db = {
 
   getWorkflowDefinition: (id: string): Promise<WorkflowDefinition | null> => {
     return window.api.workflow.getDefinition(id) as Promise<WorkflowDefinition | null>
+  },
+
+  generateWorkflowDefinition: (
+    input: GenerateWorkflowDefinitionInput
+  ): Promise<GeneratedWorkflowDefinitionResult> => {
+    return window.api.workflow.generateDefinition(input) as Promise<GeneratedWorkflowDefinitionResult>
   },
 
   createWorkflowDefinition: (input: Record<string, unknown>): Promise<WorkflowDefinition> => {

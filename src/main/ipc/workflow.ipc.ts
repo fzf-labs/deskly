@@ -25,6 +25,20 @@ export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): 
     databaseService.getWorkflowDefinition(id)
   )
 
+  handle(
+    IPC_CHANNELS.workflow.generateDefinition,
+    [
+      v.shape({
+        prompt: v.string(),
+        name: v.optional(v.nullable(v.string({ allowEmpty: true })))
+      })
+    ],
+    (_, input) =>
+      databaseService.generateWorkflowDefinition(
+        input as unknown as Parameters<DatabaseService['generateWorkflowDefinition']>[0]
+      )
+  )
+
   handle(IPC_CHANNELS.workflow.createDefinition, [v.object()], (_, input) =>
     databaseService.createWorkflowDefinition(
       input as unknown as Parameters<DatabaseService['createWorkflowDefinition']>[0]

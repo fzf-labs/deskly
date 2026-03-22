@@ -143,6 +143,17 @@ export interface WorkflowDefinition {
   updated_at: string
 }
 
+export interface GenerateWorkflowDefinitionInput {
+  prompt: string
+  name?: string | null
+}
+
+export interface GeneratedWorkflowDefinitionResult {
+  name: string
+  description: string | null
+  definition: WorkflowDefinitionDocument
+}
+
 export interface AgentToolConfig {
   id: string
   tool_id: string

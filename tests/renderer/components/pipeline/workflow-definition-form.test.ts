@@ -2,72 +2,82 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildWorkflowDefinitionFromForm,
-  canEditWorkflowDefinitionInLinearDialog,
   workflowDefinitionToFormValues
 } from '../../../../src/renderer/src/components/pipeline/workflow-definition-form'
 
 describe('workflow-definition-form', () => {
-  it('builds a linear workflow definition from form values', () => {
+  it('builds a DAG workflow definition from form values', () => {
     const definition = buildWorkflowDefinitionFromForm({
       name: 'Code review',
-      description: 'two-step flow',
+      description: 'branching flow',
       nodes: [
         {
+          id: 'node-a',
+          key: 'analyze',
+          type: 'agent',
           name: 'Analyze',
           prompt: 'Check the diff',
+          command: '',
           cliToolId: 'codex',
           agentToolConfigId: 'cfg-1',
-          requiresApproval: false
+          requiresApproval: false,
+          dependsOnIds: []
         },
         {
-          name: 'Confirm',
-          prompt: 'Ask for approval',
+          id: 'node-b',
+          key: 'test',
+          type: 'command',
+          name: 'Run tests',
+          prompt: '',
+          command: 'npm test',
           cliToolId: '',
           agentToolConfigId: '',
-          requiresApproval: true
+          requiresApproval: false,
+          dependsOnIds: ['node-a']
+        },
+        {
+          id: 'node-c',
+          key: 'review',
+          type: 'agent',
+          name: 'Review result',
+          prompt: 'Summarize the outcome',
+          command: '',
+          cliToolId: '',
+          agentToolConfigId: '',
+          requiresApproval: true,
+          dependsOnIds: ['node-a', 'node-b']
         }
       ]
     })
 
     expect(definition.version).toBe(1)
-    expect(definition.nodes).toHaveLength(2)
-    expect(definition.nodes[0]).toEqual(
-      expect.objectContaining({
-        key: 'linear-node-1',
-        type: 'agent',
-        name: 'Analyze',
-        prompt: 'Check the diff',
-        cliToolId: 'codex',
-        agentToolConfigId: 'cfg-1',
-        requiresApprovalAfterRun: false
-      })
-    )
+    expect(definition.nodes).toHaveLength(3)
     expect(definition.nodes[1]).toEqual(
       expect.objectContaining({
-        key: 'linear-node-2',
-        type: 'agent',
-        name: 'Confirm',
-        prompt: 'Ask for approval',
+        id: 'node-b',
+        key: 'test',
+        type: 'command',
+        name: 'Run tests',
+        prompt: null,
+        command: 'npm test',
         cliToolId: null,
-        agentToolConfigId: null,
-        requiresApprovalAfterRun: true
+        agentToolConfigId: null
       })
     )
     expect(definition.edges).toEqual([
-      {
-        from: definition.nodes[0]!.id,
-        to: definition.nodes[1]!.id
-      }
+      { from: 'node-a', to: 'node-b' },
+      { from: 'node-a', to: 'node-c' },
+      { from: 'node-b', to: 'node-c' }
     ])
   })
 
-  it('round-trips a linear workflow definition back into dialog form values', () => {
+  it('round-trips a DAG workflow definition back into dialog form values', () => {
     const result = workflowDefinitionToFormValues({
       id: 'definition-1',
       scope: 'project',
       project_id: 'project-1',
-      name: 'Linear flow',
-      description: 'simple flow',
+      name: 'DAG flow',
+      description: 'branching flow',
       created_at: '2026-03-22T00:00:00.000Z',
       updated_at: '2026-03-22T00:00:00.000Z',
       definition: {
@@ -75,91 +85,81 @@ describe('workflow-definition-form', () => {
         nodes: [
           {
             id: 'node-a',
-            key: 'node-a',
+            key: 'analyze',
             type: 'agent',
-            name: 'Step A',
-            prompt: 'Do A',
-            cliToolId: 'codex',
-            agentToolConfigId: 'cfg-a',
+            name: 'Analyze',
+            prompt: 'Inspect task',
             requiresApprovalAfterRun: false,
             position: null
           },
           {
             id: 'node-b',
-            key: 'node-b',
+            key: 'test',
+            type: 'command',
+            name: 'Run tests',
+            command: 'npm test',
+            requiresApprovalAfterRun: false,
+            position: null
+          },
+          {
+            id: 'node-c',
+            key: 'review',
             type: 'agent',
-            name: 'Step B',
-            prompt: 'Do B',
-            cliToolId: null,
-            agentToolConfigId: null,
+            name: 'Review',
+            prompt: 'Review outcome',
             requiresApprovalAfterRun: true,
             position: null
           }
         ],
-        edges: [{ from: 'node-a', to: 'node-b' }]
+        edges: [
+          { from: 'node-a', to: 'node-b' },
+          { from: 'node-a', to: 'node-c' },
+          { from: 'node-b', to: 'node-c' }
+        ]
       }
     })
 
     expect(result).toEqual({
-      name: 'Linear flow',
-      description: 'simple flow',
+      name: 'DAG flow',
+      description: 'branching flow',
       nodes: [
         {
-          name: 'Step A',
-          prompt: 'Do A',
-          cliToolId: 'codex',
-          agentToolConfigId: 'cfg-a',
-          requiresApproval: false
-        },
-        {
-          name: 'Step B',
-          prompt: 'Do B',
+          id: 'node-a',
+          key: 'analyze',
+          type: 'agent',
+          name: 'Analyze',
+          prompt: 'Inspect task',
+          command: '',
           cliToolId: '',
           agentToolConfigId: '',
-          requiresApproval: true
+          requiresApproval: false,
+          dependsOnIds: []
+        },
+        {
+          id: 'node-b',
+          key: 'test',
+          type: 'command',
+          name: 'Run tests',
+          prompt: '',
+          command: 'npm test',
+          cliToolId: '',
+          agentToolConfigId: '',
+          requiresApproval: false,
+          dependsOnIds: ['node-a']
+        },
+        {
+          id: 'node-c',
+          key: 'review',
+          type: 'agent',
+          name: 'Review',
+          prompt: 'Review outcome',
+          command: '',
+          cliToolId: '',
+          agentToolConfigId: '',
+          requiresApproval: true,
+          dependsOnIds: ['node-a', 'node-b']
         }
       ]
     })
-  })
-
-  it('rejects non-linear definitions for the legacy linear dialog', () => {
-    expect(
-      canEditWorkflowDefinitionInLinearDialog({
-        version: 1,
-        nodes: [
-          {
-            id: 'root',
-            key: 'root',
-            type: 'agent',
-            name: 'Root',
-            prompt: 'Start',
-            requiresApprovalAfterRun: false,
-            position: null
-          },
-          {
-            id: 'branch-a',
-            key: 'branch-a',
-            type: 'agent',
-            name: 'Branch A',
-            prompt: 'A',
-            requiresApprovalAfterRun: false,
-            position: null
-          },
-          {
-            id: 'branch-b',
-            key: 'branch-b',
-            type: 'agent',
-            name: 'Branch B',
-            prompt: 'B',
-            requiresApprovalAfterRun: false,
-            position: null
-          }
-        ],
-        edges: [
-          { from: 'root', to: 'branch-a' },
-          { from: 'root', to: 'branch-b' }
-        ]
-      })
-    ).toBe(false)
   })
 })

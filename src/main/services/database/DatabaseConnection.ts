@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { normalizeCliToolConfig } from '../../../shared/cli-config-spec'
 
-const TARGET_SCHEMA_VERSION = 8
+const TARGET_SCHEMA_VERSION = 9
 
 export class DatabaseConnection {
   private dbPath: string
@@ -27,7 +27,7 @@ export class DatabaseConnection {
     this.createBaseTables(db)
     this.createBaseIndexes(db)
 
-    const userVersion = Number(db.pragma('user_version', { simple: true }) ?? 0)
+    let userVersion = Number(db.pragma('user_version', { simple: true }) ?? 0)
     if (userVersion < 3) {
       console.log(
         `[DatabaseService] Rebuilding runtime schema: v${userVersion} -> v3`
@@ -44,17 +44,19 @@ export class DatabaseConnection {
         `)
 
         this.createRuntimeTables(db)
-        this.createRuntimeIndexes(db)
         db.pragma('user_version = 3')
       })
 
       rebuildRuntimeSchema()
+      userVersion = 3
     } else {
       this.createRuntimeTables(db)
-      this.createRuntimeIndexes(db)
     }
 
+    // Run migrations before creating runtime indexes; older DBs may have tables that exist but
+    // don't match the latest shape, which can cause index creation to fail.
     this.migrateSchema(db, userVersion)
+    this.createRuntimeIndexes(db)
 
     console.log('[DatabaseService] Tables initialized successfully')
   }
@@ -378,23 +380,41 @@ export class DatabaseConnection {
         WHERE scope = 'project';
       CREATE INDEX IF NOT EXISTS idx_workflow_definitions_scope_project
         ON workflow_definitions(scope, project_id, updated_at DESC);
-
-      CREATE INDEX IF NOT EXISTS idx_workflow_runs_status
-        ON workflow_runs(status, updated_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_workflow_runs_definition
-        ON workflow_runs(workflow_definition_id, created_at DESC);
-
-      CREATE INDEX IF NOT EXISTS idx_workflow_run_nodes_run_status
-        ON workflow_run_nodes(workflow_run_id, status, updated_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_workflow_run_nodes_session_id
-        ON workflow_run_nodes(session_id);
-      CREATE UNIQUE INDEX IF NOT EXISTS uniq_workflow_run_nodes_single_running
-        ON workflow_run_nodes(workflow_run_id)
-        WHERE status = 'running';
-
-      CREATE INDEX IF NOT EXISTS idx_workflow_run_reviews_node
-        ON workflow_run_reviews(workflow_run_node_id, reviewed_at DESC);
     `)
+
+    // Workflow tables had a legacy schema in older DBs; guard index creation so we can migrate cleanly.
+    if (this.tableHasColumn(db, 'workflow_runs', 'status') && this.tableHasColumn(db, 'workflow_runs', 'updated_at')) {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_workflow_runs_status
+          ON workflow_runs(status, updated_at DESC);
+      `)
+    }
+
+    if (this.tableHasColumn(db, 'workflow_runs', 'workflow_definition_id')) {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_workflow_runs_definition
+          ON workflow_runs(workflow_definition_id, created_at DESC);
+      `)
+    }
+
+    if (this.tableHasColumn(db, 'workflow_run_nodes', 'workflow_run_id')) {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_workflow_run_nodes_run_status
+          ON workflow_run_nodes(workflow_run_id, status, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_workflow_run_nodes_session_id
+          ON workflow_run_nodes(session_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_workflow_run_nodes_single_running
+          ON workflow_run_nodes(workflow_run_id)
+          WHERE status = 'running';
+      `)
+    }
+
+    if (this.tableHasColumn(db, 'workflow_run_reviews', 'workflow_run_node_id')) {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_workflow_run_reviews_node
+          ON workflow_run_reviews(workflow_run_node_id, reviewed_at DESC);
+      `)
+    }
   }
 
   private migrateSchema(db: Database.Database, originalUserVersion: number): void {
@@ -511,6 +531,118 @@ export class DatabaseConnection {
       }
     }
 
+    if (currentVersion < 9) {
+      db.pragma('foreign_keys = OFF')
+      const migrateToV9 = db.transaction(() => {
+        // workflow_template_nodes used to include a NOT NULL `capability_spec_json` column. The current
+        // code no longer writes it, so we rebuild the table to match the new schema while preserving data.
+        if (this.tableHasColumn(db, 'workflow_template_nodes', 'capability_spec_json')) {
+          db.exec(`
+            DROP TABLE IF EXISTS workflow_template_nodes_v9;
+            CREATE TABLE workflow_template_nodes_v9 (
+              id TEXT PRIMARY KEY,
+              template_id TEXT NOT NULL,
+              node_order INTEGER NOT NULL CHECK (node_order >= 1),
+              name TEXT NOT NULL,
+              prompt TEXT NOT NULL,
+              cli_tool_id TEXT
+                CHECK (cli_tool_id IS NULL OR cli_tool_id IN (
+                  'claude-code', 'cursor-agent', 'gemini-cli', 'codex', 'codex-cli', 'opencode'
+                )),
+              agent_tool_config_id TEXT,
+              requires_approval INTEGER NOT NULL DEFAULT 0 CHECK (requires_approval IN (0, 1)),
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE,
+              FOREIGN KEY (agent_tool_config_id) REFERENCES agent_tool_configs(id) ON DELETE SET NULL,
+              UNIQUE (template_id, node_order)
+            );
+
+            INSERT INTO workflow_template_nodes_v9 (
+              id, template_id, node_order, name, prompt, cli_tool_id, agent_tool_config_id,
+              requires_approval, created_at, updated_at
+            )
+            SELECT
+              id,
+              template_id,
+              node_order,
+              name,
+              prompt,
+              CASE
+                WHEN cli_tool_id IN ('claude-code', 'cursor-agent', 'gemini-cli', 'codex', 'codex-cli', 'opencode')
+                  THEN cli_tool_id
+                ELSE NULL
+              END AS cli_tool_id,
+              agent_tool_config_id,
+              requires_approval,
+              created_at,
+              updated_at
+            FROM workflow_template_nodes;
+
+            DROP TABLE workflow_template_nodes;
+            ALTER TABLE workflow_template_nodes_v9 RENAME TO workflow_template_nodes;
+          `)
+
+          this.createBaseIndexes(db)
+        }
+
+        // Older DBs may have a legacy workflow runtime schema (different columns and extra tables).
+        // Rebuild runtime workflow tables to the current schema to prevent crashes at startup.
+        const hasNewWorkflowRuns = this.tableHasColumn(db, 'workflow_runs', 'workflow_definition_id')
+        const hasNewWorkflowRunNodes = this.tableHasColumn(db, 'workflow_run_nodes', 'workflow_run_id')
+        if (!hasNewWorkflowRuns || !hasNewWorkflowRunNodes) {
+          const legacyWorkflowTables = [
+            'workflow_run_reviews',
+            'workflow_attempt_artifacts',
+            'workflow_node_attempts',
+            'workflow_run_edges',
+            'workflow_run_snapshots',
+            'workflow_run_nodes',
+            'workflow_runs'
+          ]
+
+          // Snapshot legacy workflow runtime data before dropping incompatible tables.
+          // This keeps historical rows available for manual recovery if needed.
+          for (const tableName of legacyWorkflowTables) {
+            if (!this.tableExists(db, tableName)) {
+              continue
+            }
+
+            const backupTableName = `legacy_${tableName}_v9`
+            if (this.tableExists(db, backupTableName)) {
+              continue
+            }
+
+            db.exec(`
+              CREATE TABLE ${backupTableName} AS
+              SELECT * FROM ${tableName};
+            `)
+          }
+
+          db.exec(`
+            DROP TABLE IF EXISTS workflow_run_reviews;
+            DROP TABLE IF EXISTS workflow_attempt_artifacts;
+            DROP TABLE IF EXISTS workflow_node_attempts;
+            DROP TABLE IF EXISTS workflow_run_edges;
+            DROP TABLE IF EXISTS workflow_run_snapshots;
+            DROP TABLE IF EXISTS workflow_run_nodes;
+            DROP TABLE IF EXISTS workflow_runs;
+          `)
+          this.createRuntimeTables(db)
+        }
+
+        db.pragma('user_version = 9')
+      })
+
+      try {
+        migrateToV9()
+        currentVersion = 9
+        console.log('[DatabaseService] Migrated schema to v9')
+      } finally {
+        db.pragma('foreign_keys = ON')
+      }
+    }
+
     if (currentVersion < TARGET_SCHEMA_VERSION) {
       db.pragma(`user_version = ${TARGET_SCHEMA_VERSION}`)
     }
@@ -519,6 +651,14 @@ export class DatabaseConnection {
   private tableHasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
     const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name?: string }>
     return columns.some((column) => column.name === columnName)
+  }
+
+  private tableExists(db: Database.Database, tableName: string): boolean {
+    const row = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(tableName) as { name?: string } | undefined
+
+    return row?.name === tableName
   }
 
   private normalizeAgentToolConfigs(db: Database.Database): void {

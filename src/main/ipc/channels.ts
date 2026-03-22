@@ -156,6 +156,7 @@ export const IPC_CHANNELS = {
   workflow: {
     listDefinitions: 'workflow:listDefinitions',
     getDefinition: 'workflow:getDefinition',
+    generateDefinition: 'workflow:generateDefinition',
     createDefinition: 'workflow:createDefinition',
     updateDefinition: 'workflow:updateDefinition',
     deleteDefinition: 'workflow:deleteDefinition',
@@ -461,6 +462,15 @@ export interface IpcContracts {
     unknown[]
   >
   'workflow:getDefinition': IpcContract<[string], unknown>
+  'workflow:generateDefinition': IpcContract<
+    [
+      {
+        prompt: string
+        name?: string | null
+      }
+    ],
+    unknown
+  >
   'workflow:createDefinition': IpcContract<[UnknownRecord], unknown>
   'workflow:updateDefinition': IpcContract<[UnknownRecord], unknown>
   'workflow:deleteDefinition': IpcContract<[string], boolean>

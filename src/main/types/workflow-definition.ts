@@ -7,7 +7,9 @@ export type {
   WorkflowDefinitionDocument,
   DbWorkflowDefinition,
   CreateWorkflowDefinitionInput,
-  UpdateWorkflowDefinitionInput
+  UpdateWorkflowDefinitionInput,
+  GenerateWorkflowDefinitionInput,
+  GeneratedWorkflowDefinitionResult
 } from './db/workflow-definition'
 
 import type {

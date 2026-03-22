@@ -1,383 +1,611 @@
-import { useCallback, useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
-import { db, type AgentToolConfig } from '@/data';
+import { useCallback, useEffect, useMemo, useState } from 'react'
+
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { useLanguage } from '@/providers/language-provider';
-import { normalizeCliTools, type CLIToolInfo } from '@/lib/cli-tools';
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
+import { Select } from '@/components/ui/select'
+import { db, type AgentToolConfig, type GeneratedWorkflowDefinitionResult } from '@/data'
+import { newUuid } from '@/lib/ids'
+import { normalizeCliTools, type CLIToolInfo } from '@/lib/cli-tools'
+import { cn } from '@/lib/utils'
+import { useLanguage } from '@/providers/language-provider'
 
 export interface TaskNodeTemplateDraft {
-  name: string;
-  prompt: string;
-  cliToolId: string;
-  agentToolConfigId: string;
-  requiresApproval: boolean;
+  id: string
+  key: string
+  type: 'agent' | 'command'
+  name: string
+  prompt: string
+  command: string
+  cliToolId: string
+  agentToolConfigId: string
+  requiresApproval: boolean
+  dependsOnIds: string[]
 }
 
 export interface WorkflowTemplateFormValues {
-  name: string;
-  description?: string;
-  nodes: Array<{
-    name: string;
-    prompt: string;
-    cliToolId?: string;
-    agentToolConfigId?: string;
-    requiresApproval: boolean;
-  }>;
+  name: string
+  description?: string
+  nodes: TaskNodeTemplateDraft[]
 }
 
 interface WorkflowTemplateDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  initialValues?: WorkflowTemplateFormValues | null;
-  onSubmit: (values: WorkflowTemplateFormValues) => Promise<void>;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  initialValues?: WorkflowTemplateFormValues | null
+  onSubmit: (values: WorkflowTemplateFormValues) => Promise<void>
 }
 
-const DEFAULT_NODE: TaskNodeTemplateDraft = {
+const createDefaultNode = (
+  index: number,
+  previousNodeId?: string | null
+): TaskNodeTemplateDraft => ({
+  id: newUuid(),
+  key: `workflow-node-${index + 1}`,
+  type: 'agent',
   name: '',
   prompt: '',
+  command: '',
   cliToolId: '',
   agentToolConfigId: '',
-  requiresApproval: true,
-};
+  requiresApproval: index === 0,
+  dependsOnIds: previousNodeId ? [previousNodeId] : []
+})
+
+const mapGeneratedDefinitionToDrafts = (
+  generated: GeneratedWorkflowDefinitionResult
+): WorkflowTemplateFormValues => {
+  const dependencyMap = new Map<string, string[]>()
+  generated.definition.edges.forEach((edge) => {
+    dependencyMap.set(edge.to, [...(dependencyMap.get(edge.to) ?? []), edge.from])
+  })
+
+  return {
+    name: generated.name,
+    description: generated.description ?? undefined,
+    nodes: generated.definition.nodes.map((node, index) => ({
+      id: node.id,
+      key: node.key || `workflow-node-${index + 1}`,
+      type: node.type,
+      name: node.name,
+      prompt: node.prompt ?? '',
+      command: node.command ?? '',
+      cliToolId: node.cliToolId ?? '',
+      agentToolConfigId: node.agentToolConfigId ?? '',
+      requiresApproval: Boolean(node.requiresApprovalAfterRun),
+      dependsOnIds: dependencyMap.get(node.id) ?? []
+    }))
+  }
+}
 
 export function WorkflowTemplateDialog({
   open,
   onOpenChange,
   title,
   initialValues,
-  onSubmit,
+  onSubmit
 }: WorkflowTemplateDialogProps) {
-  const { t } = useLanguage();
-  const [templateName, setTemplateName] = useState('');
-  const [templateDescription, setTemplateDescription] = useState('');
+  const { t } = useLanguage()
+  const [templateName, setTemplateName] = useState('')
+  const [templateDescription, setTemplateDescription] = useState('')
   const [templateNodes, setTemplateNodes] = useState<TaskNodeTemplateDraft[]>([
-    { ...DEFAULT_NODE },
-  ]);
-  const [cliTools, setCliTools] = useState<CLIToolInfo[]>([]);
-  const [cliConfigsByTool, setCliConfigsByTool] = useState<
-    Record<string, AgentToolConfig[]>
-  >({});
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+    createDefaultNode(0)
+  ])
+  const [generationPrompt, setGenerationPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [cliTools, setCliTools] = useState<CLIToolInfo[]>([])
+  const [cliConfigsByTool, setCliConfigsByTool] = useState<Record<string, AgentToolConfig[]>>({})
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const loadCliConfigs = useCallback(
     async (toolId: string): Promise<AgentToolConfig[]> => {
-      if (!toolId) return [];
-      const cached = cliConfigsByTool[toolId];
-      if (cached) return cached;
+      if (!toolId) return []
+      const cached = cliConfigsByTool[toolId]
+      if (cached) return cached
 
       try {
-        const result = await db.listAgentToolConfigs(toolId);
-        const list = Array.isArray(result)
-          ? (result as AgentToolConfig[])
-          : [];
-        setCliConfigsByTool((prev) =>
-          prev[toolId] ? prev : { ...prev, [toolId]: list }
-        );
-        return list;
+        const result = await db.listAgentToolConfigs(toolId)
+        const list = Array.isArray(result) ? (result as AgentToolConfig[]) : []
+        setCliConfigsByTool((prev) => (prev[toolId] ? prev : { ...prev, [toolId]: list }))
+        return list
       } catch {
-        setCliConfigsByTool((prev) =>
-          prev[toolId] ? prev : { ...prev, [toolId]: [] }
-        );
-        return [];
+        setCliConfigsByTool((prev) => (prev[toolId] ? prev : { ...prev, [toolId]: [] }))
+        return []
       }
     },
     [cliConfigsByTool]
-  );
+  )
 
   useEffect(() => {
-    if (!open) return;
-    let active = true;
+    if (!open) return
+    let active = true
+
     const loadTools = async () => {
       try {
-        const detected = await window.api?.cliTools?.getSnapshot?.();
-        if (active) setCliTools(normalizeCliTools(detected));
-        void window.api?.cliTools?.refresh?.({ level: 'fast' });
+        const detected = await window.api?.cliTools?.getSnapshot?.()
+        if (active) setCliTools(normalizeCliTools(detected))
+        void window.api?.cliTools?.refresh?.({ level: 'fast' })
       } catch {
-        if (active) setCliTools([]);
+        if (active) setCliTools([])
       }
-    };
+    }
 
     const unsubscribe = window.api?.cliTools?.onUpdated?.((tools) => {
-      if (!active) return;
-      setCliTools(normalizeCliTools(tools));
-    });
-    void loadTools();
+      if (!active) return
+      setCliTools(normalizeCliTools(tools))
+    })
+
+    void loadTools()
+
     return () => {
-      active = false;
-      unsubscribe?.();
-    };
-  }, [open]);
+      active = false
+      unsubscribe?.()
+    }
+  }, [open])
 
   useEffect(() => {
-    if (!open) return;
-    setError(null);
+    if (!open) return
+
+    setError(null)
+    setGenerationPrompt('')
+
     if (initialValues) {
-      setTemplateName(initialValues.name);
-      setTemplateDescription(initialValues.description || '');
+      setTemplateName(initialValues.name)
+      setTemplateDescription(initialValues.description || '')
       setTemplateNodes(
         initialValues.nodes.length > 0
           ? initialValues.nodes.map((node) => ({
-              ...DEFAULT_NODE,
-              name: node.name,
-              prompt: node.prompt,
-              cliToolId: node.cliToolId || '',
-              agentToolConfigId: node.agentToolConfigId || '',
-              requiresApproval: node.requiresApproval,
+              ...node,
+              id: node.id || newUuid(),
+              key: node.key || `workflow-node-${node.name || 'node'}`
             }))
-          : [{ ...DEFAULT_NODE }]
-      );
-    } else {
-      setTemplateName('');
-      setTemplateDescription('');
-      setTemplateNodes([{ ...DEFAULT_NODE }]);
+          : [createDefaultNode(0)]
+      )
+      return
     }
-  }, [open, initialValues]);
+
+    setTemplateName('')
+    setTemplateDescription('')
+    setTemplateNodes([createDefaultNode(0)])
+  }, [open, initialValues])
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return
+
     const toolIds = Array.from(
       new Set(
         templateNodes
+          .filter((node) => node.type === 'agent')
           .map((node) => node.cliToolId)
           .filter((toolId): toolId is string => Boolean(toolId))
       )
-    );
+    )
+
     toolIds.forEach((toolId) => {
-      void loadCliConfigs(toolId);
-    });
-  }, [loadCliConfigs, open, templateNodes]);
+      void loadCliConfigs(toolId)
+    })
+  }, [loadCliConfigs, open, templateNodes])
+
+  const nodeOptions = useMemo(
+    () =>
+      templateNodes.map((node, index) => ({
+        value: node.id,
+        label: node.name.trim() || `${t.task.workflowNodeLabel} ${index + 1}`
+      })),
+    [t.task.workflowNodeLabel, templateNodes]
+  )
+
+  const updateNode = (nodeId: string, updater: (node: TaskNodeTemplateDraft) => TaskNodeTemplateDraft) => {
+    setTemplateNodes((prev) => prev.map((node) => (node.id === nodeId ? updater(node) : node)))
+  }
+
+  const moveNode = (fromIndex: number, toIndex: number) => {
+    setTemplateNodes((prev) => {
+      if (toIndex < 0 || toIndex >= prev.length) {
+        return prev
+      }
+
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      if (!moved) return prev
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }
+
+  const removeNode = (nodeId: string) => {
+    setTemplateNodes((prev) => {
+      const next = prev.filter((node) => node.id !== nodeId)
+      if (next.length === 0) {
+        return [createDefaultNode(0)]
+      }
+
+      return next.map((node) => ({
+        ...node,
+        dependsOnIds: node.dependsOnIds.filter((dependencyId) => dependencyId !== nodeId)
+      }))
+    })
+  }
+
+  const handleGenerate = async () => {
+    if (!generationPrompt.trim()) {
+      setError(t.task.workflowGenerationPromptRequired || 'Please enter a workflow goal first.')
+      return
+    }
+
+    setIsGenerating(true)
+    setError(null)
+
+    try {
+      const generated = await db.generateWorkflowDefinition({
+        prompt: generationPrompt.trim(),
+        name: templateName.trim() || undefined
+      })
+      const draft = mapGeneratedDefinitionToDrafts(generated)
+      setTemplateName((current) => current.trim() || draft.name)
+      setTemplateDescription((current) => current.trim() || draft.description || '')
+      setTemplateNodes(draft.nodes.length > 0 ? draft.nodes : [createDefaultNode(0)])
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+    event.preventDefault()
+
     if (!templateName.trim()) {
-      setError(t.task.createTemplateNameRequired);
-      return;
+      setError(t.task.createTemplateNameRequired)
+      return
     }
 
-    const nodes = templateNodes
-      .map((node, index) => ({
-        name: node.name.trim() || `${t.task.workflowNodeLabel} ${index + 1}`,
-        prompt: node.prompt.trim(),
-        cliToolId: node.cliToolId || undefined,
-        agentToolConfigId: node.cliToolId
-          ? node.agentToolConfigId || undefined
-          : undefined,
-        requiresApproval: node.requiresApproval,
-      }))
-      .filter((node) => node.prompt.length > 0);
+    const nodes = templateNodes.map((node, index) => ({
+      ...node,
+      name: node.name.trim() || `${t.task.workflowNodeLabel} ${index + 1}`,
+      key: node.key.trim() || `workflow-node-${index + 1}`,
+      prompt: node.prompt.trim(),
+      command: node.command.trim(),
+      cliToolId: node.type === 'agent' ? node.cliToolId : '',
+      agentToolConfigId: node.type === 'agent' ? node.agentToolConfigId : '',
+      dependsOnIds: (node.dependsOnIds ?? []).filter((dependencyId) => dependencyId !== node.id)
+    }))
 
     if (nodes.length === 0) {
-      setError(t.task.createTemplateStageRequired);
-      return;
+      setError(t.task.createTemplateStageRequired)
+      return
     }
 
-    setSaving(true);
-    setError(null);
+    const invalidNode = nodes.find(
+      (node) =>
+        (node.type === 'agent' && !node.prompt) || (node.type === 'command' && !node.command)
+    )
+    if (invalidNode) {
+      setError(t.task.workflowNodeContentRequired || 'Each workflow node needs prompt or command content.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
     try {
-      await onSubmit({
+      const payload: WorkflowTemplateFormValues = {
         name: templateName.trim(),
         description: templateDescription.trim() || undefined,
-        nodes,
-      });
-      onOpenChange(false);
+        nodes
+      }
+      await onSubmit(payload)
+      onOpenChange(false)
     } catch (err) {
-      setError(String(err));
+      setError(String(err))
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label className="text-sm font-medium">
-              {t.task.createTemplateNameLabel}
-            </label>
-            <input
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              placeholder={t.task.createTemplateNamePlaceholder}
-              className={cn(
-                'mt-1.5 w-full px-3 py-2 text-sm',
-                'bg-background border rounded-md',
-                'focus:outline-none focus:ring-2 focus:ring-primary'
-              )}
-            />
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 overflow-hidden">
+          <div className="grid gap-4 lg:grid-cols-[1.15fr,0.85fr]">
+            <div>
+              <label className="text-sm font-medium">{t.task.createTemplateNameLabel}</label>
+              <input
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
+                placeholder={t.task.createTemplateNamePlaceholder}
+                className={cn(
+                  'mt-1.5 w-full px-3 py-2 text-sm',
+                  'bg-background border rounded-md',
+                  'focus:outline-none focus:ring-2 focus:ring-primary'
+                )}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t.task.workflowGenerationPromptLabel || 'Generate from goal'}</label>
+              <div className="mt-1.5 flex gap-2">
+                <textarea
+                  value={generationPrompt}
+                  onChange={(event) => setGenerationPrompt(event.target.value)}
+                  placeholder={
+                    t.task.workflowGenerationPromptPlaceholder ||
+                    'Describe the workflow you want to generate.'
+                  }
+                  className={cn(
+                    'min-h-[84px] flex-1 px-3 py-2 text-sm',
+                    'bg-background border rounded-md',
+                    'focus:outline-none focus:ring-2 focus:ring-primary'
+                  )}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="self-start"
+                  onClick={() => void handleGenerate()}
+                  disabled={isGenerating}
+                >
+                  {isGenerating
+                    ? t.task.workflowGenerateLoading || 'Generating...'
+                    : t.task.workflowGenerateButton || 'Generate'}
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div>
-            <label className="text-sm font-medium">
-              {t.task.createTemplateDescriptionLabel}
-            </label>
+            <label className="text-sm font-medium">{t.task.createTemplateDescriptionLabel}</label>
             <textarea
               value={templateDescription}
-              onChange={(e) => setTemplateDescription(e.target.value)}
+              onChange={(event) => setTemplateDescription(event.target.value)}
               placeholder={t.task.createTemplateDescriptionPlaceholder}
               className={cn(
-                'mt-1.5 w-full min-h-[80px] px-3 py-2 text-sm',
+                'mt-1.5 w-full min-h-[72px] px-3 py-2 text-sm',
                 'bg-background border rounded-md',
                 'focus:outline-none focus:ring-2 focus:ring-primary'
               )}
             />
           </div>
 
-          <div className="space-y-3">
-            <div className="max-h-[45vh] overflow-y-auto overflow-x-hidden space-y-3 pr-1">
-              {templateNodes.map((node, index) => (
-                <div key={`node-${index}`} className="rounded-md border p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-medium">
-                      {t.task.workflowNodeLabel} {index + 1}
-                    </div>
-                    {templateNodes.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setTemplateNodes((prev) =>
-                            prev.filter((_, idx) => idx !== index)
-                          );
-                        }}
-                      >
-                        {t.common.remove}
-                      </Button>
-                    )}
-                  </div>
-                  <input
-                    value={node.name}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setTemplateNodes((prev) =>
-                        prev.map((item, idx) =>
-                          idx === index ? { ...item, name: value } : item
-                        )
-                      );
-                    }}
-                    placeholder={t.task.createStageNamePlaceholder}
-                    className="mt-2 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                  />
-                  <textarea
-                    value={node.prompt}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setTemplateNodes((prev) =>
-                        prev.map((item, idx) =>
-                          idx === index ? { ...item, prompt: value } : item
-                        )
-                      );
-                    }}
-                    placeholder={t.task.createStagePromptPlaceholder}
-                    className="mt-2 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                  />
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">
-                        {t.task.createCliLabel}
-                      </label>
-                      <Select
-                        value={node.cliToolId || ''}
-                        onValueChange={async (toolId) => {
-                          let defaultConfigId = '';
-                          if (toolId) {
-                            const configs =
-                              cliConfigsByTool[toolId] ||
-                              (await loadCliConfigs(toolId));
-                            const defaultConfig = configs.find(
-                              (cfg) => cfg.is_default
-                            );
-                            defaultConfigId = defaultConfig?.id || '';
-                          }
+          <div className="flex min-h-0 flex-1 flex-col space-y-3">
+            <div className="max-h-[50vh] overflow-y-auto overflow-x-hidden space-y-3 pr-1">
+              {templateNodes.map((node, index) => {
+                const dependencyCandidates = nodeOptions.filter((candidate) => candidate.value !== node.id)
 
-                          setTemplateNodes((prev) =>
-                            prev.map((item, idx) =>
-                              idx === index
-                                ? {
-                                    ...item,
-                                    cliToolId: toolId,
-                                    agentToolConfigId: defaultConfigId,
-                                  }
-                                : item
-                            )
-                          );
-                        }}
-                        triggerClassName="mt-1.5 h-9 px-2"
-                        placeholder={t.task.createStageCliInherit}
-                        options={cliTools.map((tool) => ({
-                          value: tool.id,
-                          label: tool.displayName || tool.name || tool.id,
-                        }))}
-                      />
+                return (
+                  <div key={node.id} className="rounded-md border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-xs font-medium">
+                        {t.task.workflowNodeLabel} {index + 1}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={index === 0}
+                          onClick={() => moveNode(index, index - 1)}
+                        >
+                          {t.task.workflowMoveUp || 'Up'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={index === templateNodes.length - 1}
+                          onClick={() => moveNode(index, index + 1)}
+                        >
+                          {t.task.workflowMoveDown || 'Down'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeNode(node.id)}
+                        >
+                          {t.common.remove}
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">
-                        {t.task.createCliConfigLabel}
-                      </label>
-                      <Select
-                        value={node.agentToolConfigId || ''}
-                        disabled={!node.cliToolId}
-                        onValueChange={(configId) => {
-                          setTemplateNodes((prev) =>
-                            prev.map((item, idx) =>
-                              idx === index
-                                ? { ...item, agentToolConfigId: configId }
-                                : item
-                            )
-                          );
-                        }}
-                        triggerClassName="mt-1.5 h-9 px-2"
-                        placeholder={
-                          !node.cliToolId
-                            ? t.task.createCliConfigSelectTool
-                            : t.task.createStageConfigInherit
-                        }
-                        options={(node.cliToolId
-                          ? cliConfigsByTool[node.cliToolId] || []
-                          : []
-                        ).map((config) => ({
-                          value: config.id,
-                          label: config.name,
-                        }))}
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    <label className="flex items-center gap-1.5">
+
+                    <div className="mt-3 grid gap-3 lg:grid-cols-[1fr,180px]">
                       <input
-                        type="checkbox"
-                        checked={node.requiresApproval}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setTemplateNodes((prev) =>
-                            prev.map((item, idx) =>
-                              idx === index
-                                ? { ...item, requiresApproval: checked }
-                                : item
-                            )
-                          );
+                        value={node.name}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          updateNode(node.id, (current) => ({
+                            ...current,
+                            name: value,
+                            key:
+                              current.key.startsWith('workflow-node-') && value.trim()
+                                ? value
+                                    .trim()
+                                    .toLowerCase()
+                                    .replace(/[^a-z0-9]+/g, '-')
+                                    .replace(/^-+|-+$/g, '') || current.key
+                                : current.key
+                          }))
                         }}
+                        placeholder={t.task.createStageNamePlaceholder}
+                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
                       />
-                      {t.task.createStageRequiresApproval}
-                    </label>
+                      <Select
+                        value={node.type}
+                        onValueChange={(value) => {
+                          updateNode(node.id, (current) => ({
+                            ...current,
+                            type: value as 'agent' | 'command',
+                            cliToolId: value === 'agent' ? current.cliToolId : '',
+                            agentToolConfigId: value === 'agent' ? current.agentToolConfigId : ''
+                          }))
+                        }}
+                        options={[
+                          {
+                            value: 'agent',
+                            label: t.task.workflowNodeTypeAgent || 'Agent'
+                          },
+                          {
+                            value: 'command',
+                            label: t.task.workflowNodeTypeCommand || 'Command'
+                          }
+                        ]}
+                      />
+                    </div>
+
+                    <div className="mt-3">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        {node.type === 'agent'
+                          ? t.task.workflowNodePromptLabel || 'Prompt'
+                          : t.task.workflowNodeCommandLabel || 'Command'}
+                      </label>
+                      <textarea
+                        value={node.type === 'agent' ? node.prompt : node.command}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          updateNode(node.id, (current) =>
+                            current.type === 'agent'
+                              ? { ...current, prompt: value }
+                              : { ...current, command: value }
+                          )
+                        }}
+                        placeholder={
+                          node.type === 'agent'
+                            ? t.task.createStagePromptPlaceholder
+                            : t.task.workflowNodeCommandPlaceholder || 'Command to run'
+                        }
+                        className="mt-1.5 w-full rounded-md border bg-background px-2 py-2 text-sm"
+                      />
+                    </div>
+
+                    {node.type === 'agent' && (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">
+                            {t.task.createCliLabel}
+                          </label>
+                          <Select
+                            value={node.cliToolId || ''}
+                            onValueChange={async (toolId) => {
+                              let defaultConfigId = ''
+                              if (toolId) {
+                                const configs = cliConfigsByTool[toolId] || (await loadCliConfigs(toolId))
+                                const defaultConfig = configs.find((config) => config.is_default)
+                                defaultConfigId = defaultConfig?.id || ''
+                              }
+
+                              updateNode(node.id, (current) => ({
+                                ...current,
+                                cliToolId: toolId,
+                                agentToolConfigId: defaultConfigId
+                              }))
+                            }}
+                            triggerClassName="mt-1.5 h-9 px-2"
+                            placeholder={t.task.createStageCliInherit}
+                            options={cliTools.map((tool) => ({
+                              value: tool.id,
+                              label: tool.displayName || tool.name || tool.id
+                            }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">
+                            {t.task.createCliConfigLabel}
+                          </label>
+                          <Select
+                            value={node.agentToolConfigId || ''}
+                            disabled={!node.cliToolId}
+                            onValueChange={(configId) => {
+                              updateNode(node.id, (current) => ({
+                                ...current,
+                                agentToolConfigId: configId
+                              }))
+                            }}
+                            triggerClassName="mt-1.5 h-9 px-2"
+                            placeholder={
+                              !node.cliToolId
+                                ? t.task.createCliConfigSelectTool
+                                : t.task.createStageConfigInherit
+                            }
+                            options={(node.cliToolId ? cliConfigsByTool[node.cliToolId] || [] : []).map(
+                              (config) => ({
+                                value: config.id,
+                                label: config.name
+                              })
+                            )}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-3 space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        {t.task.workflowDependenciesLabel || 'Dependencies'}
+                      </label>
+                      {dependencyCandidates.length === 0 ? (
+                        <div className="text-xs text-muted-foreground">
+                          {t.task.workflowDependenciesEmpty || 'This node can start immediately.'}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {dependencyCandidates.map((candidate) => {
+                            const checked = node.dependsOnIds.includes(candidate.value)
+                            return (
+                              <label
+                                key={candidate.value}
+                                className="flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(event) => {
+                                    const nextChecked = event.target.checked
+                                    updateNode(node.id, (current) => ({
+                                      ...current,
+                                      dependsOnIds: nextChecked
+                                        ? [...current.dependsOnIds, candidate.value]
+                                        : current.dependsOnIds.filter(
+                                            (dependencyId) => dependencyId !== candidate.value
+                                          )
+                                    }))
+                                  }}
+                                />
+                                <span>{candidate.label}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      <label className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={node.requiresApproval}
+                          onChange={(event) => {
+                            const checked = event.target.checked
+                            updateNode(node.id, (current) => ({
+                              ...current,
+                              requiresApproval: checked
+                            }))
+                          }}
+                        />
+                        {t.task.createStageRequiresApproval}
+                      </label>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             <Button
@@ -385,7 +613,10 @@ export function WorkflowTemplateDialog({
               variant="ghost"
               size="sm"
               onClick={() =>
-                setTemplateNodes((prev) => [...prev, { ...DEFAULT_NODE }])
+                setTemplateNodes((prev) => [
+                  ...prev,
+                  createDefaultNode(prev.length, prev[prev.length - 1]?.id ?? null)
+                ])
               }
             >
               {t.task.addStage}
@@ -405,5 +636,5 @@ export function WorkflowTemplateDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

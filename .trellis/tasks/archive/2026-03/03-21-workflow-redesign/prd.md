@@ -53,22 +53,32 @@
 
 ## Acceptance Criteria (evolving)
 
-* [ ] 明确 Deskly 当前 workflow 的数据模型、执行模型与 UI 入口。
-* [ ] 明确 AgentCrew 的 Pipeline / Agent 双模式、调度和规划机制。
-* [ ] 明确两者最关键的设计差异及对 Deskly 改造的影响。
-* [ ] 给出 2-3 个适合 Deskly 的改造方向选项，并说明权衡。
-* [ ] 明确“生成后可微调、执行中冻结”的产品规则。
-* [ ] 明确节点级人工确认的时机与状态流转。
-* [ ] 明确失败节点对并行分支、后继节点和 task/run 聚合状态的影响。
-* [ ] 明确 run 顶层状态枚举并避免过度设计。
-* [ ] 明确节点重试后的状态恢复与历史记录策略。
-* [ ] 明确 review 状态下的用户动作与交互规则。
+* [x] 明确 Deskly 当前 workflow 的数据模型、执行模型与 UI 入口。
+* [x] 明确 AgentCrew 的 Pipeline / Agent 双模式、调度和规划机制。
+* [x] 明确两者最关键的设计差异及对 Deskly 改造的影响。
+* [x] 给出 2-3 个适合 Deskly 的改造方向选项，并说明权衡。
+* [x] 明确“生成后可微调、执行中冻结”的产品规则。
+* [x] 明确节点级人工确认的时机与状态流转。
+* [x] 明确失败节点对并行分支、后继节点和 task/run 聚合状态的影响。
+* [x] 明确 run 顶层状态枚举并避免过度设计。
+* [x] 明确节点重试后的状态恢复与历史记录策略。
+* [x] 明确 review 状态下的用户动作与交互规则。
 
 ## Definition of Done (team quality bar)
 
 * 流程设计结论能映射回现有代码结构
 * 方案边界清晰，MVP 与 out-of-scope 明确
 * 后续实施前有可执行的技术拆分
+
+## Implementation Outcome
+
+本任务后续已继续推进到实现阶段，当前仓库已落地以下结果：
+
+* 主数据模型从旧 `workflow template -> task_nodes` 桥接到 `workflow_definitions / workflow_runs / workflow_run_nodes / workflow_run_reviews`。
+* 调度器已按 DAG 依赖关系释放 ready 节点，并支持 agent/command 两类节点执行。
+* 节点级 review / retry / failed 聚合状态已落地，`task.status` 与 `workflow_run.status` 对齐。
+* 工作流模板编辑器已支持 DAG 依赖、command 节点，以及基于自然语言 prompt 生成初始 workflow 后再人工微调。
+* 第一版仍保持“执行中冻结定义”，不支持运行时动态 replan 或改变拓扑。
 
 ## Technical Approach
 

@@ -359,6 +359,8 @@ const api = {
     listDefinitions: (filter?: { scope?: 'global' | 'project'; projectId?: string | null }) =>
       invoke(IPC_CHANNELS.workflow.listDefinitions, filter),
     getDefinition: (id: string) => invoke(IPC_CHANNELS.workflow.getDefinition, id),
+    generateDefinition: (input: { prompt: string; name?: string | null }) =>
+      invoke(IPC_CHANNELS.workflow.generateDefinition, input),
     createDefinition: (input: unknown) => invoke(IPC_CHANNELS.workflow.createDefinition, input),
     updateDefinition: (input: unknown) => invoke(IPC_CHANNELS.workflow.updateDefinition, input),
     deleteDefinition: (id: string) => invoke(IPC_CHANNELS.workflow.deleteDefinition, id),

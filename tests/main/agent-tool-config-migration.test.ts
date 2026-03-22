@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { DatabaseConnection } from '../../src/main/services/database/DatabaseConnection'
 
 describe('agent tool config schema migration', () => {
-  it('migrates stored config_json values to canonical supported keys in v6', () => {
+  it('migrates stored config_json values to canonical supported keys and upgrades schema to latest version', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'deskly-agent-config-'))
     const dbPath = join(tempDir, 'test.db')
 
@@ -71,7 +71,7 @@ describe('agent tool config schema migration', () => {
     connection.initTables()
 
     const userVersion = Number(db.pragma('user_version', { simple: true }) ?? 0)
-    expect(userVersion).toBe(6)
+    expect(userVersion).toBe(9)
 
     const row = db
       .prepare('SELECT config_json FROM agent_tool_configs WHERE id = ?')

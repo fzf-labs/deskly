@@ -53,3 +53,14 @@ export interface CreateWorkflowDefinitionInput {
 export interface UpdateWorkflowDefinitionInput extends CreateWorkflowDefinitionInput {
   id: string
 }
+
+export interface GenerateWorkflowDefinitionInput {
+  prompt: string
+  name?: string | null
+}
+
+export interface GeneratedWorkflowDefinitionResult {
+  name: string
+  description: string | null
+  definition: WorkflowDefinitionDocument
+}

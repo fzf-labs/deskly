@@ -13,6 +13,7 @@ import { WorkflowRunReviewRepository } from './database/WorkflowRunReviewReposit
 import { TaskNodeRepository } from './database/TaskNodeRepository'
 import { AgentToolConfigRepository } from './database/AgentToolConfigRepository'
 import { AutomationRepository } from './database/AutomationRepository'
+import { WorkflowDefinitionGenerationService } from './WorkflowDefinitionGenerationService'
 import { WorkflowDefinitionService } from './WorkflowDefinitionService'
 import { WorkflowRunService } from './WorkflowRunService'
 import type { WorkflowSchedulerService } from './WorkflowSchedulerService'
@@ -43,6 +44,8 @@ import type {
 } from '../types/workflow'
 import type {
   CreateWorkflowDefinitionInput,
+  GenerateWorkflowDefinitionInput,
+  GeneratedWorkflowDefinitionResult,
   UpdateWorkflowDefinitionInput,
   WorkflowDefinition
 } from '../types/workflow-definition'
@@ -77,6 +80,7 @@ export class DatabaseService {
   private automationRepo: AutomationRepository
   private taskExecutionService: TaskExecutionService
   private workflowDefinitionService: WorkflowDefinitionService
+  private workflowDefinitionGenerationService: WorkflowDefinitionGenerationService
   private workflowRunService: WorkflowRunService
   private workflowSchedulerService: WorkflowSchedulerService | null = null
   private taskNodeStatusListeners: Array<(node: TaskNode) => void> = []
@@ -103,6 +107,7 @@ export class DatabaseService {
     this.automationRepo = new AutomationRepository(this.db)
     this.taskExecutionService = new TaskExecutionService(this.taskRepo, this.taskNodeRepo)
     this.workflowDefinitionService = new WorkflowDefinitionService(workflowDefinitionRepo)
+    this.workflowDefinitionGenerationService = new WorkflowDefinitionGenerationService()
     this.workflowRunService = new WorkflowRunService(
       this.taskRepo,
       workflowDefinitionRepo,
@@ -615,6 +620,12 @@ export class DatabaseService {
 
   createWorkflowDefinition(input: CreateWorkflowDefinitionInput): WorkflowDefinition {
     return this.workflowDefinitionService.createDefinition(input)
+  }
+
+  generateWorkflowDefinition(
+    input: GenerateWorkflowDefinitionInput
+  ): GeneratedWorkflowDefinitionResult {
+    return this.workflowDefinitionGenerationService.generateDefinition(input)
   }
 
   updateWorkflowDefinition(input: UpdateWorkflowDefinitionInput): WorkflowDefinition {

@@ -11,7 +11,6 @@ import { db } from '@/data';
 import { useLanguage } from '@/providers/language-provider';
 import {
   buildWorkflowDefinitionFromForm,
-  canEditWorkflowDefinitionInLinearDialog,
   WorkflowTemplateDialog,
   type WorkflowTemplateFormValues,
   workflowDefinitionToFormValues,
@@ -42,10 +41,6 @@ export function WorkflowTemplatesSettings() {
   };
 
   const handleEdit = (template: WorkflowDefinition) => {
-    if (!canEditWorkflowDefinitionInLinearDialog(template.definition)) {
-      window.alert('当前工作流包含分支或命令节点，暂不支持在线性编辑器中修改。');
-      return;
-    }
     setEditingTemplate(template);
     setDialogOpen(true);
   };

@@ -289,6 +289,7 @@ interface DatabaseAPI {
 interface WorkflowAPI {
   listDefinitions: (filter?: { scope?: 'global' | 'project'; projectId?: string | null }) => Promise<unknown[]>
   getDefinition: (id: string) => Promise<unknown>
+  generateDefinition: (input: { prompt: string; name?: string | null }) => Promise<unknown>
   createDefinition: (input: unknown) => Promise<unknown>
   updateDefinition: (input: unknown) => Promise<unknown>
   deleteDefinition: (id: string) => Promise<boolean>
