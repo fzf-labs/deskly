@@ -1,10 +1,14 @@
+import { EventEmitter } from 'events'
+import { readFile, stat } from 'fs/promises'
 import { describe, expect, it } from 'vitest'
+import { afterEach, vi } from 'vitest'
 
 import { ClaudeCodeAdapter } from '../../src/main/services/cli/adapters/ClaudeCodeAdapter'
 import { CodexCliAdapter } from '../../src/main/services/cli/adapters/CodexCliAdapter'
 import { CursorAgentAdapter } from '../../src/main/services/cli/adapters/CursorAgentAdapter'
 import { GeminiCliAdapter } from '../../src/main/services/cli/adapters/GeminiCliAdapter'
 import { OpencodeAdapter } from '../../src/main/services/cli/adapters/OpencodeAdapter'
+import { ProcessCliAdapter } from '../../src/main/services/cli/adapters/ProcessCliAdapter'
 
 const baseOptions = {
   sessionId: 'session-1',
@@ -13,7 +17,30 @@ const baseOptions = {
   prompt: 'Implement the requested change'
 }
 
+const waitFor = async (predicate: () => boolean | Promise<boolean>, timeoutMs = 1000): Promise<void> => {
+  const startedAt = Date.now()
+  while (!(await predicate())) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error('Timed out waiting for condition')
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+class MockCliSessionHandle extends EventEmitter {
+  sessionId = 'session-1'
+  toolId = 'codex'
+  status = 'running' as const
+  msgStore = {} as never
+
+  stop() {}
+}
+
 describe('CLI adapter argv builders', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('builds claude args from canonical snake_case config', () => {
     const adapter = new ClaudeCodeAdapter({
       getConfig: () => ({ executablePath: 'claude' })
@@ -87,6 +114,7 @@ describe('CLI adapter argv builders', () => {
       toolId: 'codex',
       toolConfig: {
         model: 'gpt-5',
+        reasoning_effort: 'high',
         config_overrides: ['model="gpt-5"'],
         enable_features: ['alpha'],
         disable_features: ['beta'],
@@ -110,6 +138,8 @@ describe('CLI adapter argv builders', () => {
 
     expect(spec.args).toEqual(
       expect.arrayContaining([
+        '-c',
+        'reasoning.effort="high"',
         '-c',
         'model="gpt-5"',
         '--enable',
@@ -146,6 +176,41 @@ describe('CLI adapter argv builders', () => {
         '-'
       ])
     )
+  })
+
+  it('materializes inline codex output schema JSON into a temp file', async () => {
+    const adapter = new CodexCliAdapter()
+    const handle = new MockCliSessionHandle()
+    const startSessionSpy = vi
+      .spyOn(ProcessCliAdapter.prototype, 'startSession')
+      .mockResolvedValue(handle as never)
+
+    await adapter.startSession({
+      ...baseOptions,
+      toolId: 'codex',
+      toolConfig: {
+        output_schema: '{"type":"object","properties":{"name":{"type":"string"}}}'
+      }
+    })
+
+    expect(startSessionSpy).toHaveBeenCalledTimes(1)
+
+    const forwardedOptions = startSessionSpy.mock.calls[0]?.[0]
+    const schemaPath = forwardedOptions?.toolConfig?.output_schema
+
+    expect(typeof schemaPath).toBe('string')
+    expect(schemaPath).not.toBe('{"type":"object","properties":{"name":{"type":"string"}}}')
+    await expect(readFile(schemaPath as string, 'utf-8')).resolves.toContain('"type": "object"')
+
+    handle.emit('close', { sessionId: 'session-1', code: 0 })
+    await waitFor(async () => {
+      try {
+        await stat(schemaPath as string)
+        return false
+      } catch {
+        return true
+      }
+    })
   })
 
   it('builds cursor args from canonical snake_case config', () => {

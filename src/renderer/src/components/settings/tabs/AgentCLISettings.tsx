@@ -24,9 +24,12 @@ import {
 } from '@/lib/agent-cli-tools';
 import {
   createCliToolConfigTemplate,
+  deriveCodexPermissionsPreset,
+  getVisibleCliToolConfigSpec,
   getCliToolConfigSpec,
   normalizeCliToolConfig,
   normalizeCliToolConfigWithDefaults,
+  resolveCodexPermissionsPreset,
   type CliConfigFieldSpec as ConfigFieldSchema,
 } from '../../../../../shared/agent-cli-config-spec';
 
@@ -44,21 +47,32 @@ const TOOL_CONFIG_SCHEMAS: Record<string, Record<string, ConfigFieldSchema>> = T
   {} as Record<string, Record<string, ConfigFieldSchema>>
 );
 
-const ADVANCED_FIELDS_BY_TOOL: Record<string, Set<string>> = TOOL_IDS.reduce((acc, toolId) => {
-  const fields = getCliToolConfigSpec(toolId)?.fields ?? {};
-  acc[toolId] = new Set(
-    Object.entries(fields)
-      .filter(([, field]) => field.advanced)
-      .map(([fieldKey]) => fieldKey)
-  );
-  return acc;
-}, {} as Record<string, Set<string>>);
+const VISIBLE_TOOL_CONFIG_SCHEMAS: Record<string, Record<string, ConfigFieldSchema>> = TOOL_IDS.reduce(
+  (acc, toolId) => {
+    acc[toolId] = getVisibleCliToolConfigSpec(toolId);
+    return acc;
+  },
+  {} as Record<string, Record<string, ConfigFieldSchema>>
+);
 
 const formatFieldLabel = (key: string): string =>
   key
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+
+const getLocalizedCopy = (
+  localized: Partial<Record<'en-US' | 'zh-CN', string>> | undefined,
+  fallback: string | undefined,
+  language: 'en-US' | 'zh-CN'
+): string | undefined => localized?.[language] || fallback;
+
+const getFieldLabel = (
+  fieldKey: string,
+  field: ConfigFieldSchema
+): string =>
+  getLocalizedCopy(field.labels, field.label, 'en-US') ||
+  formatFieldLabel(fieldKey);
 
 const parseStringArrayInput = (value: string): string[] =>
   value
@@ -131,7 +145,7 @@ export function AgentCLISettings({
   settings,
   onSettingsChange,
 }: SettingsTabProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [tools, setTools] = useState<CLIToolInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -269,13 +283,7 @@ export function AgentCLISettings({
           ? base.model
           : typeof base.defaultModel === 'string' && base.defaultModel.trim()
             ? base.defaultModel
-            : base.model,
-      base_command_override:
-        typeof base.base_command_override === 'string' && base.base_command_override.trim()
-          ? base.base_command_override
-          : typeof base.executablePath === 'string' && base.executablePath.trim()
-            ? base.executablePath
-            : base.base_command_override
+            : base.model
     });
 
     return {
@@ -449,38 +457,37 @@ export function AgentCLISettings({
   );
   const configToolLabel = activeTool?.displayName || configToolId;
   const activeConfigSchema = useMemo(
-    () => TOOL_CONFIG_SCHEMAS[configToolId] || {},
+    () => VISIBLE_TOOL_CONFIG_SCHEMAS[configToolId] || {},
     [configToolId]
   );
   const configFieldEntries = useMemo(
     () => Object.entries(activeConfigSchema),
     [activeConfigSchema]
   );
-  const advancedFieldKeys = useMemo(
-    () => ADVANCED_FIELDS_BY_TOOL[configToolId] ?? new Set<string>(),
-    [configToolId]
-  );
-  const basicConfigFieldEntries = useMemo(
-    () => configFieldEntries.filter(([fieldKey]) => !advancedFieldKeys.has(fieldKey)),
-    [advancedFieldKeys, configFieldEntries]
-  );
-  const advancedConfigFieldEntries = useMemo(
-    () => configFieldEntries.filter(([fieldKey]) => advancedFieldKeys.has(fieldKey)),
-    [advancedFieldKeys, configFieldEntries]
-  );
-
   const setDraftFieldValue = useCallback((fieldKey: string, value: unknown) => {
-    setConfigDraftConfig((prev) =>
-      sanitizeConfigDraft(configToolId, {
+    setConfigDraftConfig((prev) => {
+      const nextDraft: Record<string, unknown> = {
         ...prev,
         [fieldKey]: value,
-      })
-    );
+      };
+
+      if (configToolId === 'codex') {
+        if (fieldKey === 'permissions_preset') {
+          Object.assign(nextDraft, resolveCodexPermissionsPreset(value));
+        }
+
+        if (fieldKey === 'sandbox' || fieldKey === 'ask_for_approval') {
+          nextDraft.permissions_preset = deriveCodexPermissionsPreset(nextDraft);
+        }
+      }
+
+      return sanitizeConfigDraft(configToolId, nextDraft);
+    });
   }, [configToolId, sanitizeConfigDraft]);
 
   const renderConfigField = useCallback((fieldKey: string, field: ConfigFieldSchema) => {
     const value = configDraftConfig[fieldKey];
-    const label = formatFieldLabel(fieldKey);
+    const label = getFieldLabel(fieldKey, field);
     const isSecretField = fieldKey === 'api_key';
     const isWideField =
       field.type === 'stringArray' ||
@@ -488,7 +495,7 @@ export function AgentCLISettings({
       (field.type === 'string' && Boolean(field.multiline)) ||
       isSecretField;
     const fieldDescription =
-      field.description ||
+      getLocalizedCopy(field.descriptions, field.description, language) ||
       (field.type === 'stringArray'
         ? t.settings?.cliConfigHintArgsPerLine || 'One argument per line'
         : field.type === 'stringMap'
@@ -505,7 +512,7 @@ export function AgentCLISettings({
             placeholder={t.settings?.cliConfigOptionDefault || "Default"}
             options={field.options.map((option) => ({
               value: option.value,
-              label: option.label,
+              label: getLocalizedCopy(option.labels, option.label, language) || option.label,
             }))}
           />
         ) : field.type === 'string' && field.multiline ? (
@@ -581,14 +588,14 @@ export function AgentCLISettings({
             <span>{(value ?? field.defaultValue) === true ? (t.settings?.cliConfigOptionEnabled || 'Enabled') : (t.settings?.cliConfigOptionDisabled || 'Disabled')}</span>
           </label>
         )}
-        <p className="text-muted-foreground text-[11px] font-mono">
-          {fieldKey}
-          {fieldDescription ? ` · ${fieldDescription}` : ''}
-        </p>
+        {fieldDescription ? (
+          <p className="text-muted-foreground text-[11px]">{fieldDescription}</p>
+        ) : null}
       </div>
     );
   }, [
     configDraftConfig,
+    language,
     setDraftFieldValue,
     isApiKeyVisible,
     t.settings?.cliConfigHideSecret,
@@ -910,32 +917,10 @@ export function AgentCLISettings({
                   {t.settings?.cliConfigNoFields || 'No configurable fields for this CLI.'}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {basicConfigFieldEntries.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                        {t.settings?.cliConfigSectionBasic || 'Basic'}
-                      </p>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {basicConfigFieldEntries.map(([fieldKey, field]) =>
-                          renderConfigField(fieldKey, field)
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {advancedConfigFieldEntries.length > 0 ? (
-                    <div className="space-y-2 border-t pt-3">
-                      <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                        {t.settings?.cliConfigSectionAdvanced || 'Advanced'}
-                      </p>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {advancedConfigFieldEntries.map(([fieldKey, field]) =>
-                          renderConfigField(fieldKey, field)
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
+                <div className="grid gap-3 md:grid-cols-2">
+                  {configFieldEntries.map(([fieldKey, field]) =>
+                    renderConfigField(fieldKey, field)
+                  )}
                 </div>
               )}
             </div>

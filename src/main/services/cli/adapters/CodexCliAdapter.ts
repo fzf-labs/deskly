@@ -1,7 +1,18 @@
+import { mkdtemp, rm, writeFile } from 'fs/promises'
+import * as os from 'os'
+import * as path from 'path'
+
 import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliAdapter } from './ProcessCliAdapter'
 import { parseJsonLine, successSignal } from './completion'
-import { asBoolean, asString, asStringArray, pushFlag, pushFlagWithValue, pushRepeatableFlag } from './config-utils'
+import {
+  asBoolean,
+  asString,
+  asStringArray,
+  pushFlag,
+  pushFlagWithValue,
+  pushRepeatableFlag
+} from './config-utils'
 import { ProcessCommandSpec } from '../ProcessCliSession'
 
 type RecordLike = Record<string, unknown>
@@ -24,6 +35,7 @@ export class CodexCliAdapter implements CliAdapter {
   private adapter: ProcessCliAdapter
   private threadIds = new Map<string, string>()
   private stdoutBuffers = new Map<string, string>()
+  private materializedSchemaDirs = new Map<string, string>()
 
   private log(message: string, meta?: Record<string, unknown>): void {
     if (meta) {
@@ -34,51 +46,75 @@ export class CodexCliAdapter implements CliAdapter {
   }
 
   constructor() {
-    this.adapter = new ProcessCliAdapter(
-      {
-        id: this.id,
-        buildCommand: (options: CliStartOptions) => this.buildCommandSpec(options),
-        detectCompletion: detectCodexCompletion
-      }
-    )
+    this.adapter = new ProcessCliAdapter({
+      id: this.id,
+      buildCommand: (options: CliStartOptions) => this.buildCommandSpec(options),
+      detectCompletion: detectCodexCompletion
+    })
   }
 
   async startSession(options: CliStartOptions): Promise<CliSessionHandle> {
+    const normalizedOptions = await this.normalizeOptions(options)
     this.log('startSession', {
-      sessionId: options.sessionId,
-      workdir: options.workdir,
-      model: options.model ?? null,
-      toolConfig: options.toolConfig ?? null
+      sessionId: normalizedOptions.sessionId,
+      workdir: normalizedOptions.workdir,
+      model: normalizedOptions.model ?? null,
+      toolConfig: normalizedOptions.toolConfig ?? null
     })
-    const handle = await this.adapter.startSession(options)
-    this.attachThreadTracking(handle, options.sessionId)
-    return handle
+    try {
+      const handle = await this.adapter.startSession(normalizedOptions)
+      this.attachThreadTracking(handle, normalizedOptions.sessionId)
+      return handle
+    } catch (error) {
+      await this.cleanupMaterializedSchema(normalizedOptions.sessionId)
+      throw error
+    }
   }
 
   buildCommandSpec(options: CliStartOptions): ProcessCommandSpec {
     const command = options.executablePath || 'codex'
     const toolConfig = options.toolConfig ?? {}
     const model = options.model || asString((toolConfig as Record<string, unknown>).model)
+    const reasoningEffort = asString((toolConfig as Record<string, unknown>).reasoning_effort)
     const prompt = options.prompt
     const resumeThreadId = this.getResumeThreadId(options)
     const hasPrompt = typeof prompt === 'string' && prompt.trim().length > 0
     const args: string[] = []
 
+    if (reasoningEffort) {
+      args.push('-c', `reasoning.effort=${JSON.stringify(reasoningEffort)}`)
+    }
     pushRepeatableFlag(args, '-c', (toolConfig as Record<string, unknown>).config_overrides)
     pushRepeatableFlag(args, '--enable', (toolConfig as Record<string, unknown>).enable_features)
     pushRepeatableFlag(args, '--disable', (toolConfig as Record<string, unknown>).disable_features)
     pushRepeatableFlag(args, '-i', (toolConfig as Record<string, unknown>).image_paths)
     pushFlagWithValue(args, '--profile', (toolConfig as Record<string, unknown>).profile)
     pushFlagWithValue(args, '--sandbox', (toolConfig as Record<string, unknown>).sandbox)
-    pushFlagWithValue(args, '--ask-for-approval', (toolConfig as Record<string, unknown>).ask_for_approval)
+    pushFlagWithValue(
+      args,
+      '--ask-for-approval',
+      (toolConfig as Record<string, unknown>).ask_for_approval
+    )
     pushFlag(args, '--full-auto', asBoolean((toolConfig as Record<string, unknown>).full_auto))
-    pushFlag(args, '--dangerously-bypass-approvals-and-sandbox', asBoolean((toolConfig as Record<string, unknown>).dangerously_bypass_approvals_and_sandbox))
+    pushFlag(
+      args,
+      '--dangerously-bypass-approvals-and-sandbox',
+      asBoolean((toolConfig as Record<string, unknown>).dangerously_bypass_approvals_and_sandbox)
+    )
     pushFlag(args, '--oss', asBoolean((toolConfig as Record<string, unknown>).oss))
-    pushFlagWithValue(args, '--local-provider', (toolConfig as Record<string, unknown>).local_provider)
+    pushFlagWithValue(
+      args,
+      '--local-provider',
+      (toolConfig as Record<string, unknown>).local_provider
+    )
     pushFlag(args, '--search', asBoolean((toolConfig as Record<string, unknown>).search))
     pushRepeatableFlag(args, '--add-dir', (toolConfig as Record<string, unknown>).add_dir)
     pushFlagWithValue(args, '--cd', (toolConfig as Record<string, unknown>).cd)
-    pushFlag(args, '--no-alt-screen', asBoolean((toolConfig as Record<string, unknown>).no_alt_screen))
+    pushFlag(
+      args,
+      '--no-alt-screen',
+      asBoolean((toolConfig as Record<string, unknown>).no_alt_screen)
+    )
 
     const additionalArgs = asStringArray((toolConfig as Record<string, unknown>).additional_params)
     if (additionalArgs) {
@@ -89,13 +125,29 @@ export class CodexCliAdapter implements CliAdapter {
     if (resumeThreadId) {
       args.push('resume')
     }
-    pushFlag(args, '--skip-git-repo-check', asBoolean((toolConfig as Record<string, unknown>).skip_git_repo_check))
+    pushFlag(
+      args,
+      '--skip-git-repo-check',
+      asBoolean((toolConfig as Record<string, unknown>).skip_git_repo_check)
+    )
     pushFlag(args, '--ephemeral', asBoolean((toolConfig as Record<string, unknown>).ephemeral))
-    pushFlagWithValue(args, '--output-schema', (toolConfig as Record<string, unknown>).output_schema)
+    pushFlagWithValue(
+      args,
+      '--output-schema',
+      (toolConfig as Record<string, unknown>).output_schema
+    )
     pushFlagWithValue(args, '--color', (toolConfig as Record<string, unknown>).color)
-    pushFlag(args, '--progress-cursor', asBoolean((toolConfig as Record<string, unknown>).progress_cursor))
+    pushFlag(
+      args,
+      '--progress-cursor',
+      asBoolean((toolConfig as Record<string, unknown>).progress_cursor)
+    )
     args.push('--json')
-    pushFlagWithValue(args, '--output-last-message', (toolConfig as Record<string, unknown>).output_last_message)
+    pushFlagWithValue(
+      args,
+      '--output-last-message',
+      (toolConfig as Record<string, unknown>).output_last_message
+    )
     if (model) {
       args.push('-m', model)
     }
@@ -173,6 +225,7 @@ export class CodexCliAdapter implements CliAdapter {
 
     const cleanup = () => {
       this.stdoutBuffers.delete(sessionId)
+      void this.cleanupMaterializedSchema(sessionId)
       handle.off('output', onOutput)
       handle.off('close', onClose)
       handle.off('error', onError)
@@ -236,5 +289,78 @@ export class CodexCliAdapter implements CliAdapter {
     return value && typeof value === 'object' && !Array.isArray(value)
       ? (value as RecordLike)
       : null
+  }
+
+  private async normalizeOptions(options: CliStartOptions): Promise<CliStartOptions> {
+    const toolConfig = options.toolConfig
+    const outputSchema = this.getString((toolConfig as RecordLike | undefined)?.output_schema)
+    if (!toolConfig || !outputSchema) {
+      return options
+    }
+
+    const schemaPath = await this.materializeOutputSchema(outputSchema, options.sessionId)
+    if (schemaPath === outputSchema) {
+      return options
+    }
+
+    return {
+      ...options,
+      toolConfig: {
+        ...toolConfig,
+        output_schema: schemaPath
+      }
+    }
+  }
+
+  private async materializeOutputSchema(outputSchema: string, sessionId: string): Promise<string> {
+    const parsedSchema = this.parseInlineOutputSchema(outputSchema)
+    if (parsedSchema === null) {
+      return outputSchema
+    }
+
+    const existingDir = this.materializedSchemaDirs.get(sessionId)
+    if (existingDir) {
+      return path.join(existingDir, 'output-schema.json')
+    }
+
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'deskly-codex-schema-'))
+    const schemaPath = path.join(tempDir, 'output-schema.json')
+    const serializedSchema =
+      typeof parsedSchema === 'boolean'
+        ? String(parsedSchema)
+        : JSON.stringify(parsedSchema, null, 2)
+
+    await writeFile(schemaPath, serializedSchema, 'utf-8')
+    this.materializedSchemaDirs.set(sessionId, tempDir)
+    this.log('materializedOutputSchema', { sessionId, schemaPath })
+    return schemaPath
+  }
+
+  private parseInlineOutputSchema(outputSchema: string): RecordLike | boolean | null {
+    const trimmed = outputSchema.trim()
+    if (!trimmed.startsWith('{') && trimmed !== 'true' && trimmed !== 'false') {
+      return null
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed)
+      return typeof parsed === 'boolean' || this.asRecord(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
+  private async cleanupMaterializedSchema(sessionId: string): Promise<void> {
+    const tempDir = this.materializedSchemaDirs.get(sessionId)
+    if (!tempDir) {
+      return
+    }
+
+    this.materializedSchemaDirs.delete(sessionId)
+    try {
+      await rm(tempDir, { recursive: true, force: true })
+    } catch {
+      // ignore cleanup failures for transient temp files
+    }
   }
 }
