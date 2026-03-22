@@ -88,13 +88,13 @@ const WORKFLOW_NODE_GAP_X = 280
 const WORKFLOW_NODE_GAP_Y = 148
 const EDGE_ID_SEPARATOR = '::'
 const EDITOR_INPUT_CLASS =
-  'mt-1.5 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
+  'mt-1.5 w-full rounded-[2px] border border-slate-200/80 bg-white px-3 py-2.5 text-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
 const EDITOR_TEXTAREA_CLASS =
-  'mt-1.5 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
+  'mt-1.5 w-full rounded-[2px] border border-slate-200/80 bg-white px-3 py-2.5 text-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
 const EDITOR_SECTION_CLASS =
-  'rounded-2xl border border-slate-200/80 bg-white/84 shadow-[0_12px_30px_rgba(15,23,42,0.05)] backdrop-blur'
+  'rounded-[4px] border border-slate-200/90 bg-white/92 shadow-[0_1px_2px_rgba(15,23,42,0.04)]'
 const EDITOR_BADGE_CLASS =
-  'rounded-full border border-slate-200/80 bg-white/84 px-2.5 py-0.5 text-[11px] font-medium text-slate-600'
+  'rounded-[2px] border border-slate-200/80 bg-white/92 px-2.5 py-0.5 text-[11px] font-medium text-slate-600'
 const EDITOR_TOOLBAR_GROUP_CLASS =
   'flex items-center gap-1 rounded-[2px] border border-slate-200/80 bg-white/88 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]'
 const EDITOR_RAIL_BUTTON_CLASS =
@@ -441,12 +441,12 @@ const WorkflowEditorNodeCard = memo(function WorkflowEditorNodeCard({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[24px] border px-4 py-4 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))]',
+        'relative overflow-hidden rounded-[8px] border px-4 py-4 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))]',
         dragging
-          ? 'border-slate-300/90 shadow-[0_10px_24px_rgba(15,23,42,0.1)]'
+          ? 'border-slate-300/90 shadow-[0_6px_18px_rgba(15,23,42,0.08)]'
           : selected
             ? 'border-sky-400/85 ring-2 ring-sky-500/20 shadow-sky-500/10'
-            : 'border-slate-200/80 shadow-[0_8px_20px_rgba(15,23,42,0.05)] hover:border-slate-300/90'
+            : 'border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-slate-300/90'
       )}
       style={{
         width: WORKFLOW_NODE_WIDTH,
@@ -467,7 +467,7 @@ const WorkflowEditorNodeCard = memo(function WorkflowEditorNodeCard({
 
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-slate-50 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[4px] border border-slate-200/80 bg-slate-50 text-slate-700">
             <TypeIcon className="size-[18px]" />
           </div>
           <div className="min-w-0">
@@ -1186,7 +1186,7 @@ export function WorkflowTemplateEditor({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex size-9 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+              <div className="flex size-9 items-center justify-center rounded-[2px] border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                 <GitBranchPlus className="size-4" />
               </div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
