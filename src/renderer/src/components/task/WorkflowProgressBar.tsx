@@ -1,10 +1,10 @@
 import { cn } from '@/lib/utils';
-import { Check, Circle, Clock } from 'lucide-react';
+import { AlertTriangle, Check, Circle, Clock } from 'lucide-react';
 
 interface TaskNode {
   id: string;
   name: string;
-  status: 'todo' | 'in_progress' | 'in_review' | 'done';
+  status: 'todo' | 'in_progress' | 'in_review' | 'done' | 'failed';
   node_order: number;
 }
 
@@ -79,6 +79,12 @@ function TaskNodeStatusBadge({ node, isCurrent }: TaskNodeStatusBadgeProps) {
       bg: 'bg-emerald-100 dark:bg-emerald-900/30',
       text: 'text-emerald-600 dark:text-emerald-400',
       ring: '',
+    },
+    failed: {
+      icon: AlertTriangle,
+      bg: 'bg-red-100 dark:bg-red-900/30',
+      text: 'text-red-600 dark:text-red-400',
+      ring: 'ring-2 ring-red-500',
     },
   };
 

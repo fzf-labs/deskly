@@ -21,7 +21,8 @@ export const registerTaskIpc = ({ handle, v, services, taskStatusValues }: IpcMo
         worktreeRootPath: v.optional(v.string()),
         cliToolId: v.optional(v.string()),
         agentToolConfigId: v.optional(v.string()),
-        workflowTemplateId: v.optional(v.string())
+        workflowTemplateId: v.optional(v.string()),
+        workflowDefinitionId: v.optional(v.string())
       })
     ],
     async (_, options) => {
@@ -50,11 +51,19 @@ export const registerTaskIpc = ({ handle, v, services, taskStatusValues }: IpcMo
     return await taskService.deleteTask(id, removeWorktree)
   })
 
-  handle(IPC_CHANNELS.task.startExecution, [v.string()], (_, taskId) => {
+  handle(IPC_CHANNELS.task.startExecution, [v.string()], async (_, taskId) => {
+    const workflowRun = databaseService.getWorkflowRunByTask(taskId)
+    if (workflowRun) {
+      return await databaseService.startWorkflowRun(workflowRun.id)
+    }
     return databaseService.startTaskExecution(taskId)
   })
 
-  handle(IPC_CHANNELS.task.stopExecution, [v.string()], (_, taskId) => {
+  handle(IPC_CHANNELS.task.stopExecution, [v.string()], async (_, taskId) => {
+    const workflowRun = databaseService.getWorkflowRunByTask(taskId)
+    if (workflowRun) {
+      return await databaseService.stopWorkflowRun(workflowRun.id)
+    }
     return databaseService.stopTaskExecution(taskId)
   })
 }

@@ -153,6 +153,21 @@ export const IPC_CHANNELS = {
     rerunTaskNode: 'db:rerunTaskNode',
     stopTaskNodeExecution: 'db:stopTaskNodeExecution'
   },
+  workflow: {
+    listDefinitions: 'workflow:listDefinitions',
+    getDefinition: 'workflow:getDefinition',
+    createDefinition: 'workflow:createDefinition',
+    updateDefinition: 'workflow:updateDefinition',
+    deleteDefinition: 'workflow:deleteDefinition',
+    createRunForTask: 'workflow:createRunForTask',
+    getRun: 'workflow:getRun',
+    getRunByTask: 'workflow:getRunByTask',
+    listRunNodes: 'workflow:listRunNodes',
+    startRun: 'workflow:startRun',
+    approveNode: 'workflow:approveNode',
+    retryNode: 'workflow:retryNode',
+    stopRun: 'workflow:stopRun'
+  },
   fs: {
     readFile: 'fs:readFile',
     readTextFile: 'fs:readTextFile',
@@ -436,6 +451,46 @@ export interface IpcContracts {
   'db:rerunTaskNode': IpcContract<[string], unknown>
   'db:stopTaskNodeExecution': IpcContract<[string, string?], unknown>
 
+  'workflow:listDefinitions': IpcContract<
+    [
+      {
+        scope?: 'global' | 'project'
+        projectId?: string | null
+      }?
+    ],
+    unknown[]
+  >
+  'workflow:getDefinition': IpcContract<[string], unknown>
+  'workflow:createDefinition': IpcContract<[UnknownRecord], unknown>
+  'workflow:updateDefinition': IpcContract<[UnknownRecord], unknown>
+  'workflow:deleteDefinition': IpcContract<[string], boolean>
+  'workflow:createRunForTask': IpcContract<
+    [
+      {
+        taskId: string
+        workflowDefinitionId: string
+      }
+    ],
+    unknown
+  >
+  'workflow:getRun': IpcContract<[string], unknown>
+  'workflow:getRunByTask': IpcContract<[string], unknown>
+  'workflow:listRunNodes': IpcContract<[string], unknown[]>
+  'workflow:startRun': IpcContract<[string], unknown>
+  'workflow:approveNode': IpcContract<
+    [
+      string,
+      {
+        comment?: string | null
+        reviewed_by?: string | null
+        reviewed_at?: string
+      }?
+    ],
+    unknown
+  >
+  'workflow:retryNode': IpcContract<[string], unknown>
+  'workflow:stopRun': IpcContract<[string], unknown>
+
   'fs:readFile': IpcContract<[string], Uint8Array>
   'fs:readTextFile': IpcContract<[string], string>
   'fs:writeFile': IpcContract<[string, Uint8Array | string], unknown>
@@ -480,6 +535,7 @@ export interface IpcContracts {
         cliToolId?: string
         agentToolConfigId?: string
         workflowTemplateId?: string
+        workflowDefinitionId?: string
       }
     ],
     unknown

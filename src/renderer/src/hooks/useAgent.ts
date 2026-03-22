@@ -45,7 +45,7 @@ type ContentLike =
 
 type TaskNodeLike = {
   id: string;
-  status: 'todo' | 'in_progress' | 'in_review' | 'done';
+  status: 'todo' | 'in_progress' | 'in_review' | 'done' | 'failed';
 };
 
 function stringifyContentPart(part: ContentLike): string {

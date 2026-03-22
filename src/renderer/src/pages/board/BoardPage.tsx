@@ -34,11 +34,12 @@ const columns: { id: TaskStatus; title: string; color: string }[] = [
   { id: 'todo', title: '待办', color: 'bg-zinc-500' },
   { id: 'in_progress', title: '进行中', color: 'bg-blue-500' },
   { id: 'in_review', title: '审查中', color: 'bg-amber-500' },
-  { id: 'done', title: '已完成', color: 'bg-green-500' }
+  { id: 'done', title: '已完成', color: 'bg-green-500' },
+  { id: 'failed', title: '失败', color: 'bg-red-500' }
 ]
 
 function normalizeTaskStatus(status: string): TaskStatus {
-  if (['todo', 'in_progress', 'in_review', 'done'].includes(status)) {
+  if (['todo', 'in_progress', 'in_review', 'done', 'failed'].includes(status)) {
     return status as TaskStatus
   }
   return 'todo'

@@ -16,6 +16,7 @@ import { CliSessionService } from '../services/cli/CliSessionService'
 import { TerminalService } from '../services/terminal/TerminalService'
 import { AutomationRunnerService } from '../services/AutomationRunnerService'
 import { AutomationService } from '../services/AutomationService'
+import { WorkflowSchedulerService } from '../services/WorkflowSchedulerService'
 import { AppContext, AppServices } from './AppContext'
 
 export const createAppContext = (): AppContext => {
@@ -28,6 +29,8 @@ export const createAppContext = (): AppContext => {
   const cliToolDetectorService = new CLIToolDetectorService()
   const cliToolConfigService = new CLIToolConfigService()
   const cliSessionService = new CliSessionService(cliToolConfigService, databaseService)
+  const workflowSchedulerService = new WorkflowSchedulerService(databaseService, cliSessionService)
+  databaseService.setWorkflowSchedulerService(workflowSchedulerService)
   const terminalService = new TerminalService()
   const editorService = new EditorService()
   const pipelineService = new PipelineService()
@@ -58,6 +61,7 @@ export const createAppContext = (): AppContext => {
     settingsService,
     taskService,
     cliSessionService,
+    workflowSchedulerService,
     terminalService,
     automationRunnerService,
     automationService
@@ -78,6 +82,7 @@ export const createAppContext = (): AppContext => {
     notificationService,
     settingsService,
     taskService,
+    workflowSchedulerService,
     terminalService,
     automationRunnerService,
     automationService

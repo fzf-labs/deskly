@@ -8,8 +8,10 @@ import { newUlid } from '../utils/ids'
 import { getAppPaths } from '../app/AppPaths'
 import type { CreateTaskOptions, TaskWithWorktree } from '../types/domain/task'
 import type { TaskStatus } from '../types/task'
+import type { WorkflowTemplate } from '../types/workflow'
+import type { WorkflowDefinitionDocument } from '../types/workflow-definition'
 
-const TASK_STATUS_VALUES = ['todo', 'in_progress', 'in_review', 'done'] as const
+const TASK_STATUS_VALUES = ['todo', 'in_progress', 'in_review', 'done', 'failed'] as const
 type TaskStatusValue = (typeof TASK_STATUS_VALUES)[number]
 
 export class TaskService {
@@ -30,6 +32,62 @@ export class TaskService {
     const trimmed = pathInput.trim()
     const resolved = trimmed.replace(/^~(?=\/|\\|$)/, homedir())
     return resolved || fallback
+  }
+
+  private buildDefinitionFromTemplate(template: WorkflowTemplate): WorkflowDefinitionDocument {
+    const sortedNodes = [...(template.nodes ?? [])].sort((left, right) => left.node_order - right.node_order)
+
+    return {
+      version: 1,
+      nodes: sortedNodes.map((node, index) => ({
+        id: node.id,
+        key: `legacy-template-node-${index + 1}`,
+        type: 'agent',
+        name: node.name,
+        prompt: node.prompt,
+        cliToolId: node.cli_tool_id ?? null,
+        agentToolConfigId: node.agent_tool_config_id ?? null,
+        requiresApprovalAfterRun: Boolean(node.requires_approval),
+        position: null
+      })),
+      edges: sortedNodes.slice(1).map((node, index) => ({
+        from: sortedNodes[index].id,
+        to: node.id
+      }))
+    }
+  }
+
+  private ensureWorkflowDefinitionIdForTemplate(templateId: string): string {
+    const template = this.db.getWorkflowTemplate(templateId)
+    if (!template) {
+      throw new Error(`Workflow template not found: ${templateId}`)
+    }
+
+    const definition = this.buildDefinitionFromTemplate(template)
+    const filter =
+      template.scope === 'project'
+        ? { scope: 'project' as const, projectId: template.project_id ?? null }
+        : { scope: 'global' as const }
+
+    const serializedDefinition = JSON.stringify(definition)
+    const existingDefinition = this.db
+      .listWorkflowDefinitions(filter)
+      .find(
+        (item) =>
+          item.name === template.name && JSON.stringify(item.definition) === serializedDefinition
+      )
+
+    if (existingDefinition) {
+      return existingDefinition.id
+    }
+
+    return this.db.createWorkflowDefinition({
+      scope: template.scope,
+      project_id: template.scope === 'project' ? (template.project_id ?? null) : undefined,
+      name: template.name,
+      description: template.description ?? undefined,
+      definition
+    }).id
   }
 
   async createTask(options: CreateTaskOptions): Promise<TaskWithWorktree> {
@@ -74,8 +132,12 @@ export class TaskService {
       throw new Error('CLI tool is required for conversation tasks')
     }
 
-    if (options.taskMode === 'workflow' && !options.workflowTemplateId) {
-      throw new Error('Workflow template is required for workflow tasks')
+    if (
+      options.taskMode === 'workflow' &&
+      !options.workflowTemplateId &&
+      !options.workflowDefinitionId
+    ) {
+      throw new Error('Workflow template or workflow definition is required for workflow tasks')
     }
 
     let agentToolConfigId = options.agentToolConfigId
@@ -105,11 +167,21 @@ export class TaskService {
       })
     }
 
-    if (options.taskMode === 'workflow' && options.workflowTemplateId) {
-      this.db.createTaskNodesFromTemplate(taskId, options.workflowTemplateId, {
-        cliToolId: options.cliToolId ?? null,
-        agentToolConfigId: agentToolConfigId ?? null
-      })
+    if (options.taskMode === 'workflow') {
+      if (options.workflowDefinitionId) {
+        this.db.createWorkflowRunForTask({
+          taskId,
+          workflowDefinitionId: options.workflowDefinitionId
+        })
+      } else if (options.workflowTemplateId) {
+        const workflowDefinitionId = this.ensureWorkflowDefinitionIdForTemplate(
+          options.workflowTemplateId
+        )
+        this.db.createWorkflowRunForTask({
+          taskId,
+          workflowDefinitionId
+        })
+      }
     }
 
     return this.mapTask(this.db.getTask(taskId) ?? task)

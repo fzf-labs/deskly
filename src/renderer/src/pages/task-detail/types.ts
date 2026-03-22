@@ -12,7 +12,7 @@ export type TaskMetaRow = {
   visible: boolean
 }
 
-export type PipelineDisplayStatus = 'todo' | 'in_progress' | 'in_review' | 'done'
+export type PipelineDisplayStatus = 'todo' | 'in_progress' | 'in_review' | 'done' | 'failed'
 
 export const filterVisibleMetaRows = (rows: TaskMetaRow[]) =>
   rows.filter((row) => row.visible)

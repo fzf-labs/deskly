@@ -1,4 +1,4 @@
-import { CheckCircle, Clock, ListChecks } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock, ListChecks } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -62,6 +62,7 @@ export function WorkflowCard({
                 const isRunningNode = nodeStatus === 'in_progress'
                 const isWaiting = nodeStatus === 'in_review'
                 const isTodo = nodeStatus === 'todo'
+                const isFailed = nodeStatus === 'failed'
                 const isSelected = selectedNodeId === node.id
                 const templateNode = templateNodeMap.get(node.id)
                 const nodeName =
@@ -77,6 +78,7 @@ export function WorkflowCard({
                         isCompleted && 'bg-green-500/10 text-green-600',
                         isWaiting && 'bg-amber-500/10 text-amber-600',
                         isRunningNode && 'bg-blue-500/10 text-blue-600',
+                        isFailed && 'bg-red-500/10 text-red-600',
                         isTodo && 'bg-muted/40 text-muted-foreground',
                         isSelected && 'ring-primary/50 ring-2',
                         onSelectNode && 'hover:brightness-95 cursor-pointer'
@@ -89,6 +91,7 @@ export function WorkflowCard({
                         <span className="size-2 animate-pulse rounded-full bg-blue-500" />
                       )}
                       {isWaiting && <Clock className="size-3" />}
+                      {isFailed && <AlertTriangle className="size-3" />}
                       {isTodo && (
                         <span className="size-2 rounded-full bg-muted-foreground/30" />
                       )}

@@ -132,6 +132,7 @@ export function useTaskDetail({
   // Section 1: Init State
   // ===========================================================================
   const [task, setTask] = useState<Task | null>(null);
+  const [backendWorkflowRun, setBackendWorkflowRun] = useState<{ id: string; status: string } | null>(null);
   const [currentNodeRuntime, setCurrentNodeRuntime] = useState<CurrentNodeRuntime>({
     taskNodeId: null,
     sessionId: null,
@@ -149,6 +150,7 @@ export function useTaskDetail({
     if (prevTaskIdRef.current !== taskId) {
       if (prevTaskIdRef.current !== undefined) {
         setTask(null);
+        setBackendWorkflowRun(null);
         setCurrentNodeRuntime({ taskNodeId: null, sessionId: null, cliToolId: null, agentToolConfigId: null });
         setHasStarted(false);
         isInitializingRef.current = false;
@@ -203,6 +205,8 @@ export function useTaskDetail({
     try {
       const refreshedTask = await db.getTask(taskId);
       if (refreshedTask) setTask(refreshedTask as Task);
+      const workflowRun = await db.getWorkflowRunByTask(taskId);
+      setBackendWorkflowRun(workflowRun ? { id: workflowRun.id, status: workflowRun.status } : null);
     } catch {
       /* ignore */
     }
@@ -221,6 +225,8 @@ export function useTaskDetail({
 
         if (existingTask) {
           setTask(existingTask);
+          const workflowRun = await db.getWorkflowRunByTask(taskId);
+          setBackendWorkflowRun(workflowRun ? { id: workflowRun.id, status: workflowRun.status } : null);
           await loadCurrentNodeRuntime();
           await loadMessages(taskId);
           setHasStarted(true);
@@ -986,12 +992,13 @@ export function useTaskDetail({
   const normalizedTaskStatus = useMemo<PipelineDisplayStatus>(() => {
     const rawStatus = task?.status;
     if (!rawStatus) return 'todo';
-    if (['todo', 'in_progress', 'in_review', 'done'].includes(rawStatus)) return rawStatus as PipelineDisplayStatus;
+    if (['todo', 'in_progress', 'in_review', 'done', 'failed'].includes(rawStatus)) return rawStatus as PipelineDisplayStatus;
     return 'todo';
   }, [task?.status]);
 
   // Auto-start pipeline
   useEffect(() => {
+    if (backendWorkflowRun) return;
     if (!pipelineTemplate || pipelineStatus !== 'idle' || isRunning) return;
     if (useCliSession && cliStatus === 'running') return;
     if (!taskId || messages.length > 0) return;
@@ -1013,10 +1020,11 @@ export function useTaskDetail({
     };
     void maybeStart();
     return () => { active = false; };
-  }, [cliStatus, isRunning, messages.length, normalizedTaskStatus, pipelineStatus, pipelineTemplate, startPipelineStage, taskId, useCliSession, workflowCurrentNode?.index]);
+  }, [backendWorkflowRun, cliStatus, isRunning, messages.length, normalizedTaskStatus, pipelineStatus, pipelineTemplate, startPipelineStage, taskId, useCliSession, workflowCurrentNode?.index]);
 
   // Handle pipeline stage completion
   useEffect(() => {
+    if (backendWorkflowRun) return;
     if (!pipelineTemplate || pipelineStatus !== 'running' || isRunning) return;
     const stageMessages = messages.slice(pipelineStageMessageStart);
     let outcome: (typeof stageMessages)[number] | undefined;
@@ -1035,7 +1043,7 @@ export function useTaskDetail({
       setPipelineStatus('failed');
       appendPipelineNotice(t.task.pipelineStageFailed.replace('{name}', stageName));
     }
-  }, [appendPipelineNotice, isRunning, messages, pipelineStageIndex, pipelineStageMessageStart, pipelineStatus, pipelineTemplate, taskId, t.task.pipelineStageCompleted, t.task.pipelineStageFailed, t.task.stageLabel]);
+  }, [appendPipelineNotice, backendWorkflowRun, isRunning, messages, pipelineStageIndex, pipelineStageMessageStart, pipelineStatus, pipelineTemplate, taskId, t.task.pipelineStageCompleted, t.task.pipelineStageFailed, t.task.stageLabel]);
 
   const pipelineBanner = useMemo(() => {
     if (!pipelineTemplate) return null;
@@ -1049,6 +1057,7 @@ export function useTaskDetail({
 
   // Auto-run workflow node for CLI session
   useEffect(() => {
+    if (backendWorkflowRun) return;
     if (!useCliSession || !workflowCurrentNode || workflowCurrentNode.status !== 'in_progress' || cliStatus === 'running') return;
     if (lastAutoRunTaskNodeIdRef.current === workflowCurrentNode.id) return;
     let active = true;
@@ -1082,7 +1091,7 @@ export function useTaskDetail({
     };
     void run();
     return () => { active = false; };
-  }, [appendCliUserLog, buildCliPrompt, cliStatus, currentNodeRuntime.sessionId, resolveTaskNodePrompt, runCliPrompt, useCliSession, workflowCurrentNode]);
+  }, [appendCliUserLog, backendWorkflowRun, buildCliPrompt, cliStatus, currentNodeRuntime.sessionId, resolveTaskNodePrompt, runCliPrompt, useCliSession, workflowCurrentNode]);
 
   // ===========================================================================
   // Section 12: Artifacts
@@ -1241,9 +1250,6 @@ export function useTaskDetail({
   }, [hasStartedOnce, isRunning, messages.length, normalizedTaskStatus, task]);
 
   const showStartButton = !hasExecuted;
-  const showActionButton = showStartButton || isCliTaskReviewPending;
-  const actionLabel = isCliTaskReviewPending ? (t.task.completeTask || 'Complete task') : (t.task.startExecution || 'Start');
-  const actionDisabled = isCliTaskReviewPending ? false : startDisabled;
 
   const displayStatus = useMemo<PipelineDisplayStatus | null>(() => {
     if (!task?.status) return null;
@@ -1312,6 +1318,19 @@ export function useTaskDetail({
     () => Boolean(task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'done'),
     [selectedWorkflowNode?.status, task?.task_mode]
   );
+
+  const selectedWorkflowNodeIsFailed = useMemo(
+    () => Boolean(task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'failed'),
+    [selectedWorkflowNode?.status, task?.task_mode]
+  );
+
+  const showActionButton = showStartButton || isCliTaskReviewPending || selectedWorkflowNodeIsFailed;
+  const actionLabel = selectedWorkflowNodeIsFailed
+    ? 'Retry node'
+    : isCliTaskReviewPending
+      ? (t.task.completeTask || 'Complete task')
+      : (t.task.startExecution || 'Start');
+  const actionDisabled = selectedWorkflowNodeIsFailed ? false : isCliTaskReviewPending ? false : startDisabled;
 
   const runtimeWorkflowNode = useMemo(() => {
     if (task?.task_mode !== 'workflow') return null;
@@ -1469,12 +1488,19 @@ export function useTaskDetail({
           if (content) {
             sessionId = await appendCliUserLog(content);
           }
-          if (task?.status === 'in_review') {
+          if (task?.task_mode !== 'workflow' && task?.status === 'in_review') {
             try {
               const reviewNode = (await db.getCurrentTaskNode(taskId)) as { id?: string; status?: string } | null;
               if (reviewNode?.id && reviewNode.status === 'in_review') {
                 await db.rerunTaskNode(reviewNode.id);
               }
+              const updatedTask = await db.getTask(taskId);
+              if (updatedTask) setTask(updatedTask);
+            } catch { /* ignore */ }
+          }
+          if (task?.task_mode === 'workflow' && selectedWorkflowNode?.id && selectedWorkflowNode.status === 'failed') {
+            try {
+              await db.rerunTaskNode(selectedWorkflowNode.id);
               const updatedTask = await db.getTask(taskId);
               if (updatedTask) setTask(updatedTask);
             } catch { /* ignore */ }
@@ -1502,22 +1528,39 @@ export function useTaskDetail({
         await continueConversation(text.trim(), messageAttachments, workingDir || undefined);
       }
     },
-    [activeTaskId, appendCliSystemLog, appendCliUserLog, continueConversation, isRunning, loadMessages, pipelineStatus, pipelineTemplate, runCliPrompt, selectedWorkflowNode?.status, setMessages, setTask, startNextPipelineStage, t.common.errors.serverNotRunning, task?.status, task?.task_mode, taskId, useCliSession, workingDir]
+    [activeTaskId, appendCliSystemLog, appendCliUserLog, continueConversation, isRunning, loadMessages, pipelineStatus, pipelineTemplate, runCliPrompt, selectedWorkflowNode?.id, selectedWorkflowNode?.status, setMessages, setTask, startNextPipelineStage, t.common.errors.serverNotRunning, task?.status, task?.task_mode, taskId, useCliSession, workingDir]
   );
 
   const handleStartTask = useCallback(async () => {
     if (!taskId) return;
+
+    if (selectedWorkflowNodeIsFailed && selectedWorkflowNode?.id) {
+      await db.rerunTaskNode(selectedWorkflowNode.id);
+      await loadCurrentNodeRuntime();
+      await loadWorkflowStatus();
+      const refreshedTask = await db.getTask(taskId);
+      if (refreshedTask) setTask(refreshedTask);
+      return;
+    }
+
     markStartedOnce();
 
     try {
       await db.startTaskExecution(taskId);
       const refreshedTask = await db.getTask(taskId);
       if (refreshedTask) setTask(refreshedTask);
+      const workflowRun = await db.getWorkflowRunByTask(taskId);
+      setBackendWorkflowRun(workflowRun ? { id: workflowRun.id, status: workflowRun.status } : null);
     } catch {
       /* ignore */
     }
 
     if (task?.task_mode === 'workflow') {
+      if (backendWorkflowRun) {
+        await loadCurrentNodeRuntime();
+        await loadWorkflowStatus();
+        return;
+      }
       if (!pipelineTemplate || pipelineStatus !== 'idle' || isRunning) return;
       await startPipelineStage(0);
       return;
@@ -1544,7 +1587,7 @@ export function useTaskDetail({
     const pendingAttachments = initialAttachmentsRef.current;
     initialAttachmentsRef.current = undefined;
     await runAgent(task?.prompt || initialPrompt, taskId, sessionInfo, pendingAttachments, workingDir || undefined);
-  }, [appendCliSystemLog, appendCliUserLog, buildCliPrompt, currentNodeRuntime.sessionId, initialPrompt, initialAttachmentsRef, isRunning, markStartedOnce, pipelineStatus, pipelineTemplate, resolveCurrentNodePrompt, runAgent, runCliPrompt, setTask, startPipelineStage, t.common.errors.serverNotRunning, task?.prompt, task?.task_mode, taskId, useCliSession, workingDir]);
+  }, [appendCliSystemLog, appendCliUserLog, backendWorkflowRun, buildCliPrompt, currentNodeRuntime.sessionId, initialPrompt, initialAttachmentsRef, isRunning, loadCurrentNodeRuntime, loadWorkflowStatus, markStartedOnce, pipelineStatus, pipelineTemplate, resolveCurrentNodePrompt, runAgent, runCliPrompt, selectedWorkflowNode?.id, selectedWorkflowNodeIsFailed, setTask, setBackendWorkflowRun, startPipelineStage, t.common.errors.serverNotRunning, task?.prompt, task?.task_mode, taskId, useCliSession, workingDir]);
 
   const handleApproveCliTask = useCallback(async () => {
     if (!taskId) return;

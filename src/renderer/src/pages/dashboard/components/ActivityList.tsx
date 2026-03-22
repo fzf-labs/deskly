@@ -13,14 +13,16 @@ const statusLabels: Record<TaskStatus, string> = {
   todo: '待办',
   in_progress: '进行中',
   in_review: '审查中',
-  done: '已完成'
+  done: '已完成',
+  failed: '失败'
 }
 
 const statusStyles: Record<TaskStatus, string> = {
   todo: 'bg-muted text-muted-foreground',
   in_progress: 'bg-blue-100 text-blue-700',
   in_review: 'bg-amber-100 text-amber-700',
-  done: 'bg-green-100 text-green-700'
+  done: 'bg-green-100 text-green-700',
+  failed: 'bg-red-100 text-red-700'
 }
 
 function formatTimestamp(value: string) {

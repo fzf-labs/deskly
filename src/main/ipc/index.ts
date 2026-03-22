@@ -23,6 +23,7 @@ import { registerTaskIpc } from './task.ipc'
 import { registerAppIpc } from './app.ipc'
 import { registerTerminalIpc } from './terminal.ipc'
 import { registerAutomationIpc } from './automation.ipc'
+import { registerWorkflowIpc } from './workflow.ipc'
 
 export const registerIpcHandlers = (deps: IpcDependencies): void => {
   const handle = <C extends IpcContractChannel>(
@@ -33,8 +34,8 @@ export const registerIpcHandlers = (deps: IpcDependencies): void => {
     ipcMain.handle(channel, wrapHandler(handler, validators))
   }
 
-  const taskStatusValues = ['todo', 'in_progress', 'in_review', 'done'] as const
-  const taskNodeStatusValues = ['todo', 'in_progress', 'in_review', 'done'] as const
+  const taskStatusValues = ['todo', 'in_progress', 'in_review', 'done', 'failed'] as const
+  const taskNodeStatusValues = ['todo', 'in_progress', 'in_review', 'done', 'failed'] as const
 
   const fileDataValidator: Validator<Uint8Array | string> = (value, name) => {
     if (typeof value === 'string') return value
@@ -121,6 +122,7 @@ export const registerIpcHandlers = (deps: IpcDependencies): void => {
   registerSettingsIpc(context)
   registerTaskIpc(context)
   registerAutomationIpc(context)
+  registerWorkflowIpc(context)
   registerAppIpc(context)
   registerTerminalIpc(context)
 }

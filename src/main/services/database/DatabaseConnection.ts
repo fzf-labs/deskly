@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { normalizeCliToolConfig } from '../../../shared/cli-config-spec'
 
-const TARGET_SCHEMA_VERSION = 6
+const TARGET_SCHEMA_VERSION = 8
 
 export class DatabaseConnection {
   private dbPath: string
@@ -173,7 +173,7 @@ export class DatabaseConnection {
         prompt TEXT NOT NULL,
 
         status TEXT NOT NULL DEFAULT 'todo'
-          CHECK (status IN ('todo', 'in_progress', 'in_review', 'done')),
+          CHECK (status IN ('todo', 'in_progress', 'in_review', 'done', 'failed')),
         task_mode TEXT NOT NULL DEFAULT 'conversation'
           CHECK (task_mode IN ('conversation', 'workflow')),
 
@@ -235,6 +235,84 @@ export class DatabaseConnection {
         FOREIGN KEY (agent_tool_config_id) REFERENCES agent_tool_configs(id) ON DELETE SET NULL,
         UNIQUE (task_id, node_order)
       );
+
+      CREATE TABLE IF NOT EXISTS workflow_definitions (
+        id TEXT PRIMARY KEY,
+        scope TEXT NOT NULL CHECK (scope IN ('global', 'project')),
+        project_id TEXT,
+        name TEXT NOT NULL,
+        description TEXT,
+        definition_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS workflow_runs (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL UNIQUE,
+        workflow_definition_id TEXT NOT NULL,
+        status TEXT NOT NULL
+          CHECK (status IN ('waiting', 'running', 'review', 'done', 'failed')),
+        definition_snapshot_json TEXT NOT NULL,
+        current_wave INTEGER NOT NULL DEFAULT 0,
+        started_at TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+        FOREIGN KEY (workflow_definition_id) REFERENCES workflow_definitions(id) ON DELETE RESTRICT
+      );
+
+      CREATE TABLE IF NOT EXISTS workflow_run_nodes (
+        id TEXT PRIMARY KEY,
+        workflow_run_id TEXT NOT NULL,
+        definition_node_id TEXT NOT NULL,
+        node_key TEXT NOT NULL,
+        name TEXT NOT NULL,
+        node_type TEXT NOT NULL CHECK (node_type IN ('agent', 'command')),
+        prompt TEXT,
+        command TEXT,
+        cli_tool_id TEXT
+          CHECK (cli_tool_id IS NULL OR cli_tool_id IN (
+            'claude-code', 'cursor-agent', 'gemini-cli', 'codex', 'codex-cli', 'opencode'
+          )),
+        agent_tool_config_id TEXT,
+        requires_approval_after_run INTEGER NOT NULL DEFAULT 0
+          CHECK (requires_approval_after_run IN (0, 1)),
+        status TEXT NOT NULL
+          CHECK (status IN ('waiting', 'running', 'review', 'done', 'failed')),
+        failure_reason TEXT
+          CHECK (failure_reason IN ('execution_error', 'cancelled') OR failure_reason IS NULL),
+        session_id TEXT,
+        resume_session_id TEXT,
+        result_summary TEXT,
+        error_message TEXT,
+        cost REAL,
+        duration REAL,
+        attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+        started_at TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (workflow_run_id) REFERENCES workflow_runs(id) ON DELETE CASCADE,
+        FOREIGN KEY (agent_tool_config_id) REFERENCES agent_tool_configs(id) ON DELETE SET NULL,
+        UNIQUE (workflow_run_id, definition_node_id),
+        UNIQUE (workflow_run_id, node_key)
+      );
+
+      CREATE TABLE IF NOT EXISTS workflow_run_reviews (
+        id TEXT PRIMARY KEY,
+        workflow_run_id TEXT NOT NULL,
+        workflow_run_node_id TEXT NOT NULL,
+        decision TEXT NOT NULL CHECK (decision IN ('approved')),
+        comment TEXT,
+        reviewed_by TEXT,
+        reviewed_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (workflow_run_id) REFERENCES workflow_runs(id) ON DELETE CASCADE,
+        FOREIGN KEY (workflow_run_node_id) REFERENCES workflow_run_nodes(id) ON DELETE CASCADE
+      );
     `)
   }
 
@@ -291,6 +369,31 @@ export class DatabaseConnection {
       CREATE UNIQUE INDEX IF NOT EXISTS uniq_task_nodes_single_in_progress
         ON task_nodes(task_id)
         WHERE status = 'in_progress';
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_workflow_definitions_global_name
+        ON workflow_definitions(name)
+        WHERE scope = 'global';
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_workflow_definitions_project_name
+        ON workflow_definitions(project_id, name)
+        WHERE scope = 'project';
+      CREATE INDEX IF NOT EXISTS idx_workflow_definitions_scope_project
+        ON workflow_definitions(scope, project_id, updated_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_workflow_runs_status
+        ON workflow_runs(status, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_workflow_runs_definition
+        ON workflow_runs(workflow_definition_id, created_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_workflow_run_nodes_run_status
+        ON workflow_run_nodes(workflow_run_id, status, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_workflow_run_nodes_session_id
+        ON workflow_run_nodes(session_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_workflow_run_nodes_single_running
+        ON workflow_run_nodes(workflow_run_id)
+        WHERE status = 'running';
+
+      CREATE INDEX IF NOT EXISTS idx_workflow_run_reviews_node
+        ON workflow_run_reviews(workflow_run_node_id, reviewed_at DESC);
     `)
   }
 
@@ -331,6 +434,81 @@ export class DatabaseConnection {
       migrateToV6()
       currentVersion = 6
       console.log('[DatabaseService] Migrated schema to v6')
+    }
+
+    if (currentVersion < 7) {
+      const migrateToV7 = db.transaction(() => {
+        this.createRuntimeTables(db)
+        this.createRuntimeIndexes(db)
+        db.pragma('user_version = 7')
+      })
+
+      migrateToV7()
+      currentVersion = 7
+      console.log('[DatabaseService] Migrated schema to v7')
+    }
+
+    if (currentVersion < 8) {
+      db.pragma('foreign_keys = OFF')
+      const migrateToV8 = db.transaction(() => {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS tasks_v8 (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            prompt TEXT NOT NULL,
+
+            status TEXT NOT NULL DEFAULT 'todo'
+              CHECK (status IN ('todo', 'in_progress', 'in_review', 'done', 'failed')),
+            task_mode TEXT NOT NULL DEFAULT 'conversation'
+              CHECK (task_mode IN ('conversation', 'workflow')),
+
+            project_id TEXT,
+            worktree_path TEXT,
+            branch_name TEXT,
+            base_branch TEXT,
+            workspace_path TEXT,
+
+            started_at TEXT,
+            completed_at TEXT,
+            cost REAL,
+            duration REAL,
+
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
+
+            CHECK (
+              (worktree_path IS NULL AND branch_name IS NULL AND base_branch IS NULL)
+              OR
+              (worktree_path IS NOT NULL AND branch_name IS NOT NULL AND base_branch IS NOT NULL)
+            )
+          );
+
+          INSERT INTO tasks_v8 (
+            id, title, prompt, status, task_mode, project_id, worktree_path, branch_name,
+            base_branch, workspace_path, started_at, completed_at, cost, duration, created_at, updated_at
+          )
+          SELECT
+            id, title, prompt, status, task_mode, project_id, worktree_path, branch_name,
+            base_branch, workspace_path, started_at, completed_at, cost, duration, created_at, updated_at
+          FROM tasks;
+
+          DROP TABLE tasks;
+          ALTER TABLE tasks_v8 RENAME TO tasks;
+        `)
+
+        this.createRuntimeIndexes(db)
+        db.pragma('user_version = 8')
+      })
+
+      try {
+        migrateToV8()
+        currentVersion = 8
+        console.log('[DatabaseService] Migrated schema to v8')
+      } finally {
+        db.pragma('foreign_keys = ON')
+      }
     }
 
     if (currentVersion < TARGET_SCHEMA_VERSION) {

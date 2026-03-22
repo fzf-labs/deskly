@@ -3,7 +3,14 @@ import {
   notifyTaskNeedsReview,
   playTaskReviewSound
 } from '@/lib/notifications'
-import type { CreateTaskInput, Task, TaskNode, UpdateTaskInput } from './types'
+import type {
+  CreateTaskInput,
+  Task,
+  TaskNode,
+  UpdateTaskInput,
+  WorkflowDefinition,
+  WorkflowRun
+} from './types'
 import type { Automation, AutomationRun } from './types'
 
 export const db = {
@@ -167,6 +174,32 @@ export const db = {
 
   stopTaskExecution: (taskId: string): Promise<unknown> => {
     return window.api.task.stopExecution(taskId) as Promise<unknown>
+  },
+
+  getWorkflowRunByTask: (taskId: string): Promise<WorkflowRun | null> => {
+    return window.api.workflow.getRunByTask(taskId) as Promise<WorkflowRun | null>
+  },
+
+  listWorkflowDefinitions: (
+    filter?: { scope?: 'global' | 'project'; projectId?: string | null }
+  ): Promise<WorkflowDefinition[]> => {
+    return window.api.workflow.listDefinitions(filter) as Promise<WorkflowDefinition[]>
+  },
+
+  getWorkflowDefinition: (id: string): Promise<WorkflowDefinition | null> => {
+    return window.api.workflow.getDefinition(id) as Promise<WorkflowDefinition | null>
+  },
+
+  createWorkflowDefinition: (input: Record<string, unknown>): Promise<WorkflowDefinition> => {
+    return window.api.workflow.createDefinition(input) as Promise<WorkflowDefinition>
+  },
+
+  updateWorkflowDefinition: (input: Record<string, unknown>): Promise<WorkflowDefinition> => {
+    return window.api.workflow.updateDefinition(input) as Promise<WorkflowDefinition>
+  },
+
+  deleteWorkflowDefinition: (id: string): Promise<boolean> => {
+    return window.api.workflow.deleteDefinition(id) as Promise<boolean>
   },
 
   createAutomation: (input: Record<string, unknown>): Promise<Automation> => {

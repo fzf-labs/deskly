@@ -1,4 +1,4 @@
-export type TaskNodeStatus = 'todo' | 'in_progress' | 'in_review' | 'done'
+export type TaskNodeStatus = 'todo' | 'in_progress' | 'in_review' | 'done' | 'failed'
 
 export interface DbTaskNode {
   id: string

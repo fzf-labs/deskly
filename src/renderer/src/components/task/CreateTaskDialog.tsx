@@ -46,7 +46,7 @@ export function CreateTaskDialog({
   const [selectedCliConfigId, setSelectedCliConfigId] = useState('')
   const [branches, setBranches] = useState<string[]>([])
   const [selectedBaseBranch, setSelectedBaseBranch] = useState('')
-  const [pipelineTemplates, setPipelineTemplates] = useState<PipelineTemplate[]>([])
+  const [workflowDefinitions, setWorkflowDefinitions] = useState<PipelineTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [taskMode, setTaskMode] = useState<TaskMode>('conversation')
   const [loading, setLoading] = useState(false)
@@ -89,17 +89,26 @@ export function CreateTaskDialog({
       setCliTools(normalizeCliTools(tools))
     })
 
-    const loadTemplates = async () => {
+    const loadDefinitions = async () => {
       if (!projectId) {
-        setPipelineTemplates([])
+        setWorkflowDefinitions([])
         return
       }
       try {
-        const projectTemplates = await db.getWorkflowTemplatesByProject(projectId)
-        setPipelineTemplates(projectTemplates as PipelineTemplate[])
+        const [projectDefinitions, globalDefinitions] = await Promise.all([
+          db.listWorkflowDefinitions({ scope: 'project', projectId }),
+          db.listWorkflowDefinitions({ scope: 'global' })
+        ])
+        setWorkflowDefinitions([
+          ...(projectDefinitions as Array<{ id: string; name: string }>),
+          ...(globalDefinitions as Array<{ id: string; name: string }>).map((definition) => ({
+            id: definition.id,
+            name: `${definition.name}（全局）`
+          }))
+        ])
       } catch (err) {
-        console.error('Failed to load pipeline templates:', err)
-        setPipelineTemplates([])
+        console.error('Failed to load workflow definitions:', err)
+        setWorkflowDefinitions([])
       }
     }
 
@@ -135,7 +144,7 @@ export function CreateTaskDialog({
     }
 
     loadTools()
-    loadTemplates()
+    loadDefinitions()
     loadBranches()
 
     return () => {
@@ -177,15 +186,15 @@ export function CreateTaskDialog({
 
   useEffect(() => {
     if (taskMode !== 'workflow') return
-    if (pipelineTemplates.length === 0) {
+    if (workflowDefinitions.length === 0) {
       if (selectedTemplateId) setSelectedTemplateId('')
       return
     }
-    const exists = pipelineTemplates.some((template) => template.id === selectedTemplateId)
+    const exists = workflowDefinitions.some((template) => template.id === selectedTemplateId)
     if (!exists) {
-      setSelectedTemplateId(pipelineTemplates[0].id)
+      setSelectedTemplateId(workflowDefinitions[0].id)
     }
-  }, [pipelineTemplates, selectedTemplateId, taskMode])
+  }, [workflowDefinitions, selectedTemplateId, taskMode])
 
   const handleSubmit = async (text: string, attachments?: MessageAttachment[]) => {
     const trimmedTitle = title.trim()
@@ -253,7 +262,7 @@ export function CreateTaskDialog({
         worktreeRootPath,
         cliToolId,
         agentToolConfigId,
-        workflowTemplateId: taskMode === 'workflow' ? selectedTemplateId : undefined
+        workflowDefinitionId: taskMode === 'workflow' ? selectedTemplateId : undefined
       })
 
       if (result.success && result.data) {
@@ -303,7 +312,7 @@ export function CreateTaskDialog({
                 cliConfigs={cliConfigs}
                 selectedCliConfigId={selectedCliConfigId}
                 onSelectCliConfigId={setSelectedCliConfigId}
-                workflowTemplates={pipelineTemplates}
+                workflowTemplates={workflowDefinitions}
                 selectedTemplateId={selectedTemplateId}
                 onSelectTemplateId={setSelectedTemplateId}
                 isGitProject={isGitProject}

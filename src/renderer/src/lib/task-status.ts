@@ -1,4 +1,4 @@
-import { CheckCircle, Clock, Play } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock, Play } from 'lucide-react'
 
 import type { TaskStatus } from '@/data'
 
@@ -40,5 +40,12 @@ export const taskStatusUi: Record<TaskStatus, TaskStatusUiConfig> = {
     badgeColor: 'text-green-500 bg-green-500/10',
     dotColor: 'bg-emerald-500',
     subtleTextColor: 'text-emerald-600'
+  },
+  failed: {
+    icon: AlertTriangle,
+    label: 'Failed',
+    badgeColor: 'text-red-500 bg-red-500/10',
+    dotColor: 'bg-red-500',
+    subtleTextColor: 'text-red-600'
   }
 }

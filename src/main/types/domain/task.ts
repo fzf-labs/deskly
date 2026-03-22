@@ -11,6 +11,7 @@ export interface CreateTaskOptions {
   cliToolId?: string
   agentToolConfigId?: string
   workflowTemplateId?: string
+  workflowDefinitionId?: string
 }
 
 export interface TaskWithWorktree {

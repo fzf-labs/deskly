@@ -1,0 +1,5 @@
+{"file": ".claude/commands/trellis/finish-work.md", "reason": "Finish work checklist"}
+{"file": ".claude/commands/trellis/check.md", "reason": "Code quality check spec"}
+{"file": "./.trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer verification before exposing new workflow contracts"}
+{"file": "src/main/services/database/DatabaseConnection.ts", "reason": "Verify schema and migration consistency"}
+{"file": "src/main/ipc/channels.ts", "reason": "Verify IPC contract matches new backend surface"}

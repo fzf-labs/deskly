@@ -355,6 +355,26 @@ const api = {
     stopTaskNodeExecution: (nodeId: string, reason?: string) =>
       invoke(IPC_CHANNELS.database.stopTaskNodeExecution, nodeId, reason)
   },
+  workflow: {
+    listDefinitions: (filter?: { scope?: 'global' | 'project'; projectId?: string | null }) =>
+      invoke(IPC_CHANNELS.workflow.listDefinitions, filter),
+    getDefinition: (id: string) => invoke(IPC_CHANNELS.workflow.getDefinition, id),
+    createDefinition: (input: unknown) => invoke(IPC_CHANNELS.workflow.createDefinition, input),
+    updateDefinition: (input: unknown) => invoke(IPC_CHANNELS.workflow.updateDefinition, input),
+    deleteDefinition: (id: string) => invoke(IPC_CHANNELS.workflow.deleteDefinition, id),
+    createRunForTask: (input: { taskId: string; workflowDefinitionId: string }) =>
+      invoke(IPC_CHANNELS.workflow.createRunForTask, input),
+    getRun: (id: string) => invoke(IPC_CHANNELS.workflow.getRun, id),
+    getRunByTask: (taskId: string) => invoke(IPC_CHANNELS.workflow.getRunByTask, taskId),
+    listRunNodes: (runId: string) => invoke(IPC_CHANNELS.workflow.listRunNodes, runId),
+    startRun: (runId: string) => invoke(IPC_CHANNELS.workflow.startRun, runId),
+    approveNode: (
+      nodeId: string,
+      input?: { comment?: string | null; reviewed_by?: string | null; reviewed_at?: string }
+    ) => invoke(IPC_CHANNELS.workflow.approveNode, nodeId, input),
+    retryNode: (nodeId: string) => invoke(IPC_CHANNELS.workflow.retryNode, nodeId),
+    stopRun: (runId: string) => invoke(IPC_CHANNELS.workflow.stopRun, runId)
+  },
   fs: {
     readFile: (path: string) => invoke(IPC_CHANNELS.fs.readFile, path),
     readTextFile: (path: string) => invoke(IPC_CHANNELS.fs.readTextFile, path),
@@ -410,6 +430,7 @@ const api = {
       cliToolId?: string
       agentToolConfigId?: string
       workflowTemplateId?: string
+      workflowDefinitionId?: string
     }) => invoke(IPC_CHANNELS.task.create, options),
     get: (id: string) => invoke(IPC_CHANNELS.task.get, id),
     getAll: () => invoke(IPC_CHANNELS.task.getAll),

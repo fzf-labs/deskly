@@ -17,6 +17,7 @@ import type { CliSessionService } from '../services/cli/CliSessionService'
 import type { TerminalService } from '../services/terminal/TerminalService'
 import type { AutomationRunnerService } from '../services/AutomationRunnerService'
 import type { AutomationService } from '../services/AutomationService'
+import type { WorkflowSchedulerService } from '../services/WorkflowSchedulerService'
 
 export interface LifecycleService {
   init?: () => void | Promise<void>
@@ -38,6 +39,7 @@ export interface AppServices {
   settingsService: SettingsService
   taskService: TaskService
   cliSessionService: CliSessionService
+  workflowSchedulerService: WorkflowSchedulerService
   terminalService: TerminalService
   automationRunnerService: AutomationRunnerService
   automationService: AutomationService

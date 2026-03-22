@@ -1,7 +1,7 @@
-export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done'
+export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done' | 'failed'
 export type TaskMode = 'conversation' | 'workflow'
 
-export type TaskNodeStatus = 'todo' | 'in_progress' | 'in_review' | 'done'
+export type TaskNodeStatus = 'todo' | 'in_progress' | 'in_review' | 'done' | 'failed'
 
 export interface Project {
   id: string
@@ -86,6 +86,61 @@ export interface UpdateTaskInput {
   workspace_path?: string | null
   started_at?: string | null
   completed_at?: string | null
+}
+
+export interface WorkflowRun {
+  id: string
+  task_id: string
+  workflow_definition_id: string
+  status: 'waiting' | 'running' | 'review' | 'done' | 'failed'
+  current_wave: number
+  started_at: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type WorkflowDefinitionScope = 'global' | 'project'
+export type WorkflowDefinitionNodeType = 'agent' | 'command'
+
+export interface WorkflowDefinitionNodePosition {
+  x: number
+  y: number
+}
+
+export interface WorkflowDefinitionNode {
+  id: string
+  key: string
+  type: WorkflowDefinitionNodeType
+  name: string
+  prompt?: string | null
+  command?: string | null
+  cliToolId?: string | null
+  agentToolConfigId?: string | null
+  requiresApprovalAfterRun: boolean
+  position?: WorkflowDefinitionNodePosition | null
+}
+
+export interface WorkflowDefinitionEdge {
+  from: string
+  to: string
+}
+
+export interface WorkflowDefinitionDocument {
+  version: 1
+  nodes: WorkflowDefinitionNode[]
+  edges: WorkflowDefinitionEdge[]
+}
+
+export interface WorkflowDefinition {
+  id: string
+  scope: WorkflowDefinitionScope
+  project_id: string | null
+  name: string
+  description: string | null
+  definition: WorkflowDefinitionDocument
+  created_at: string
+  updated_at: string
 }
 
 export interface AgentToolConfig {

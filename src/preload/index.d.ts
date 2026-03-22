@@ -286,6 +286,25 @@ interface DatabaseAPI {
   stopTaskNodeExecution: (nodeId: string, reason?: string) => Promise<unknown>
 }
 
+interface WorkflowAPI {
+  listDefinitions: (filter?: { scope?: 'global' | 'project'; projectId?: string | null }) => Promise<unknown[]>
+  getDefinition: (id: string) => Promise<unknown>
+  createDefinition: (input: unknown) => Promise<unknown>
+  updateDefinition: (input: unknown) => Promise<unknown>
+  deleteDefinition: (id: string) => Promise<boolean>
+  createRunForTask: (input: { taskId: string; workflowDefinitionId: string }) => Promise<unknown>
+  getRun: (id: string) => Promise<unknown>
+  getRunByTask: (taskId: string) => Promise<unknown>
+  listRunNodes: (runId: string) => Promise<unknown[]>
+  startRun: (runId: string) => Promise<unknown>
+  approveNode: (
+    nodeId: string,
+    input?: { comment?: string | null; reviewed_by?: string | null; reviewed_at?: string }
+  ) => Promise<unknown>
+  retryNode: (nodeId: string) => Promise<unknown>
+  stopRun: (runId: string) => Promise<unknown>
+}
+
 interface FSAPI {
   readFile: (path: string) => Promise<Uint8Array>
   readTextFile: (path: string) => Promise<string>
@@ -374,6 +393,7 @@ interface TaskAPI {
     cliToolId?: string
     agentToolConfigId?: string
     workflowTemplateId?: string
+    workflowDefinitionId?: string
   }) => Promise<{ success: boolean; data?: TaskWithWorktree; error?: string }>
   get: (id: string) => Promise<TaskWithWorktree | null>
   getAll: () => Promise<TaskWithWorktree[]>
@@ -468,6 +488,7 @@ interface API {
   settings: SettingsAPI
   task: TaskAPI
   automation: AutomationAPI
+  workflow: WorkflowAPI
 }
 
 declare global {

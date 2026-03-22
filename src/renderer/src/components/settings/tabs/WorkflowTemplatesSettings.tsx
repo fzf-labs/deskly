@@ -10,53 +10,25 @@ import { MoreVertical } from 'lucide-react';
 import { db } from '@/data';
 import { useLanguage } from '@/providers/language-provider';
 import {
+  buildWorkflowDefinitionFromForm,
+  canEditWorkflowDefinitionInLinearDialog,
   WorkflowTemplateDialog,
   type WorkflowTemplateFormValues,
+  workflowDefinitionToFormValues,
 } from '@/components/pipeline';
-
-interface TaskNodeTemplate {
-  id: string;
-  template_id: string;
-  node_order: number;
-  name: string;
-  prompt: string;
-  cli_tool_id?: string | null;
-  agent_tool_config_id?: string | null;
-  requires_approval: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-interface WorkflowTemplate {
-  id: string;
-  name: string;
-  description?: string | null;
-  scope: 'global' | 'project';
-  project_id?: string | null;
-  nodes: TaskNodeTemplate[];
-  created_at: string;
-  updated_at: string;
-}
-
-const toNodeInputs = (values: WorkflowTemplateFormValues) =>
-  values.nodes.map((node, index) => ({
-    name: node.name,
-    prompt: node.prompt,
-    node_order: index + 1,
-    cli_tool_id: node.cliToolId || undefined,
-    agent_tool_config_id: node.agentToolConfigId || undefined,
-    requires_approval: node.requiresApproval,
-  }));
+import type { WorkflowDefinition } from '@/data';
 
 export function WorkflowTemplatesSettings() {
   const { t } = useLanguage();
-  const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
+  const [templates, setTemplates] = useState<WorkflowDefinition[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] =
-    useState<WorkflowTemplate | null>(null);
+    useState<WorkflowDefinition | null>(null);
 
   const loadTemplates = async () => {
-    const list = (await db.getGlobalWorkflowTemplates()) as WorkflowTemplate[];
+    const list = (await db.listWorkflowDefinitions({
+      scope: 'global',
+    })) as WorkflowDefinition[];
     setTemplates(list);
   };
 
@@ -69,32 +41,37 @@ export function WorkflowTemplatesSettings() {
     setDialogOpen(true);
   };
 
-  const handleEdit = (template: WorkflowTemplate) => {
+  const handleEdit = (template: WorkflowDefinition) => {
+    if (!canEditWorkflowDefinitionInLinearDialog(template.definition)) {
+      window.alert('当前工作流包含分支或命令节点，暂不支持在线性编辑器中修改。');
+      return;
+    }
     setEditingTemplate(template);
     setDialogOpen(true);
   };
 
   const handleSubmit = async (values: WorkflowTemplateFormValues) => {
+    const definition = buildWorkflowDefinitionFromForm(values);
     if (editingTemplate) {
-      await db.updateWorkflowTemplate({
+      await db.updateWorkflowDefinition({
         id: editingTemplate.id,
         scope: 'global',
         name: values.name,
         description: values.description,
-        nodes: toNodeInputs(values),
+        definition,
       });
     } else {
-      await db.createWorkflowTemplate({
+      await db.createWorkflowDefinition({
         scope: 'global',
         name: values.name,
         description: values.description,
-        nodes: toNodeInputs(values),
+        definition,
       });
     }
     await loadTemplates();
   };
 
-  const handleDelete = async (template: WorkflowTemplate) => {
+  const handleDelete = async (template: WorkflowDefinition) => {
     if (
       !confirm(
         t.task.pipelineTemplateDeleteConfirm.replace('{name}', template.name)
@@ -102,14 +79,14 @@ export function WorkflowTemplatesSettings() {
     ) {
       return;
     }
-    await db.deleteWorkflowTemplate(template.id, 'global');
+    await db.deleteWorkflowDefinition(template.id);
     await loadTemplates();
   };
 
-  const nodeCount = (template: WorkflowTemplate) =>
+  const nodeCount = (template: WorkflowDefinition) =>
     t.task.pipelineTemplateStageCount.replace(
       '{count}',
-      `${template.nodes?.length || 0}`
+      `${template.definition.nodes?.length || 0}`
     );
 
   const dialogTitle = editingTemplate
@@ -196,18 +173,8 @@ export function WorkflowTemplatesSettings() {
         title={dialogTitle}
         initialValues={
           editingTemplate
-            ? {
-                name: editingTemplate.name,
-                description: editingTemplate.description || undefined,
-                nodes: editingTemplate.nodes.map((node) => ({
-                  name: node.name,
-                  prompt: node.prompt,
-                  cliToolId: node.cli_tool_id || '',
-                  agentToolConfigId: node.agent_tool_config_id || '',
-                  requiresApproval: node.requires_approval,
-                })),
-            }
-          : null
+            ? workflowDefinitionToFormValues(editingTemplate)
+            : null
         }
         onSubmit={handleSubmit}
       />

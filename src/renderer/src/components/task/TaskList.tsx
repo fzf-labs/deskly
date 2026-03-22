@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
-import { Play, CheckCircle, Clock, GitBranch, Trash2 } from 'lucide-react'
+import { Play, CheckCircle, Clock, GitBranch, Trash2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface Task {
@@ -25,18 +25,20 @@ const statusIcons = {
   todo: Clock,
   in_progress: Play,
   in_review: Clock,
-  done: CheckCircle
+  done: CheckCircle,
+  failed: AlertTriangle
 }
 
 const statusColors = {
   todo: 'text-muted-foreground',
   in_progress: 'text-blue-500',
   in_review: 'text-amber-500',
-  done: 'text-green-500'
+  done: 'text-green-500',
+  failed: 'text-red-500'
 }
 
 function normalizeTaskStatus(status: string): keyof typeof statusIcons {
-  if (['todo', 'in_progress', 'in_review', 'done'].includes(status)) {
+  if (['todo', 'in_progress', 'in_review', 'done', 'failed'].includes(status)) {
     return status as keyof typeof statusIcons
   }
   return 'todo'

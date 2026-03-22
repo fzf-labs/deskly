@@ -27,7 +27,7 @@ export function TasksPage() {
   const [selectedCliConfigId, setSelectedCliConfigId] = useState('')
   const [branches, setBranches] = useState<string[]>([])
   const [selectedBaseBranch, setSelectedBaseBranch] = useState('')
-  const [workflowTemplates, setWorkflowTemplates] = useState<TaskMenuWorkflowTemplate[]>([])
+  const [workflowDefinitions, setWorkflowDefinitions] = useState<TaskMenuWorkflowTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [taskMode, setTaskMode] = useState<TaskMode>('conversation')
 
@@ -100,29 +100,43 @@ export function TasksPage() {
 
   useEffect(() => {
     if (!currentProject?.id) {
-      setWorkflowTemplates([])
+      setWorkflowDefinitions([])
       setSelectedTemplateId('')
       return
     }
 
     let active = true
-    const loadTemplates = async () => {
+    const loadDefinitions = async () => {
       try {
-        const templates = await db.getWorkflowTemplatesByProject(currentProject.id)
-        const list = Array.isArray(templates) ? (templates as TaskMenuWorkflowTemplate[]) : []
+        const [projectDefinitions, globalDefinitions] = await Promise.all([
+          db.listWorkflowDefinitions({ scope: 'project', projectId: currentProject.id }),
+          db.listWorkflowDefinitions({ scope: 'global' })
+        ])
+        const list = [
+          ...(Array.isArray(projectDefinitions)
+            ? (projectDefinitions as TaskMenuWorkflowTemplate[])
+            : []),
+          ...((Array.isArray(globalDefinitions)
+            ? (globalDefinitions as TaskMenuWorkflowTemplate[])
+            : []
+          ).map((definition) => ({
+            id: definition.id,
+            name: `${definition.name}（全局）`
+          })))
+        ]
         if (!active) return
-        setWorkflowTemplates(list)
+        setWorkflowDefinitions(list)
         if (selectedTemplateId && !list.some((tpl) => tpl.id === selectedTemplateId)) {
           setSelectedTemplateId('')
         }
       } catch (error) {
         if (!active) return
-        console.error('[TasksPage] Failed to load workflow templates:', error)
-        setWorkflowTemplates([])
+        console.error('[TasksPage] Failed to load workflow definitions:', error)
+        setWorkflowDefinitions([])
       }
     }
 
-    void loadTemplates()
+    void loadDefinitions()
     return () => {
       active = false
     }
@@ -130,15 +144,15 @@ export function TasksPage() {
 
   useEffect(() => {
     if (taskMode !== 'workflow') return
-    if (workflowTemplates.length === 0) {
+    if (workflowDefinitions.length === 0) {
       if (selectedTemplateId) setSelectedTemplateId('')
       return
     }
-    const exists = workflowTemplates.some((template) => template.id === selectedTemplateId)
+    const exists = workflowDefinitions.some((template) => template.id === selectedTemplateId)
     if (!exists) {
-      setSelectedTemplateId(workflowTemplates[0].id)
+      setSelectedTemplateId(workflowDefinitions[0].id)
     }
-  }, [selectedTemplateId, taskMode, workflowTemplates])
+  }, [selectedTemplateId, taskMode, workflowDefinitions])
 
   useEffect(() => {
     if (!isGitProject || !currentProject?.path) {
@@ -230,7 +244,7 @@ export function TasksPage() {
           worktreeRootPath,
           cliToolId: taskMode === 'conversation' ? resolvedCliToolId : undefined,
           agentToolConfigId: taskMode === 'conversation' ? resolvedCliConfigId : undefined,
-          workflowTemplateId: taskMode === 'workflow' ? selectedTemplateId : undefined
+          workflowDefinitionId: taskMode === 'workflow' ? selectedTemplateId : undefined
         })
 
         if (result.success && result.data) {
@@ -299,7 +313,7 @@ export function TasksPage() {
                   cliConfigs={cliConfigs}
                   selectedCliConfigId={selectedCliConfigId}
                   onSelectCliConfigId={setSelectedCliConfigId}
-                  workflowTemplates={workflowTemplates}
+                  workflowTemplates={workflowDefinitions}
                   selectedTemplateId={selectedTemplateId}
                   onSelectTemplateId={setSelectedTemplateId}
                   isGitProject={Boolean(isGitProject)}

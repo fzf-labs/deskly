@@ -1,4 +1,4 @@
-import { CheckCircle, Clock, Eye, Play } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock, Eye, Play } from 'lucide-react'
 import type { TaskStatus } from '@/data/types'
 import type { DashboardSummary } from '@/hooks/useDashboardData'
 import { cn } from '@/lib/utils'
@@ -42,6 +42,13 @@ const statusCards: Array<{
     icon: CheckCircle,
     tone: 'text-green-500',
     iconBg: 'bg-green-50'
+  },
+  {
+    id: 'failed',
+    label: '失败',
+    icon: AlertTriangle,
+    tone: 'text-red-500',
+    iconBg: 'bg-red-50'
   }
 ]
 
