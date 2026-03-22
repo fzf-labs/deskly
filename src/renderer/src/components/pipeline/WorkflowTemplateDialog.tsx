@@ -88,17 +88,17 @@ const WORKFLOW_NODE_GAP_X = 280
 const WORKFLOW_NODE_GAP_Y = 148
 const EDGE_ID_SEPARATOR = '::'
 const EDITOR_INPUT_CLASS =
-  'mt-1.5 w-full rounded-[2px] border border-slate-200/80 bg-white px-3 py-2.5 text-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
+  'mt-1.5 w-full rounded-[6px] border border-slate-200/80 bg-white px-3 py-2.5 text-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
 const EDITOR_TEXTAREA_CLASS =
-  'mt-1.5 w-full rounded-[2px] border border-slate-200/80 bg-white px-3 py-2.5 text-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
+  'mt-1.5 w-full rounded-[6px] border border-slate-200/80 bg-white px-3 py-2.5 text-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
 const EDITOR_SECTION_CLASS =
-  'rounded-[4px] border border-slate-200/90 bg-white/92 shadow-[0_1px_2px_rgba(15,23,42,0.04)]'
+  'rounded-[4px] border border-slate-200/90 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]'
 const EDITOR_BADGE_CLASS =
-  'rounded-[2px] border border-slate-200/80 bg-white/92 px-2.5 py-0.5 text-[11px] font-medium text-slate-600'
+  'rounded-[4px] border border-slate-200/80 bg-white/92 px-2.5 py-0.5 text-[11px] font-medium text-slate-600'
 const EDITOR_TOOLBAR_GROUP_CLASS =
-  'flex items-center gap-1 rounded-[2px] border border-slate-200/80 bg-white/88 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]'
+  'flex items-center gap-1 rounded-[6px] border border-slate-200/80 bg-white/88 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]'
 const EDITOR_RAIL_BUTTON_CLASS =
-  'flex h-10 w-10 items-center justify-center rounded-[2px] border border-slate-200/80 bg-white/88 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-white hover:text-slate-900'
+  'flex h-10 w-10 items-center justify-center rounded-[6px] border border-slate-200/80 bg-white/88 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-white hover:text-slate-900'
 const EDITOR_PANEL_HEADER_CLASS = 'border-b border-slate-200/70 px-4 py-4 backdrop-blur'
 
 type WorkflowEditorNodeData = {
@@ -441,7 +441,7 @@ const WorkflowEditorNodeCard = memo(function WorkflowEditorNodeCard({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[8px] border px-4 py-4 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))]',
+        'relative overflow-hidden rounded-[6px] border px-4 py-4 bg-white',
         dragging
           ? 'border-slate-300/90 shadow-[0_6px_18px_rgba(15,23,42,0.08)]'
           : selected
@@ -467,7 +467,7 @@ const WorkflowEditorNodeCard = memo(function WorkflowEditorNodeCard({
 
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[4px] border border-slate-200/80 bg-slate-50 text-slate-700">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[6px] border border-slate-200/80 bg-slate-50 text-slate-700">
             <TypeIcon className="size-[18px]" />
           </div>
           <div className="min-w-0">
@@ -519,7 +519,7 @@ function EditorToolButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'h-9 rounded-[2px] px-3 text-xs',
+        'h-9 rounded-[6px] px-3 text-xs',
         variant === 'outline' &&
           'border-slate-200/80 bg-white/88 text-slate-700 hover:bg-white hover:text-slate-900',
         variant === 'ghost' && 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -1182,11 +1182,11 @@ export function WorkflowTemplateEditor({
       onSubmit={handleSubmit}
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
     >
-      <div className="border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,245,249,0.92))] px-4 py-3 backdrop-blur">
+      <div className="border-b border-slate-200/80 bg-white px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex size-9 items-center justify-center rounded-[2px] border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <div className="flex size-9 items-center justify-center rounded-[6px] border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                 <GitBranchPlus className="size-4" />
               </div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -1201,7 +1201,7 @@ export function WorkflowTemplateEditor({
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <div
                 className={cn(
-                  'rounded-full border px-2.5 py-0.5 text-[11px] font-medium',
+                  'rounded-[2px] border px-2.5 py-0.5 text-[11px] font-medium',
                   isDirty
                     ? 'border-amber-300/80 bg-amber-50 text-amber-700'
                     : 'border-emerald-300/80 bg-emerald-50 text-emerald-700'
@@ -1248,10 +1248,10 @@ export function WorkflowTemplateEditor({
       </div>
 
       <div
-        className="grid min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_12%,#f1f5f9_100%)] transition-[grid-template-columns] duration-200 grid-cols-1 xl:[grid-template-columns:var(--workflow-editor-columns)]"
+        className="grid min-h-0 flex-1 overflow-hidden bg-slate-100 transition-[grid-template-columns] duration-200 grid-cols-1 xl:[grid-template-columns:var(--workflow-editor-columns)]"
         style={editorLayoutStyle}
       >
-        <aside className="flex min-h-0 flex-col border-r border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9),rgba(241,245,249,0.78))]">
+        <aside className="flex min-h-0 flex-col border-r border-slate-200/80 bg-slate-50">
           {leftPanelCollapsed ? (
             <div className="flex h-full flex-col items-center gap-3 px-2 py-4">
               <EditorRailButton
@@ -1266,7 +1266,7 @@ export function WorkflowTemplateEditor({
             </div>
           ) : (
             <>
-              <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-white/45')}>
+              <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-slate-50')}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -1277,7 +1277,7 @@ export function WorkflowTemplateEditor({
                   <button
                     type="button"
                     onClick={() => setLeftPanelCollapsed(true)}
-                    className="flex h-8 w-8 items-center justify-center rounded-[2px] text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
+                    className="flex h-8 w-8 items-center justify-center rounded-[6px] text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
                     title="收起工作流面板"
                   >
                     <ChevronLeft className="size-4" />
@@ -1342,7 +1342,7 @@ export function WorkflowTemplateEditor({
                           variant="outline"
                           onClick={() => void handleGenerate()}
                           disabled={isGenerating}
-                          className="rounded-[2px]"
+                          className="rounded-[6px]"
                         >
                           {isGenerating
                             ? t.task.workflowGenerateLoading || '生成中...'
@@ -1357,8 +1357,8 @@ export function WorkflowTemplateEditor({
           )}
         </aside>
 
-        <section className="flex min-h-0 flex-col bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,252,0.76))]">
-          <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-white/58')}>
+        <section className="flex min-h-0 flex-col bg-white">
+          <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-white')}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -1370,7 +1370,7 @@ export function WorkflowTemplateEditor({
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500">
                 {selectedEdgeSummary ? (
-                  <div className="rounded-full border border-sky-200/80 bg-sky-50 px-3 py-1 text-sky-700">
+                  <div className={EDITOR_BADGE_CLASS}>
                     {selectedEdgeSummary.sourceLabel} {' -> '} {selectedEdgeSummary.targetLabel}
                   </div>
                 ) : selectedNode ? (
@@ -1390,7 +1390,7 @@ export function WorkflowTemplateEditor({
             </div>
           </div>
 
-          <div className="relative min-h-0 flex-1 bg-[radial-gradient(circle_at_top,rgba(186,230,253,0.22),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(241,245,249,0.82))]">
+          <div className="relative min-h-0 flex-1 bg-slate-50">
             <ReactFlow
               nodes={editorGraph.nodes}
               edges={editorGraph.edges}
@@ -1432,7 +1432,7 @@ export function WorkflowTemplateEditor({
                 pannable
                 zoomable
                 position="bottom-right"
-                className="!border-slate-200/80 !bg-white/94 !shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+                className="!rounded-[2px] !border-slate-200/90 !bg-white !shadow-[0_1px_2px_rgba(15,23,42,0.06)]"
                 nodeColor={(node) =>
                   node.id === selectedNodeId ? 'rgba(59,130,246,0.9)' : 'rgba(100,116,139,0.72)'
                 }
@@ -1440,13 +1440,13 @@ export function WorkflowTemplateEditor({
               <Controls
                 position="top-right"
                 showInteractive={false}
-                className="!shadow-sm [&>button]:!border-border/60 [&>button]:!bg-background/92"
+                className="!rounded-[2px] !shadow-none [&>button]:!rounded-[2px] [&>button]:!border-slate-200/90 [&>button]:!bg-white"
               />
             </ReactFlow>
           </div>
         </section>
 
-        <aside className="flex min-h-0 flex-col border-l border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(248,250,252,0.84))]">
+        <aside className="flex min-h-0 flex-col border-l border-slate-200/80 bg-slate-50">
           {rightPanelCollapsed ? (
             <div className="flex h-full flex-col items-center gap-3 px-2 py-4">
               <EditorRailButton
@@ -1466,7 +1466,7 @@ export function WorkflowTemplateEditor({
             </div>
           ) : (
             <>
-              <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-white/52')}>
+              <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-slate-50')}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -1477,7 +1477,7 @@ export function WorkflowTemplateEditor({
                   <button
                     type="button"
                     onClick={() => setRightPanelCollapsed(true)}
-                    className="flex h-8 w-8 items-center justify-center rounded-[2px] text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
+                    className="flex h-8 w-8 items-center justify-center rounded-[6px] text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
                     title="收起检查面板"
                   >
                     <ChevronRight className="size-4" />
@@ -1506,7 +1506,7 @@ export function WorkflowTemplateEditor({
                             variant="ghost"
                             disabled={templateNodes.length === 1}
                             onClick={() => removeNode(selectedNode.id)}
-                            className="rounded-[2px]"
+                            className="rounded-[6px]"
                           >
                             <Trash2 className="size-4" />
                           </Button>
