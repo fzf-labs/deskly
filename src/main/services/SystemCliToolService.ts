@@ -32,8 +32,14 @@ interface SystemCliPackageSnapshot {
   pipx: Set<string>
   npm: Set<string>
   cargo: Set<string>
+  metadata: Record<SystemCliPackageManager, Map<string, SystemCliPackageMeta>>
   checkedLevel: SystemCliToolDetectionLevel
   lastCheckedAt: string
+}
+
+interface SystemCliPackageMeta {
+  version?: string
+  installPath?: string
 }
 
 const PACKAGE_MANAGER_DOCS: Record<SystemCliPackageManager, string> = {
@@ -89,6 +95,15 @@ export class SystemCliToolService extends EventEmitter {
     return { zh, en }
   }
 
+  private createEmptyMetadata(): Record<SystemCliPackageManager, Map<string, SystemCliPackageMeta>> {
+    return {
+      brew: new Map<string, SystemCliPackageMeta>(),
+      pipx: new Map<string, SystemCliPackageMeta>(),
+      npm: new Map<string, SystemCliPackageMeta>(),
+      cargo: new Map<string, SystemCliPackageMeta>()
+    }
+  }
+
   private getPackageKey(manager: SystemCliPackageManager, packageName: string): string {
     return `${manager}:${packageName}`.toLowerCase()
   }
@@ -138,33 +153,21 @@ export class SystemCliToolService extends EventEmitter {
     packageName: string,
     platform: SystemCliPlatform,
     checkedLevel: SystemCliToolDetectionLevel,
-    lastCheckedAt: string
+    lastCheckedAt: string,
+    packageMeta?: SystemCliPackageMeta
   ): SystemCliToolInfo {
     const definition = this.findDefinitionForPackage(manager, packageName)
-
-    if (definition) {
-      const base = this.createInitialTool(definition, platform)
-      return {
-        ...base,
-        id: this.getPackageKey(manager, packageName),
-        installed: true,
-        installedVia: manager,
-        installState: 'installed',
-        checkedLevel,
-        lastCheckedAt
-      }
-    }
 
     return {
       id: this.getPackageKey(manager, packageName),
       command: packageName,
       binNames: [packageName],
       displayName: packageName,
-      category: this.getPackageCategory(),
+      category: this.getPackageCategory(definition),
       summary: this.createText('', ''),
       detailIntro: this.createText(
-        `这是一个通过 ${manager} 检测到的已安装软件包，当前还没有内置的工具说明，仍然可以作为系统 CLI 工具展示。`,
-        `This installed package was detected via ${manager}. It does not have built-in tool metadata yet, but it is still surfaced as an available system CLI package.`
+        `这是一个通过 ${manager} 检测到的已安装软件包，当前按照软件包本身的信息展示。`,
+        `This installed package was detected via ${manager} and is shown using package-level metadata.`
       ),
       useCases: [],
       guideSteps: [],
@@ -176,6 +179,8 @@ export class SystemCliToolService extends EventEmitter {
       installed: true,
       installedVia: manager,
       installState: 'installed',
+      version: packageMeta?.version,
+      installPath: packageMeta?.installPath,
       checkedLevel,
       lastCheckedAt
     }
@@ -300,73 +305,138 @@ export class SystemCliToolService extends EventEmitter {
       pipx: new Set<string>(),
       npm: new Set<string>(),
       cargo: new Set<string>(),
+      metadata: this.createEmptyMetadata(),
       checkedLevel: level,
       lastCheckedAt: new Date().toISOString()
     }
   }
 
-  private parseLineSet(stdout: string): Set<string> {
-    return new Set(
-      stdout
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-    )
-  }
-
-  private async listBrewPackages(timeoutMs: number): Promise<Set<string>> {
+  private async listBrewPackages(timeoutMs: number): Promise<{
+    packages: Set<string>
+    metadata: Map<string, SystemCliPackageMeta>
+  }> {
     try {
-      const { stdout } = await safeExecFile('brew', ['list', '--formula'], {
-        allowlist: commandAllowlist,
-        timeoutMs,
-        label: 'SystemCliToolService'
-      })
-      return this.parseLineSet(stdout)
-    } catch {
-      return new Set<string>()
-    }
-  }
-
-  private async listPipxPackages(timeoutMs: number): Promise<Set<string>> {
-    try {
-      const { stdout } = await safeExecFile('pipx', ['list'], {
-        allowlist: commandAllowlist,
-        timeoutMs,
-        label: 'SystemCliToolService'
-      })
-
-      return new Set(
-        stdout
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .map((line) => {
-            const match = line.match(/^package\s+([A-Za-z0-9._-]+)/)
-            return match ? match[1] : ''
-          })
-          .filter(Boolean)
-      )
-    } catch {
-      return new Set<string>()
-    }
-  }
-
-  private async listNpmPackages(timeoutMs: number): Promise<Set<string>> {
-    try {
-      const { stdout } = await safeExecFile('npm', ['-g', 'ls', '--depth=0', '--json', '--silent'], {
+      const { stdout } = await safeExecFile('brew', ['info', '--json=v2', '--installed'], {
         allowlist: commandAllowlist,
         timeoutMs,
         label: 'SystemCliToolService',
-        maxBuffer: 1024 * 1024
+        maxBuffer: 8 * 1024 * 1024
       })
 
-      const parsed = JSON.parse(stdout) as { dependencies?: Record<string, unknown> }
-      return new Set(Object.keys(parsed.dependencies ?? {}))
+      const parsed = JSON.parse(stdout) as {
+        formulae?: Array<{
+          name?: string
+          installed?: Array<{ version?: string }>
+        }>
+      }
+      const packages = new Set<string>()
+      const metadata = new Map<string, SystemCliPackageMeta>()
+      const brewCellar = os.arch() === 'arm64' ? '/opt/homebrew/Cellar' : '/usr/local/Cellar'
+
+      for (const formula of parsed.formulae ?? []) {
+        const packageName = formula.name?.trim()
+        if (!packageName) continue
+
+        packages.add(packageName)
+        const version = formula.installed?.[0]?.version?.trim()
+        metadata.set(packageName, {
+          version,
+          installPath: version ? `${brewCellar}/${packageName}/${version}` : undefined
+        })
+      }
+
+      return { packages, metadata }
     } catch {
-      return new Set<string>()
+      return {
+        packages: new Set<string>(),
+        metadata: new Map<string, SystemCliPackageMeta>()
+      }
     }
   }
 
-  private async listCargoPackages(timeoutMs: number): Promise<Set<string>> {
+  private async listPipxPackages(timeoutMs: number): Promise<{
+    packages: Set<string>
+    metadata: Map<string, SystemCliPackageMeta>
+  }> {
+    try {
+      const { stdout } = await safeExecFile('pipx', ['list', '--json'], {
+        allowlist: commandAllowlist,
+        timeoutMs,
+        label: 'SystemCliToolService',
+        maxBuffer: 4 * 1024 * 1024
+      })
+
+      const parsed = JSON.parse(stdout) as {
+        venvs?: Record<string, { metadata?: { main_package?: { package_version?: string } } }>
+      }
+      const packages = new Set<string>()
+      const metadata = new Map<string, SystemCliPackageMeta>()
+      const pipxVenvRoot = `${os.homedir()}/.local/pipx/venvs`
+
+      for (const [packageName, venv] of Object.entries(parsed.venvs ?? {})) {
+        packages.add(packageName)
+        metadata.set(packageName, {
+          version: venv.metadata?.main_package?.package_version,
+          installPath: `${pipxVenvRoot}/${packageName}`
+        })
+      }
+
+      return { packages, metadata }
+    } catch {
+      return {
+        packages: new Set<string>(),
+        metadata: new Map<string, SystemCliPackageMeta>()
+      }
+    }
+  }
+
+  private async listNpmPackages(timeoutMs: number): Promise<{
+    packages: Set<string>
+    metadata: Map<string, SystemCliPackageMeta>
+  }> {
+    try {
+      const [{ stdout }, rootResult] = await Promise.all([
+        safeExecFile('npm', ['-g', 'ls', '--depth=0', '--json', '--silent'], {
+          allowlist: commandAllowlist,
+          timeoutMs,
+          label: 'SystemCliToolService',
+          maxBuffer: 1024 * 1024
+        }),
+        safeExecFile('npm', ['root', '-g'], {
+          allowlist: commandAllowlist,
+          timeoutMs,
+          label: 'SystemCliToolService'
+        }).catch(() => ({ stdout: '', stderr: '' }))
+      ])
+
+      const parsed = JSON.parse(stdout) as {
+        dependencies?: Record<string, { version?: string }>
+      }
+      const packages = new Set<string>()
+      const metadata = new Map<string, SystemCliPackageMeta>()
+      const npmRoot = rootResult.stdout.trim()
+
+      for (const [packageName, dependency] of Object.entries(parsed.dependencies ?? {})) {
+        packages.add(packageName)
+        metadata.set(packageName, {
+          version: dependency?.version,
+          installPath: npmRoot ? `${npmRoot}/${packageName}` : undefined
+        })
+      }
+
+      return { packages, metadata }
+    } catch {
+      return {
+        packages: new Set<string>(),
+        metadata: new Map<string, SystemCliPackageMeta>()
+      }
+    }
+  }
+
+  private async listCargoPackages(timeoutMs: number): Promise<{
+    packages: Set<string>
+    metadata: Map<string, SystemCliPackageMeta>
+  }> {
     try {
       const { stdout } = await safeExecFile('cargo', ['install', '--list'], {
         allowlist: commandAllowlist,
@@ -375,18 +445,28 @@ export class SystemCliToolService extends EventEmitter {
         maxBuffer: 1024 * 1024
       })
 
-      return new Set(
-        stdout
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .map((line) => {
-            const match = line.match(/^([A-Za-z0-9._-]+)\s+v[^:]+:$/)
-            return match ? match[1] : ''
-          })
-          .filter(Boolean)
-      )
+      const packages = new Set<string>()
+      const metadata = new Map<string, SystemCliPackageMeta>()
+      const cargoBinPath = `${os.homedir()}/.cargo/bin`
+
+      for (const line of stdout.split(/\r?\n/).map((entry) => entry.trim())) {
+        const match = line.match(/^([A-Za-z0-9._-]+)\s+v([^:]+):$/)
+        if (!match) continue
+
+        const [, packageName, version] = match
+        packages.add(packageName)
+        metadata.set(packageName, {
+          version,
+          installPath: cargoBinPath
+        })
+      }
+
+      return { packages, metadata }
     } catch {
-      return new Set<string>()
+      return {
+        packages: new Set<string>(),
+        metadata: new Map<string, SystemCliPackageMeta>()
+      }
     }
   }
 
@@ -400,7 +480,7 @@ export class SystemCliToolService extends EventEmitter {
     }
 
     const timeoutMs = Math.max(level === 'full' ? this.fullTimeoutMs * 4 : this.fullTimeoutMs * 2, 4000)
-    const [brew, pipx, npm, cargo] = await Promise.all([
+    const [brewResult, pipxResult, npmResult, cargoResult] = await Promise.all([
       this.listBrewPackages(timeoutMs),
       this.listPipxPackages(timeoutMs),
       this.listNpmPackages(timeoutMs),
@@ -408,10 +488,16 @@ export class SystemCliToolService extends EventEmitter {
     ])
 
     const snapshot = {
-      brew,
-      pipx,
-      npm,
-      cargo,
+      brew: brewResult.packages,
+      pipx: pipxResult.packages,
+      npm: npmResult.packages,
+      cargo: cargoResult.packages,
+      metadata: {
+        brew: brewResult.metadata,
+        pipx: pipxResult.metadata,
+        npm: npmResult.metadata,
+        cargo: cargoResult.metadata
+      },
       checkedLevel: level,
       lastCheckedAt: new Date().toISOString()
     }
@@ -460,8 +546,11 @@ export class SystemCliToolService extends EventEmitter {
     level: SystemCliToolDetectionLevel,
     startedAt: number
   ): Promise<SystemCliToolInfo> {
-    const installPath = await this.resolveInstallPath(tool)
-    const version = level === 'full' && installPath ? await this.resolveVersion(installPath) : tool.version
+    const resolvedInstallPath = await this.resolveInstallPath(tool)
+    const installPath = resolvedInstallPath ?? tool.installPath
+    const version = level === 'full' && resolvedInstallPath
+      ? (await this.resolveVersion(resolvedInstallPath)) ?? tool.version
+      : tool.version
 
     return {
       ...tool,
@@ -483,26 +572,21 @@ export class SystemCliToolService extends EventEmitter {
       Array.from(snapshot[manager])
         .sort((left, right) => left.localeCompare(right))
         .map((packageName) =>
-          this.createInstalledToolFromPackage(manager, packageName, platform, level, lastCheckedAt)
+          this.createInstalledToolFromPackage(
+            manager,
+            packageName,
+            platform,
+            level,
+            lastCheckedAt,
+            snapshot.metadata[manager].get(packageName)
+          )
         )
     )
 
     const enrichedInstalledEntries = await Promise.all(
-      installedEntries.map((tool) => {
-        const isKnownTool = SYSTEM_CLI_TOOLS.some((definition) =>
-          definition.packageSources?.some(
-            (source) =>
-              source.manager === tool.installedVia &&
-              source.packages.some((packageName) => tool.id === this.getPackageKey(source.manager, packageName))
-          )
-        )
-
-        if (!isKnownTool) {
-          return Promise.resolve(tool)
-        }
-
-        return this.enrichInstalledTool(tool, level, Date.now()).catch(() => tool)
-      })
+      installedEntries.map((tool) =>
+        this.enrichInstalledTool(tool, level, Date.now()).catch(() => tool)
+      )
     )
 
     const recommendedEntries = SYSTEM_CLI_TOOLS

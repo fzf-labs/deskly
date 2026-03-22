@@ -12,6 +12,7 @@ import { shell } from '@/lib/electron-api'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
 import {
+  getSystemCliDocsUrl,
   getLocalizedSystemCliText,
   getSystemCliSearchText,
   getSystemCliSupportedSources,
@@ -245,8 +246,9 @@ export function CLIToolsSettings() {
   )
 
   const renderInstalledRow = (tool: SystemCliToolInfo) => {
-    const docsUrl = tool.docsUrl
+    const docsUrl = getSystemCliDocsUrl(tool)
     const summaryText = getLocalizedSystemCliText(tool.summary, language).trim()
+    const shouldShowCommand = tool.command.trim() !== tool.displayName.trim()
 
     return (
       <div
@@ -256,9 +258,11 @@ export function CLIToolsSettings() {
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="text-foreground text-sm font-semibold">{tool.displayName}</h4>
-            <code className="bg-muted text-muted-foreground rounded-md px-1.5 py-0.5 text-[11px]">
-              {tool.command}
-            </code>
+            {shouldShowCommand ? (
+              <code className="bg-muted text-muted-foreground rounded-md px-1.5 py-0.5 text-[11px]">
+                {tool.command}
+              </code>
+            ) : null}
           </div>
           {summaryText ? (
             <p className="text-muted-foreground text-xs leading-5">
@@ -304,10 +308,11 @@ export function CLIToolsSettings() {
   }
 
   const renderRecommendedCard = (tool: SystemCliToolInfo) => {
-    const docsUrl = tool.docsUrl
+    const docsUrl = getSystemCliDocsUrl(tool)
     const visibleSources = getVisibleSources(tool)
     const primaryUseCase = tool.useCases[0]
     const summaryText = getLocalizedSystemCliText(tool.summary, language).trim()
+    const shouldShowCommand = tool.command.trim() !== tool.displayName.trim()
 
     return (
       <div
@@ -317,9 +322,11 @@ export function CLIToolsSettings() {
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="text-foreground text-sm font-semibold">{tool.displayName}</h4>
-            <code className="bg-muted text-muted-foreground rounded-md px-1.5 py-0.5 text-[11px]">
-              {tool.command}
-            </code>
+            {shouldShowCommand ? (
+              <code className="bg-muted text-muted-foreground rounded-md px-1.5 py-0.5 text-[11px]">
+                {tool.command}
+              </code>
+            ) : null}
           </div>
           {summaryText ? (
             <p className="text-muted-foreground text-xs leading-5">
@@ -457,20 +464,6 @@ export function CLIToolsSettings() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="border-border bg-background/80 rounded-xl border px-4 py-3">
-              <div className="text-muted-foreground text-xs">{t.settings.cliToolsInstalledCount}</div>
-              <div className="text-foreground mt-1 text-2xl font-semibold">{summary.installed}</div>
-            </div>
-            <div className="border-border bg-background/80 rounded-xl border px-4 py-3">
-              <div className="text-muted-foreground text-xs">{t.settings.cliToolsMissingCount}</div>
-              <div className="text-foreground mt-1 text-2xl font-semibold">{summary.missing}</div>
-            </div>
-            <div className="border-border bg-background/80 rounded-xl border px-4 py-3">
-              <div className="text-muted-foreground text-xs">{t.settings.cliToolsCatalogCount}</div>
-              <div className="text-foreground mt-1 text-2xl font-semibold">{summary.total}</div>
-            </div>
-          </div>
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">

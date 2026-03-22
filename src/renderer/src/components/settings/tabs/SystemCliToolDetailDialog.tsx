@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import { shell } from '@/lib/electron-api'
 import {
+  getSystemCliDocsUrl,
   getLocalizedSystemCliText,
   getSystemCliSupportedSources,
   isSystemCliToolInstalled
@@ -54,7 +55,7 @@ export function SystemCliToolDetailDialog({
   }
 
   const installMethods = resolveSystemCliInstallMethods(tool.installMethods, tool.platform)
-  const docsUrl = tool.docsUrl
+  const docsUrl = getSystemCliDocsUrl(tool)
   const installed = isSystemCliToolInstalled(tool)
   const sources = installed
     ? (tool.installedVia ? [tool.installedVia] : getSystemCliSupportedSources(tool))
