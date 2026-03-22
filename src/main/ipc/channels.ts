@@ -86,6 +86,13 @@ export const IPC_CHANNELS = {
     get: 'cliToolConfig:get',
     save: 'cliToolConfig:save'
   },
+  systemCliTools: {
+    getAll: 'systemCliTools:getAll',
+    getSnapshot: 'systemCliTools:getSnapshot',
+    refresh: 'systemCliTools:refresh',
+    detect: 'systemCliTools:detect',
+    detectAll: 'systemCliTools:detectAll'
+  },
   editor: {
     getAvailable: 'editor:getAvailable',
     openProject: 'editor:openProject'
@@ -246,6 +253,9 @@ export const IPC_EVENTS = {
   },
   cliTools: {
     updated: 'cliTools:updated'
+  },
+  systemCliTools: {
+    updated: 'systemCliTools:updated'
   }
 } as const
 
@@ -361,6 +371,12 @@ export interface IpcContracts {
 
   'cliToolConfig:get': IpcContract<[string], UnknownRecord>
   'cliToolConfig:save': IpcContract<[string, UnknownRecord], unknown>
+
+  'systemCliTools:getAll': IpcContract<[], unknown[]>
+  'systemCliTools:getSnapshot': IpcContract<[], unknown[]>
+  'systemCliTools:refresh': IpcContract<[UnknownRecord?], unknown[]>
+  'systemCliTools:detect': IpcContract<[string, UnknownRecord?], unknown>
+  'systemCliTools:detectAll': IpcContract<[UnknownRecord?], unknown[]>
 
   'editor:getAvailable': IpcContract<[], unknown[]>
   'editor:openProject': IpcContract<[string, string], unknown>

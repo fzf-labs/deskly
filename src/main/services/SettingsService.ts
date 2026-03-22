@@ -4,7 +4,7 @@ import {
   createDefaultEnabledCliTools,
   normalizeEnabledCliTools,
   type EnabledCliTools
-} from '../../shared/cli-tool-enablement'
+} from '../../shared/agent-cli-tool-enablement'
 
 export interface AppSettings {
   enabledCliTools: EnabledCliTools

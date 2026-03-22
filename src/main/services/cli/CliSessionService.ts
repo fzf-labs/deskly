@@ -6,12 +6,12 @@ import { GeminiCliAdapter } from './adapters/GeminiCliAdapter'
 import { CodexCliAdapter } from './adapters/CodexCliAdapter'
 import { OpencodeAdapter } from './adapters/OpencodeAdapter'
 import { MsgStoreService } from '../MsgStoreService'
-import { CLIToolConfigService } from '../CLIToolConfigService'
+import { AgentCLIToolConfigService } from '../AgentCLIToolConfigService'
 import { DatabaseService } from '../DatabaseService'
 import { SettingsService } from '../SettingsService'
 import { LogMsg } from '../../types/log'
-import { normalizeCliToolConfig } from '../../../shared/cli-config-spec'
-import { isCliToolEnabled } from '../../../shared/cli-tool-enablement'
+import { normalizeCliToolConfig } from '../../../shared/agent-cli-config-spec'
+import { isCliToolEnabled } from '../../../shared/agent-cli-tool-enablement'
 import { newUlid } from '../../utils/ids'
 
 interface SessionRecord {
@@ -47,12 +47,12 @@ export class CliSessionService extends EventEmitter {
   private sessions: Map<string, SessionRecord> = new Map()
   private pendingMsgStores: Map<string, MsgStoreService> = new Map()
   private adapters: Map<string, CliAdapter> = new Map()
-  private configService: CLIToolConfigService
+  private configService: AgentCLIToolConfigService
   private databaseService: DatabaseService
   private settingsService: SettingsService
 
   constructor(
-    configService: CLIToolConfigService,
+    configService: AgentCLIToolConfigService,
     databaseService: DatabaseService,
     settingsService: SettingsService
   ) {

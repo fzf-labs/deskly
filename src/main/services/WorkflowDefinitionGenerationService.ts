@@ -4,12 +4,12 @@ import {
   buildWorkflowGenerationPrompt,
   getWorkflowGenerationSchemaString
 } from './workflow-generation-prompt'
-import type { CLIToolDetectorService } from './CLIToolDetectorService'
+import type { AgentCLIToolDetectorService } from './AgentCLIToolDetectorService'
 import type { SettingsService } from './SettingsService'
 import type { WorkflowDefinitionService } from './WorkflowDefinitionService'
 import type { CliSessionService } from './cli/CliSessionService'
 import { newUlid } from '../utils/ids'
-import { isCliToolEnabled } from '../../shared/cli-tool-enablement'
+import { isCliToolEnabled } from '../../shared/agent-cli-tool-enablement'
 import type {
   GenerateWorkflowDefinitionInput,
   GeneratedWorkflowDefinitionResult,
@@ -478,13 +478,13 @@ const extractStructuredCandidates = (
 
 export class WorkflowDefinitionGenerationService {
   private cliSessionService: CliSessionService | null = null
-  private cliToolDetectorService: CLIToolDetectorService | null = null
+  private cliToolDetectorService: AgentCLIToolDetectorService | null = null
   private workflowDefinitionService: WorkflowDefinitionService | null = null
   private settingsService: SettingsService | null = null
 
   setCliRuntime(
     cliSessionService: CliSessionService,
-    cliToolDetectorService: CLIToolDetectorService,
+    cliToolDetectorService: AgentCLIToolDetectorService,
     workflowDefinitionService: WorkflowDefinitionService,
     settingsService: SettingsService
   ): void {

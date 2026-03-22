@@ -187,6 +187,22 @@ interface CLIToolConfigAPI {
   save: (toolId: string, config: UnknownRecord) => Promise<unknown>
 }
 
+interface SystemCLIToolsAPI {
+  getAll: () => Promise<unknown[]>
+  getSnapshot: () => Promise<unknown[]>
+  refresh: (options?: {
+    level?: 'fast' | 'full'
+    force?: boolean
+    toolIds?: string[]
+  }) => Promise<unknown[]>
+  detect: (
+    toolId: string,
+    options?: { level?: 'fast' | 'full'; force?: boolean }
+  ) => Promise<unknown>
+  detectAll: (options?: { level?: 'fast' | 'full'; force?: boolean }) => Promise<unknown[]>
+  onUpdated: (callback: (tools: unknown[]) => void) => () => void
+}
+
 interface EditorAPI {
   getAvailable: () => Promise<unknown[]>
   openProject: (projectPath: string, editorCommand: string) => Promise<unknown>
@@ -508,6 +524,7 @@ interface API {
   taskNode: TaskNodeAPI
   cliTools: CLIToolsAPI
   cliToolConfig: CLIToolConfigAPI
+  systemCliTools: SystemCLIToolsAPI
   editor: EditorAPI
   pipeline: PipelineAPI
   previewConfig: PreviewConfigAPI

@@ -8,7 +8,8 @@ import {
 import { cn } from '@/lib/utils';
 import { AboutSettings } from './tabs/AboutSettings';
 import { AccountSettings } from './tabs/AccountSettings';
-import { CLISettings } from './tabs/CLISettings';
+import { AgentCLISettings } from './tabs/AgentCLISettings';
+import { CLIToolsSettings } from './tabs/CLIToolsSettings';
 import { DataSettings } from './tabs/DataSettings';
 import { EditorSettings } from './tabs/EditorSettings';
 import { GitSettings } from './tabs/GitSettings';
@@ -68,8 +69,10 @@ export function SettingsContent({
           <EditorSettings settings={settings} onSettingsChange={handleSettingsChange} />
         )}
 
+        {activeCategory === 'cliTools' && <CLIToolsSettings />}
+
         {activeCategory === 'cli' && (
-          <CLISettings settings={settings} onSettingsChange={handleSettingsChange} />
+          <AgentCLISettings settings={settings} onSettingsChange={handleSettingsChange} />
         )}
 
         {activeCategory === 'git' && (

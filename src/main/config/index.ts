@@ -42,6 +42,11 @@ const defaultCommandAllowlist = [
   'gemini',
   'opencode',
   'cursor-agent',
+  'ffmpeg',
+  'jq',
+  'rg',
+  'yt-dlp',
+  'pandoc',
   'which',
   'where'
 ]

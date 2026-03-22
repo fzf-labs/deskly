@@ -40,8 +40,8 @@ import {
   type WorkflowDefinitionNodePosition
 } from '@/data'
 import { newUuid } from '@/lib/ids'
-import { filterEnabledCliTools } from '@/lib/cli-tool-enablement'
-import { normalizeCliTools, type CLIToolInfo } from '@/lib/cli-tools'
+import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
+import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
 

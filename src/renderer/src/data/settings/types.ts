@@ -2,7 +2,7 @@
 import type {
   EnabledCliTools,
   SupportedCliToolId
-} from '../../../../shared/cli-tool-enablement';
+} from '../../../../shared/agent-cli-tool-enablement';
 
 export interface AIProvider {
   id: string;

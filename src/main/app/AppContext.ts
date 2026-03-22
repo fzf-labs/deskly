@@ -3,8 +3,9 @@ import type { AppPaths } from './AppPaths'
 import type { ProjectService } from '../services/ProjectService'
 import type { GitService } from '../services/GitService'
 import type { CLIProcessService } from '../services/CLIProcessService'
-import type { CLIToolDetectorService } from '../services/CLIToolDetectorService'
-import type { CLIToolConfigService } from '../services/CLIToolConfigService'
+import type { AgentCLIToolDetectorService } from '../services/AgentCLIToolDetectorService'
+import type { AgentCLIToolConfigService } from '../services/AgentCLIToolConfigService'
+import type { SystemCliToolService } from '../services/SystemCliToolService'
 import type { EditorService } from '../services/EditorService'
 import type { PipelineService } from '../services/PipelineService'
 import type { PreviewConfigService } from '../services/PreviewConfigService'
@@ -28,8 +29,9 @@ export interface AppServices {
   projectService: ProjectService
   gitService: GitService
   cliProcessService: CLIProcessService
-  cliToolDetectorService: CLIToolDetectorService
-  cliToolConfigService: CLIToolConfigService
+  cliToolDetectorService: AgentCLIToolDetectorService
+  cliToolConfigService: AgentCLIToolConfigService
+  systemCliToolService: SystemCliToolService
   editorService: EditorService
   pipelineService: PipelineService
   previewConfigService: PreviewConfigService

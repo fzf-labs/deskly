@@ -11,10 +11,10 @@ import {
 import { db } from '@/data'
 import type { AgentToolConfig } from '@/data'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
-import { filterEnabledCliTools } from '@/lib/cli-tool-enablement'
+import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
 import { useLanguage } from '@/providers/language-provider'
 import type { MessageAttachment } from '@/hooks/useAgent'
-import { normalizeCliTools, type CLIToolInfo } from '@/lib/cli-tools'
+import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools'
 import { Sparkles } from 'lucide-react'
 
 interface CreateTaskDialogProps {

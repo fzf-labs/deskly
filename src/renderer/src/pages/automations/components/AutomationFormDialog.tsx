@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { useProjects } from '@/hooks/useProjects';
 import type { AgentToolConfig } from '@/data';
-import { filterEnabledCliTools } from '@/lib/cli-tool-enablement';
+import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement';
 import type { Automation, AutomationTriggerType } from '@/types/automation';
-import { normalizeCliTools, type CLIToolInfo } from '@/lib/cli-tools';
+import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools';
 
 interface AutomationFormDialogProps {
   open: boolean;

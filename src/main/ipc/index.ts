@@ -10,7 +10,8 @@ import { registerProjectsIpc } from './projects.ipc'
 import { registerGitIpc } from './git.ipc'
 import { registerCliIpc } from './cli.ipc'
 import { registerCliSessionIpc } from './cli-session.ipc'
-import { registerCliToolsIpc } from './cli-tools.ipc'
+import { registerCliToolsIpc } from './agent-cli-tools.ipc'
+import { registerSystemCliToolsIpc } from './system-cli-tools.ipc'
 import { registerEditorIpc } from './editor.ipc'
 import { registerPipelineIpc } from './pipeline.ipc'
 import { registerPreviewConfigIpc } from './preview-config.ipc'
@@ -112,6 +113,7 @@ export const registerIpcHandlers = (deps: IpcDependencies): void => {
   registerCliIpc(context)
   registerCliSessionIpc(context)
   registerCliToolsIpc(context)
+  registerSystemCliToolsIpc(context)
   registerEditorIpc(context)
   registerPipelineIpc(context)
   registerPreviewConfigIpc(context)

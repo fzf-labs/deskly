@@ -14,6 +14,7 @@ import {
   Terminal,
   User,
   Volume2,
+  Wrench,
 } from 'lucide-react';
 
 import { SETTINGS_CATEGORIES, type SettingsCategory } from './types';
@@ -31,6 +32,7 @@ export const categoryIcons: Record<
   sound: Volume2,
   notification: Bell,
   editor: Code,
+  cliTools: Wrench,
   cli: Terminal,
   git: GitBranch,
   pipelineTemplates: ListChecks,

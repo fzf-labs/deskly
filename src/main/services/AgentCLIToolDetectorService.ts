@@ -40,7 +40,7 @@ export interface CLIToolInfo {
   errorMessage?: string
 }
 
-export class CLIToolDetectorService extends EventEmitter {
+export class AgentCLIToolDetectorService extends EventEmitter {
   private readonly inFlightDetections = new Map<string, Promise<CLIToolInfo | null>>()
 
   private readonly fastTimeoutMs = config.cliToolDetection.fastTimeoutMs
@@ -114,7 +114,7 @@ export class CLIToolDetectorService extends EventEmitter {
 
   init(): void {
     void this.refreshTools({ level: 'fast' }).catch((error) => {
-      console.error('[CLIToolDetectorService] Failed to warm tool cache:', error)
+      console.error('[AgentCLIToolDetectorService] Failed to warm tool cache:', error)
     })
   }
 
@@ -234,7 +234,7 @@ export class CLIToolDetectorService extends EventEmitter {
       const { stdout } = await safeExecFile(command, args, {
         allowlist: cliToolAllowlist,
         timeoutMs: this.fullTimeoutMs,
-        label: 'CLIToolDetectorService'
+        label: 'AgentCLIToolDetectorService'
       })
 
       return stdout
@@ -254,7 +254,7 @@ export class CLIToolDetectorService extends EventEmitter {
       const { stdout } = await safeExecFile(lookupCommand, [command], {
         allowlist: cliToolAllowlist,
         timeoutMs: this.fastTimeoutMs,
-        label: 'CLIToolDetectorService'
+        label: 'AgentCLIToolDetectorService'
       })
       const resolvedPath = stdout
         .split(/\r?\n/)

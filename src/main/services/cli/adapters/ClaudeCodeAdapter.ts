@@ -2,7 +2,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliSession, InitSequenceStep } from '../ProcessCliSession'
-import { CLIToolConfigService } from '../../CLIToolConfigService'
+import { AgentCLIToolConfigService } from '../../AgentCLIToolConfigService'
 import { failureSignal, parseJsonLine, successSignal } from './completion'
 import {
   asBoolean,
@@ -29,9 +29,9 @@ function detectClaudeCompletion(line: string) {
 
 export class ClaudeCodeAdapter implements CliAdapter {
   id = 'claude-code'
-  private configService: CLIToolConfigService
+  private configService: AgentCLIToolConfigService
 
-  constructor(configService: CLIToolConfigService) {
+  constructor(configService: AgentCLIToolConfigService) {
     this.configService = configService
   }
 

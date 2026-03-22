@@ -1,0 +1,7 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "New settings tab should keep IPC-driven state local and refresh defensively"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "IPC boundaries for CLI Tools detection need strict typed normalization"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Renderer settings tab UI and reusable components must follow repo component patterns"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "CLI Tools spans main IPC preload and renderer so contracts must be explicit"}

@@ -243,6 +243,21 @@ const api = {
     save: (toolId: string, config: Record<string, unknown>) =>
       invoke(IPC_CHANNELS.cliToolConfig.save, toolId, config)
   },
+  systemCliTools: {
+    getAll: () => invoke(IPC_CHANNELS.systemCliTools.getAll),
+    getSnapshot: () => invoke(IPC_CHANNELS.systemCliTools.getSnapshot),
+    refresh: (options?: { level?: 'fast' | 'full'; force?: boolean; toolIds?: string[] }) =>
+      invoke(IPC_CHANNELS.systemCliTools.refresh, options),
+    detect: (toolId: string, options?: { level?: 'fast' | 'full'; force?: boolean }) =>
+      invoke(IPC_CHANNELS.systemCliTools.detect, toolId, options),
+    detectAll: (options?: { level?: 'fast' | 'full'; force?: boolean }) =>
+      invoke(IPC_CHANNELS.systemCliTools.detectAll, options),
+    onUpdated: (callback: (tools: unknown[]) => void) => {
+      const listener = (_: unknown, tools: unknown[]) => callback(tools)
+      ipcRenderer.on(IPC_EVENTS.systemCliTools.updated, listener)
+      return () => ipcRenderer.removeListener(IPC_EVENTS.systemCliTools.updated, listener)
+    }
+  },
   editor: {
     getAvailable: () => invoke(IPC_CHANNELS.editor.getAvailable),
     openProject: (projectPath: string, editorCommand: string) =>

@@ -14,8 +14,8 @@ import {
 import { db, type AgentToolConfig } from '@/data'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
 import { useProjects } from '@/hooks/useProjects'
-import { filterEnabledCliTools } from '@/lib/cli-tool-enablement'
-import { normalizeCliTools } from '@/lib/cli-tools'
+import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
+import { normalizeCliTools } from '@/lib/agent-cli-tools'
 import { useLanguage } from '@/providers/language-provider'
 
 export function TasksPage() {

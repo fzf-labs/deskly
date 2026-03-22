@@ -20,7 +20,7 @@ import {
   createDefaultEnabledCliTools,
   isCliToolEnabled,
   normalizeEnabledCliTools,
-} from '../../../../shared/cli-tool-enablement';
+} from '../../../../shared/agent-cli-tool-enablement';
 import {
   DEFAULT_TASK_COMPLETE_SOUND,
   DEFAULT_TASK_NODE_COMPLETE_SOUND,

@@ -1,0 +1,4 @@
+{"file": ".claude/commands/trellis/finish-work.md", "reason": "Finish work checklist"}
+{"file": ".claude/commands/trellis/check.md", "reason": "Code quality check spec"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify renderer changes keep local async state safe and lint/typecheck clean"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Avoid duplicating agent CLI detection patterns when adding system CLI Tools detection"}

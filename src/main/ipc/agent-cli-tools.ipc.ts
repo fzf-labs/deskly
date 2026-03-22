@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron'
 import type { IpcModuleContext } from './types'
-import type { CLIToolConfigService } from '../services/CLIToolConfigService'
+import type { AgentCLIToolConfigService } from '../services/AgentCLIToolConfigService'
 import { IPC_CHANNELS, IPC_EVENTS } from './channels'
 
 let cliToolEventBound = false
@@ -58,6 +58,6 @@ export const registerCliToolsIpc = ({ handle, v, services }: IpcModuleContext): 
     (_, toolId) => cliToolConfigService.getConfig(toolId)
   )
   handle(IPC_CHANNELS.cliToolConfig.save, [v.string(), v.object()], (_, toolId, configValue) => {
-    cliToolConfigService.saveConfig(toolId, configValue as Parameters<CLIToolConfigService['saveConfig']>[1])
+    cliToolConfigService.saveConfig(toolId, configValue as Parameters<AgentCLIToolConfigService['saveConfig']>[1])
   })
 }

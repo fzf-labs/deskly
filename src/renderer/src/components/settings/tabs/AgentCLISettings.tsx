@@ -21,14 +21,14 @@ import {
   normalizeCliTools,
   isCliToolInstalled,
   type CLIToolInfo,
-} from '@/lib/cli-tools';
+} from '@/lib/agent-cli-tools';
 import {
   createCliToolConfigTemplate,
   getCliToolConfigSpec,
   normalizeCliToolConfig,
   normalizeCliToolConfigWithDefaults,
   type CliConfigFieldSpec as ConfigFieldSchema,
-} from '../../../../../shared/cli-config-spec';
+} from '../../../../../shared/agent-cli-config-spec';
 
 const TOOL_CACHE = {
   tools: null as CLIToolInfo[] | null,
@@ -127,7 +127,7 @@ const sanitizeConfigBySchema = (
   parsed: Record<string, unknown>
 ): Record<string, unknown> => normalizeCliToolConfigWithDefaults(toolId, parsed);
 
-export function CLISettings({
+export function AgentCLISettings({
   settings,
   onSettingsChange,
 }: SettingsTabProps) {
@@ -789,22 +789,6 @@ export function CLISettings({
                       <p className="text-foreground font-mono break-all">
                         {activeTool.installPath || '—'}
                       </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground">
-                        {t.settings?.cliEnabledLabel || 'Enabled'}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={isCliToolEnabledInSettings(activeTool.id, settings)}
-                          onChange={(enabled) => handleToolEnabledChange(activeTool.id, enabled)}
-                        />
-                        <span className="text-foreground font-medium">
-                          {isCliToolEnabledInSettings(activeTool.id, settings)
-                            ? t.settings?.cliConfigOptionEnabled || 'Enabled'
-                            : t.settings?.cliConfigOptionDisabled || 'Disabled'}
-                        </span>
-                      </div>
                     </div>
                   </div>
                 </div>

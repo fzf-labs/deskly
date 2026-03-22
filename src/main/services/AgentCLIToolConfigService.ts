@@ -9,7 +9,7 @@ interface ToolConfig {
   [key: string]: unknown
 }
 
-export class CLIToolConfigService {
+export class AgentCLIToolConfigService {
   private getConfigPath(toolId: string): string {
     const homeDir = os.homedir()
 

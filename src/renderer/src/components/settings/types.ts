@@ -10,6 +10,7 @@ export type SettingsCategory =
   | 'sound'
   | 'notification'
   | 'editor'
+  | 'cliTools'
   | 'cli'
   | 'git'
   | 'pipelineTemplates'
@@ -26,6 +27,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   'sound',
   'notification',
   'editor',
+  'cliTools',
   'cli',
   'git',
   'pipelineTemplates',

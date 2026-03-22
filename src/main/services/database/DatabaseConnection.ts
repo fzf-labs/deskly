@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { normalizeCliToolConfig } from '../../../shared/cli-config-spec'
+import { normalizeCliToolConfig } from '../../../shared/agent-cli-config-spec'
 
 const TARGET_SCHEMA_VERSION = 9
 

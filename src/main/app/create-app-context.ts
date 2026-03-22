@@ -2,8 +2,9 @@ import { getAppPaths } from './AppPaths'
 import { ProjectService } from '../services/ProjectService'
 import { GitService } from '../services/GitService'
 import { CLIProcessService } from '../services/CLIProcessService'
-import { CLIToolDetectorService } from '../services/CLIToolDetectorService'
-import { CLIToolConfigService } from '../services/CLIToolConfigService'
+import { AgentCLIToolDetectorService } from '../services/AgentCLIToolDetectorService'
+import { AgentCLIToolConfigService } from '../services/AgentCLIToolConfigService'
+import { SystemCliToolService } from '../services/SystemCliToolService'
 import { EditorService } from '../services/EditorService'
 import { PipelineService } from '../services/PipelineService'
 import { PreviewConfigService } from '../services/PreviewConfigService'
@@ -27,8 +28,9 @@ export const createAppContext = (): AppContext => {
   const projectService = new ProjectService(databaseService)
   const gitService = new GitService()
   const cliProcessService = new CLIProcessService()
-  const cliToolDetectorService = new CLIToolDetectorService()
-  const cliToolConfigService = new CLIToolConfigService()
+  const cliToolDetectorService = new AgentCLIToolDetectorService()
+  const cliToolConfigService = new AgentCLIToolConfigService()
+  const systemCliToolService = new SystemCliToolService()
   const cliSessionService = new CliSessionService(
     cliToolConfigService,
     databaseService,
@@ -61,6 +63,7 @@ export const createAppContext = (): AppContext => {
     cliProcessService,
     cliToolDetectorService,
     cliToolConfigService,
+    systemCliToolService,
     editorService,
     pipelineService,
     previewConfigService,
@@ -83,6 +86,7 @@ export const createAppContext = (): AppContext => {
     cliProcessService,
     cliToolDetectorService,
     cliToolConfigService,
+    systemCliToolService,
     cliSessionService,
     editorService,
     pipelineService,

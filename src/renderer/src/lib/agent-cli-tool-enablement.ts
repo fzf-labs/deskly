@@ -2,7 +2,7 @@ import {
   filterEnabledCliTools as filterEnabledCliToolsShared,
   getEnabledCliToolIds as getEnabledCliToolIdsShared,
   isCliToolEnabled as isCliToolEnabledShared,
-} from '../../../shared/cli-tool-enablement';
+} from '../../../shared/agent-cli-tool-enablement';
 import { getSettings, type Settings } from '@/data/settings';
 
 export const isCliToolEnabled = (
