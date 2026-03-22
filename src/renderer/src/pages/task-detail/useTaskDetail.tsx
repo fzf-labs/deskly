@@ -14,20 +14,21 @@
  * 8. Actions - User action handlers
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { NavigateFunction } from 'react-router-dom';
-import { Clock, GitBranch } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { NavigateFunction } from 'react-router-dom'
+import { Clock, GitBranch } from 'lucide-react'
 
-import { db, type Task } from '@/data';
-import { getSettings } from '@/data/settings';
-import { normalizeCliTools } from '@/lib/cli-tools';
-import { newUuid } from '@/lib/ids';
-import type { AgentMessage, MessageAttachment } from '@/hooks/useAgent';
-import { hasValidSearchResults, type Artifact } from '@/components/artifacts';
-import { getArtifactTypeFromExt } from '@/components/task';
-import type { CLISessionHandle } from '@/components/cli';
+import { db, type Task, type WorkflowRun, type WorkflowRunNode } from '@/data'
+import { getSettings } from '@/data/settings'
+import { normalizeCliTools } from '@/lib/cli-tools'
+import { newUuid } from '@/lib/ids'
+import type { AgentMessage, MessageAttachment } from '@/hooks/useAgent'
+import { hasValidSearchResults, type Artifact } from '@/components/artifacts'
+import { getArtifactTypeFromExt } from '@/components/task'
+import type { CLISessionHandle } from '@/components/cli'
 
-import { statusConfig } from './constants';
+import { statusConfig } from './constants'
+import { buildWorkflowGraph } from './workflow-graph'
 import {
   filterVisibleMetaRows,
   type CLIToolInfo,
@@ -38,10 +39,11 @@ import {
   type PipelineTemplate,
   type TaskMetaRow,
   type WorkflowCurrentNode,
+  type WorkflowGraph,
   type WorkflowNode,
   type WorkflowReviewNode,
-  type LanguageStrings,
-} from './types';
+  type LanguageStrings
+} from './types'
 
 // ============================================================================
 // Utils
@@ -50,60 +52,60 @@ import {
 const FILE_PATH_PATTERNS = [
   /`([^`]+\.(?:pptx|xlsx|docx|pdf))`/gi,
   /(\/[^\s"'`\n]+\.(?:pptx|xlsx|docx|pdf))/gi,
-  /(\/[^\s"'\n]*[\u4e00-\u9fff][^\s"'\n]*\.(?:pptx|xlsx|docx|pdf))/gi,
-];
+  /(\/[^\s"'\n]*[\u4e00-\u9fff][^\s"'\n]*\.(?:pptx|xlsx|docx|pdf))/gi
+]
 
 const extractFilePaths = (text: string): string[] => {
-  const results: string[] = [];
+  const results: string[] = []
   for (const pattern of FILE_PATH_PATTERNS) {
-    pattern.lastIndex = 0;
-    const matches = text.matchAll(pattern);
+    pattern.lastIndex = 0
+    const matches = text.matchAll(pattern)
     for (const match of matches) {
-      const filePath = match[1] || match[0];
-      if (filePath) results.push(filePath);
+      const filePath = match[1] || match[0]
+      if (filePath) results.push(filePath)
     }
   }
-  return results;
-};
+  return results
+}
 
 const hasFilePathMatch = (text: string): boolean => {
   return FILE_PATH_PATTERNS.some((pattern) => {
-    pattern.lastIndex = 0;
-    return pattern.test(text);
-  });
-};
+    pattern.lastIndex = 0
+    return pattern.test(text)
+  })
+}
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface UseTaskDetailInput {
-  taskId?: string;
-  initialPrompt: string;
-  initialSessionId?: string;
-  initialAttachmentsRef: React.MutableRefObject<MessageAttachment[] | undefined>;
-  navigate: NavigateFunction;
-  activeTaskId: string | null;
-  messages: AgentMessage[];
-  setMessages: React.Dispatch<React.SetStateAction<AgentMessage[]>>;
-  isRunning: boolean;
-  stopAgent: () => Promise<void>;
+  taskId?: string
+  initialPrompt: string
+  initialSessionId?: string
+  initialAttachmentsRef: React.MutableRefObject<MessageAttachment[] | undefined>
+  navigate: NavigateFunction
+  activeTaskId: string | null
+  messages: AgentMessage[]
+  setMessages: React.Dispatch<React.SetStateAction<AgentMessage[]>>
+  isRunning: boolean
+  stopAgent: () => Promise<void>
   runAgent: (
     prompt: string,
     taskId?: string,
     sessionInfo?: { sessionId: string },
     attachments?: MessageAttachment[],
     workingDir?: string
-  ) => Promise<string>;
+  ) => Promise<string>
   continueConversation: (
     prompt: string,
     attachments?: MessageAttachment[],
     workingDir?: string
-  ) => Promise<void>;
-  loadTask: (taskId: string) => Promise<Task | null>;
-  loadMessages: (taskId: string) => Promise<void>;
-  sessionFolder: string | null;
-  t: LanguageStrings;
+  ) => Promise<void>
+  loadTask: (taskId: string) => Promise<Task | null>
+  loadMessages: (taskId: string) => Promise<void>
+  sessionFolder: string | null
+  t: LanguageStrings
 }
 
 // ============================================================================
@@ -126,44 +128,58 @@ export function useTaskDetail({
   loadTask,
   loadMessages,
   sessionFolder,
-  t,
+  t
 }: UseTaskDetailInput) {
   // ===========================================================================
   // Section 1: Init State
   // ===========================================================================
-  const [task, setTask] = useState<Task | null>(null);
-  const [backendWorkflowRun, setBackendWorkflowRun] = useState<{ id: string; status: string } | null>(null);
+  const [task, setTask] = useState<Task | null>(null)
+  const [backendWorkflowRun, setBackendWorkflowRun] = useState<WorkflowRun | null>(null)
+  const [workflowRunNodes, setWorkflowRunNodes] = useState<WorkflowRunNode[]>([])
+  const [workflowGraph, setWorkflowGraph] = useState<WorkflowGraph>({ nodes: [], edges: [] })
   const [currentNodeRuntime, setCurrentNodeRuntime] = useState<CurrentNodeRuntime>({
     taskNodeId: null,
     sessionId: null,
     cliToolId: null,
     agentToolConfigId: null
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasStarted, setHasStarted] = useState(false);
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [hasStarted, setHasStarted] = useState(false)
 
-  const isInitializingRef = useRef(false);
-  const initializedTaskIdRef = useRef<string | null>(null);
-  const prevTaskIdRef = useRef<string | undefined>(undefined);
+  const isInitializingRef = useRef(false)
+  const initializedTaskIdRef = useRef<string | null>(null)
+  const prevTaskIdRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     if (prevTaskIdRef.current !== taskId) {
       if (prevTaskIdRef.current !== undefined) {
-        setTask(null);
-        setBackendWorkflowRun(null);
-        setCurrentNodeRuntime({ taskNodeId: null, sessionId: null, cliToolId: null, agentToolConfigId: null });
-        setHasStarted(false);
-        isInitializingRef.current = false;
-        initializedTaskIdRef.current = null;
+        setTask(null)
+        setBackendWorkflowRun(null)
+        setWorkflowRunNodes([])
+        setWorkflowGraph({ nodes: [], edges: [] })
+        setCurrentNodeRuntime({
+          taskNodeId: null,
+          sessionId: null,
+          cliToolId: null,
+          agentToolConfigId: null
+        })
+        setHasStarted(false)
+        isInitializingRef.current = false
+        initializedTaskIdRef.current = null
       }
-      prevTaskIdRef.current = taskId;
+      prevTaskIdRef.current = taskId
     }
-  }, [taskId]);
+  }, [taskId])
 
   const loadCurrentNodeRuntime = useCallback(async () => {
     if (!taskId) {
-      setCurrentNodeRuntime({ taskNodeId: null, sessionId: null, cliToolId: null, agentToolConfigId: null });
-      return;
+      setCurrentNodeRuntime({
+        taskNodeId: null,
+        sessionId: null,
+        cliToolId: null,
+        agentToolConfigId: null
+      })
+      return
     }
 
     try {
@@ -184,7 +200,8 @@ export function useTaskDetail({
           agent_tool_config_id?: string | null
         }>
         const sortedNodes = [...nodes].sort(
-          (a, b) => (a.node_order ?? Number.MAX_SAFE_INTEGER) - (b.node_order ?? Number.MAX_SAFE_INTEGER)
+          (a, b) =>
+            (a.node_order ?? Number.MAX_SAFE_INTEGER) - (b.node_order ?? Number.MAX_SAFE_INTEGER)
         )
         node = sortedNodes[sortedNodes.length - 1] ?? null
       }
@@ -196,439 +213,495 @@ export function useTaskDetail({
         agentToolConfigId: node?.agent_tool_config_id ?? null
       })
     } catch {
-      setCurrentNodeRuntime({ taskNodeId: null, sessionId: null, cliToolId: null, agentToolConfigId: null })
+      setCurrentNodeRuntime({
+        taskNodeId: null,
+        sessionId: null,
+        cliToolId: null,
+        agentToolConfigId: null
+      })
     }
   }, [taskId])
 
   const refreshTask = useCallback(async () => {
-    if (!taskId) return;
+    if (!taskId) return
     try {
-      const refreshedTask = await db.getTask(taskId);
-      if (refreshedTask) setTask(refreshedTask as Task);
-      const workflowRun = await db.getWorkflowRunByTask(taskId);
-      setBackendWorkflowRun(workflowRun ? { id: workflowRun.id, status: workflowRun.status } : null);
+      const refreshedTask = await db.getTask(taskId)
+      if (refreshedTask) setTask(refreshedTask as Task)
+      const workflowRun = await db.getWorkflowRunByTask(taskId)
+      setBackendWorkflowRun(workflowRun)
+      if (workflowRun) {
+        const runNodes = await db.listWorkflowRunNodes(workflowRun.id)
+        setWorkflowRunNodes(Array.isArray(runNodes) ? runNodes : [])
+      } else {
+        setWorkflowRunNodes([])
+      }
     } catch {
       /* ignore */
     }
-  }, [taskId]);
+  }, [taskId])
 
   useEffect(() => {
     async function initialize() {
-      if (!taskId) { setIsLoading(false); return; }
-      if (initializedTaskIdRef.current === taskId) return;
-      if (isInitializingRef.current) return;
-      isInitializingRef.current = true;
+      if (!taskId) {
+        setIsLoading(false)
+        return
+      }
+      if (initializedTaskIdRef.current === taskId) return
+      if (isInitializingRef.current) return
+      isInitializingRef.current = true
 
       try {
-        setIsLoading(true);
-        const existingTask = await loadTask(taskId);
+        setIsLoading(true)
+        const existingTask = await loadTask(taskId)
 
         if (existingTask) {
-          setTask(existingTask);
-          const workflowRun = await db.getWorkflowRunByTask(taskId);
-          setBackendWorkflowRun(workflowRun ? { id: workflowRun.id, status: workflowRun.status } : null);
-          await loadCurrentNodeRuntime();
-          await loadMessages(taskId);
-          setHasStarted(true);
-          setIsLoading(false);
+          setTask(existingTask)
+          const workflowRun = await db.getWorkflowRunByTask(taskId)
+          setBackendWorkflowRun(workflowRun)
+          if (workflowRun) {
+            const runNodes = await db.listWorkflowRunNodes(workflowRun.id)
+            setWorkflowRunNodes(Array.isArray(runNodes) ? runNodes : [])
+          } else {
+            setWorkflowRunNodes([])
+          }
+          await loadCurrentNodeRuntime()
+          await loadMessages(taskId)
+          setHasStarted(true)
+          setIsLoading(false)
         } else if (initialPrompt && !hasStarted) {
-          setHasStarted(true);
-          setIsLoading(false);
-          setMessages([]);
+          setHasStarted(true)
+          setIsLoading(false)
+          setMessages([])
 
-          const sessionId = initialSessionId || null;
+          const sessionId = initialSessionId || null
           try {
-            const settings = getSettings();
+            const settings = getSettings()
             const createdTask = await db.createTask({
               id: taskId,
               title: initialPrompt,
-              prompt: initialPrompt,
-            });
-            setTask(createdTask);
+              prompt: initialPrompt
+            })
+            setTask(createdTask)
             await db.updateCurrentTaskNodeRuntime(taskId, {
               session_id: sessionId ?? null,
               cli_tool_id: settings.defaultCliToolId || null
-            });
-            await loadCurrentNodeRuntime();
+            })
+            await loadCurrentNodeRuntime()
           } catch (error) {
-            console.error('[TaskDetail] Failed to initialize task:', error);
-            const newTask = await loadTask(taskId);
-            setTask(newTask);
+            console.error('[TaskDetail] Failed to initialize task:', error)
+            const newTask = await loadTask(taskId)
+            setTask(newTask)
           }
         } else {
-          setIsLoading(false);
+          setIsLoading(false)
         }
       } finally {
-        initializedTaskIdRef.current = taskId;
-        isInitializingRef.current = false;
+        initializedTaskIdRef.current = taskId
+        isInitializingRef.current = false
       }
     }
-    void initialize();
-  }, [taskId, loadCurrentNodeRuntime, loadMessages, loadTask, initialPrompt, initialSessionId, hasStarted, setMessages]);
+    void initialize()
+  }, [
+    taskId,
+    loadCurrentNodeRuntime,
+    loadMessages,
+    loadTask,
+    initialPrompt,
+    initialSessionId,
+    hasStarted,
+    setMessages
+  ])
 
-  const useCliSession = Boolean(currentNodeRuntime.cliToolId);
+  const useCliSession = Boolean(currentNodeRuntime.cliToolId)
 
   // ===========================================================================
   // Section 2: CLI Tools
   // ===========================================================================
-  const [cliTools, setCliTools] = useState<CLIToolInfo[]>([]);
+  const [cliTools, setCliTools] = useState<CLIToolInfo[]>([])
 
   useEffect(() => {
-    let active = true;
+    let active = true
     const loadCliTools = async () => {
       try {
-        const result = await window.api?.cliTools?.getSnapshot?.();
-        if (active) setCliTools(normalizeCliTools(result) as CLIToolInfo[]);
-        void window.api?.cliTools?.refresh?.({ level: 'fast' });
+        const result = await window.api?.cliTools?.getSnapshot?.()
+        if (active) setCliTools(normalizeCliTools(result) as CLIToolInfo[])
+        void window.api?.cliTools?.refresh?.({ level: 'fast' })
       } catch {
-        if (active) setCliTools([]);
+        if (active) setCliTools([])
       }
-    };
+    }
     const unsubscribe = window.api?.cliTools?.onUpdated?.((tools) => {
-      if (!active) return;
-      setCliTools(normalizeCliTools(tools) as CLIToolInfo[]);
-    });
-    void loadCliTools();
+      if (!active) return
+      setCliTools(normalizeCliTools(tools) as CLIToolInfo[])
+    })
+    void loadCliTools()
     return () => {
-      active = false;
-      unsubscribe?.();
-    };
-  }, []);
+      active = false
+      unsubscribe?.()
+    }
+  }, [])
 
   // ===========================================================================
   // Section 3: Dialog State
   // ===========================================================================
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [editPrompt, setEditPrompt] = useState('');
-  const [editCliToolId, setEditCliToolId] = useState('');
-  const [editCliConfigId, setEditCliConfigId] = useState('');
-  const [cliConfigs, setCliConfigs] = useState<Array<{ id: string; name: string; is_default?: number }>>([]);
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [editPrompt, setEditPrompt] = useState('')
+  const [editCliToolId, setEditCliToolId] = useState('')
+  const [editCliConfigId, setEditCliConfigId] = useState('')
+  const [cliConfigs, setCliConfigs] = useState<
+    Array<{ id: string; name: string; is_default?: number }>
+  >([])
 
   const handleOpenEdit = useCallback(() => {
-    if (!task || task.status !== 'todo') return;
-    setEditPrompt(task.prompt || '');
-    setEditCliToolId(currentNodeRuntime.cliToolId || '');
-    setEditCliConfigId(currentNodeRuntime.agentToolConfigId || '');
-    setIsEditOpen(true);
-  }, [currentNodeRuntime.agentToolConfigId, currentNodeRuntime.cliToolId, task]);
+    if (!task || task.status !== 'todo') return
+    setEditPrompt(task.prompt || '')
+    setEditCliToolId(currentNodeRuntime.cliToolId || '')
+    setEditCliConfigId(currentNodeRuntime.agentToolConfigId || '')
+    setIsEditOpen(true)
+  }, [currentNodeRuntime.agentToolConfigId, currentNodeRuntime.cliToolId, task])
 
   const handleSaveEdit = useCallback(async () => {
-    if (!taskId) return;
-    const trimmedPrompt = editPrompt.trim();
-    if (!trimmedPrompt) return;
+    if (!taskId) return
+    const trimmedPrompt = editPrompt.trim()
+    if (!trimmedPrompt) return
     try {
       const updatedTask = await db.updateTask(taskId, {
         prompt: trimmedPrompt
-      });
+      })
       await db.updateCurrentTaskNodeRuntime(taskId, {
         cli_tool_id: editCliToolId || null,
         agent_tool_config_id: editCliConfigId || null
       })
-      await loadCurrentNodeRuntime();
-      if (updatedTask) setTask(updatedTask);
-      setIsEditOpen(false);
+      await loadCurrentNodeRuntime()
+      if (updatedTask) setTask(updatedTask)
+      setIsEditOpen(false)
     } catch (error) {
-      console.error('Failed to update task:', error);
+      console.error('Failed to update task:', error)
     }
-  }, [editCliToolId, editCliConfigId, editPrompt, loadCurrentNodeRuntime, taskId]);
+  }, [editCliToolId, editCliConfigId, editPrompt, loadCurrentNodeRuntime, taskId])
 
   const handleDeleteTask = useCallback(async () => {
-    if (!taskId) return;
+    if (!taskId) return
     try {
-      await db.deleteTask(taskId);
-      setIsDeleteOpen(false);
-      navigate('/board', { replace: true });
+      await db.deleteTask(taskId)
+      setIsDeleteOpen(false)
+      navigate('/board', { replace: true })
     } catch (error) {
-      console.error('Failed to delete task:', error);
+      console.error('Failed to delete task:', error)
     }
-  }, [navigate, taskId]);
+  }, [navigate, taskId])
 
   useEffect(() => {
-    if (!isEditOpen) return;
+    if (!isEditOpen) return
     if (!editCliToolId) {
-      setCliConfigs([]);
-      setEditCliConfigId('');
-      return;
+      setCliConfigs([])
+      setEditCliConfigId('')
+      return
     }
-    let active = true;
+    let active = true
     const loadConfigs = async () => {
       try {
-        const result = await db.listAgentToolConfigs(editCliToolId);
-        const list = Array.isArray(result) ? (result as Array<{ id: string; name: string; is_default?: number }>) : [];
-        if (!active) return;
-        setCliConfigs(list);
-        const exists = editCliConfigId && list.some((cfg) => cfg.id === editCliConfigId);
+        const result = await db.listAgentToolConfigs(editCliToolId)
+        const list = Array.isArray(result)
+          ? (result as Array<{ id: string; name: string; is_default?: number }>)
+          : []
+        if (!active) return
+        setCliConfigs(list)
+        const exists = editCliConfigId && list.some((cfg) => cfg.id === editCliConfigId)
         if (!exists) {
-          const defaultConfig = list.find((cfg) => cfg.is_default);
-          setEditCliConfigId(defaultConfig?.id || '');
+          const defaultConfig = list.find((cfg) => cfg.is_default)
+          setEditCliConfigId(defaultConfig?.id || '')
         }
       } catch {
         if (active) {
-          setCliConfigs([]);
-          setEditCliConfigId('');
+          setCliConfigs([])
+          setEditCliConfigId('')
         }
       }
-    };
-    void loadConfigs();
-    return () => { active = false; };
-  }, [editCliConfigId, editCliToolId, isEditOpen]);
+    }
+    void loadConfigs()
+    return () => {
+      active = false
+    }
+  }, [editCliConfigId, editCliToolId, isEditOpen])
 
   // ===========================================================================
   // Section 4: CLI Session
   // ===========================================================================
-  const [cliStatus, setCliStatus] = useState<ExecutionStatus>('idle');
-  const cliSessionRef = useRef<CLISessionHandle>(null);
-  const pendingCliStartRef = useRef(false);
-  const pendingCliPromptRef = useRef<string | undefined>(undefined);
+  const [cliStatus, setCliStatus] = useState<ExecutionStatus>('idle')
+  const cliSessionRef = useRef<CLISessionHandle>(null)
+  const pendingCliStartRef = useRef(false)
+  const pendingCliPromptRef = useRef<string | undefined>(undefined)
 
   const ensureCliSessionId = useCallback(async (): Promise<string | null> => {
-    if (!taskId) return null;
+    if (!taskId) return null
 
     try {
-      const currentNode = (await db.getCurrentTaskNode(taskId)) as
-        | { id?: string | null; session_id?: string | null }
-        | null;
+      const currentNode = (await db.getCurrentTaskNode(taskId)) as {
+        id?: string | null
+        session_id?: string | null
+      } | null
 
       const runtimeMatchesCurrentNode =
-        !currentNode?.id || currentNode.id === currentNodeRuntime.taskNodeId;
+        !currentNode?.id || currentNode.id === currentNodeRuntime.taskNodeId
 
       if (runtimeMatchesCurrentNode && currentNodeRuntime.sessionId) {
-        return currentNodeRuntime.sessionId;
+        return currentNodeRuntime.sessionId
       }
 
       if (currentNode?.session_id) {
-        return currentNode.session_id;
+        return currentNode.session_id
       }
     } catch {
       // ignore and fallback to creating a new session id
     }
 
-    const newSessionId = newUuid();
+    const newSessionId = newUuid()
     try {
-      await db.updateCurrentTaskNodeRuntime(taskId, { session_id: newSessionId });
-      await loadCurrentNodeRuntime();
+      await db.updateCurrentTaskNodeRuntime(taskId, { session_id: newSessionId })
+      await loadCurrentNodeRuntime()
     } catch (error) {
-      console.error('[TaskDetail] Failed to persist session_id:', error);
+      console.error('[TaskDetail] Failed to persist session_id:', error)
     }
-    return newSessionId;
-  }, [currentNodeRuntime.sessionId, currentNodeRuntime.taskNodeId, loadCurrentNodeRuntime, taskId]);
+    return newSessionId
+  }, [currentNodeRuntime.sessionId, currentNodeRuntime.taskNodeId, loadCurrentNodeRuntime, taskId])
 
   useEffect(() => {
-    if (!currentNodeRuntime.sessionId || !pendingCliStartRef.current) return;
-    const promptOverride = pendingCliPromptRef.current;
-    pendingCliStartRef.current = false;
-    pendingCliPromptRef.current = undefined;
-    cliSessionRef.current?.start(promptOverride).catch(() => {});
-  }, [currentNodeRuntime.sessionId]);
+    if (!currentNodeRuntime.sessionId || !pendingCliStartRef.current) return
+    const promptOverride = pendingCliPromptRef.current
+    pendingCliStartRef.current = false
+    pendingCliPromptRef.current = undefined
+    cliSessionRef.current?.start(promptOverride).catch(() => {})
+  }, [currentNodeRuntime.sessionId])
 
-  useEffect(() => { setCliStatus('idle'); }, [taskId]);
+  useEffect(() => {
+    setCliStatus('idle')
+  }, [taskId])
 
   const markExecutionRunning = useCallback(async () => {
-    if (!taskId) return;
+    if (!taskId) return
     try {
-      await db.startTaskExecution(taskId);
+      await db.startTaskExecution(taskId)
     } catch {
       /* ignore */
     }
-  }, [taskId]);
+  }, [taskId])
 
   // Forward declare loadWorkflowStatus for use in handleCliStatusChange
-  const loadWorkflowStatusRef = useRef<() => Promise<void>>(async () => {});
+  const loadWorkflowStatusRef = useRef<() => Promise<void>>(async () => {})
 
   const handleCliStatusChange = useCallback(
     (status: ExecutionStatus) => {
-      setCliStatus(status);
-      if (!taskId) return;
+      setCliStatus(status)
+      if (!taskId) return
       if (status === 'running') {
-        void markExecutionRunning();
+        void markExecutionRunning()
       } else if (status === 'stopped' || status === 'error') {
         void (async () => {
-          await loadWorkflowStatusRef.current();
-          await loadCurrentNodeRuntime();
-          await refreshTask();
-        })();
+          await loadWorkflowStatusRef.current()
+          await loadCurrentNodeRuntime()
+          await refreshTask()
+        })()
       }
     },
     [markExecutionRunning, loadCurrentNodeRuntime, refreshTask, taskId]
-  );
+  )
 
   const runCliPrompt = useCallback(
     async (prompt?: string, sessionIdOverride?: string | null) => {
-      const session = cliSessionRef.current;
-      if (!session) return;
-      const content = prompt?.trim() || '';
+      const session = cliSessionRef.current
+      if (!session) return
+      const content = prompt?.trim() || ''
 
-      let sessionId = sessionIdOverride ?? currentNodeRuntime.sessionId;
+      let sessionId = sessionIdOverride ?? currentNodeRuntime.sessionId
       if (!sessionId) {
-        sessionId = await ensureCliSessionId();
-        if (!sessionId) return;
-        pendingCliStartRef.current = true;
-        pendingCliPromptRef.current = content || undefined;
-        return;
+        sessionId = await ensureCliSessionId()
+        if (!sessionId) return
+        pendingCliStartRef.current = true
+        pendingCliPromptRef.current = content || undefined
+        return
       }
       if (!currentNodeRuntime.sessionId || currentNodeRuntime.sessionId !== sessionId) {
-        pendingCliStartRef.current = true;
-        pendingCliPromptRef.current = content || undefined;
-        return;
+        pendingCliStartRef.current = true
+        pendingCliPromptRef.current = content || undefined
+        return
       }
       if (sessionId && window.api?.cliSession?.getSession) {
         try {
-          const existingSession = await window.api.cliSession.getSession(sessionId);
+          const existingSession = await window.api.cliSession.getSession(sessionId)
           if (existingSession) {
-            if (content) await session.sendInput(content);
-            return;
+            if (content) await session.sendInput(content)
+            return
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
 
       if (cliStatus === 'running') {
-        if (content) await session.sendInput(content);
-        return;
+        if (content) await session.sendInput(content)
+        return
       }
 
-      await session.start(content || undefined);
+      await session.start(content || undefined)
     },
     [cliStatus, currentNodeRuntime.sessionId, ensureCliSessionId]
-  );
+  )
 
   const appendCliLog = useCallback(
-    async (_content: string, _type: 'user_message' | 'system_message', sessionIdOverride?: string | null): Promise<string | null> => {
-      if (!taskId) return null;
-      const sessionId = sessionIdOverride ?? (await ensureCliSessionId());
-      if (!sessionId) return null;
-      return sessionId;
+    async (
+      _content: string,
+      _type: 'user_message' | 'system_message',
+      sessionIdOverride?: string | null
+    ): Promise<string | null> => {
+      if (!taskId) return null
+      const sessionId = sessionIdOverride ?? (await ensureCliSessionId())
+      if (!sessionId) return null
+      return sessionId
     },
     [ensureCliSessionId, taskId]
-  );
+  )
 
   const appendCliUserLog = useCallback(
     async (content: string, sessionIdOverride?: string | null) =>
       appendCliLog(content, 'user_message', sessionIdOverride),
     [appendCliLog]
-  );
+  )
   const appendCliSystemLog = useCallback(
     async (content: string, sessionIdOverride?: string | null) =>
       appendCliLog(content, 'system_message', sessionIdOverride),
     [appendCliLog]
-  );
+  )
 
   const stopCli = useCallback(async () => {
     try {
-      const session = cliSessionRef.current;
-      if (session) await session.stop();
+      const session = cliSessionRef.current
+      if (session) await session.stop()
       else if (currentNodeRuntime.sessionId && window.api?.cliSession?.stopSession) {
-        await window.api.cliSession.stopSession(currentNodeRuntime.sessionId);
+        await window.api.cliSession.stopSession(currentNodeRuntime.sessionId)
       }
-    } catch { /* ignore */ }
-  }, [currentNodeRuntime.sessionId]);
+    } catch {
+      /* ignore */
+    }
+  }, [currentNodeRuntime.sessionId])
 
   // ===========================================================================
   // Section 5: Prompt
   // ===========================================================================
-  const taskPrompt = useMemo(() => task?.prompt || initialPrompt, [initialPrompt, task?.prompt]);
+  const taskPrompt = useMemo(() => task?.prompt || initialPrompt, [initialPrompt, task?.prompt])
 
-  const buildCliPrompt = useCallback((nodePrompt?: string) => nodePrompt?.trim() || '', []);
+  const buildCliPrompt = useCallback((nodePrompt?: string) => nodePrompt?.trim() || '', [])
 
   // ===========================================================================
   // Section 6: Tool Selection
   // ===========================================================================
-  const [selectedToolIndex, setSelectedToolIndex] = useState<number | null>(null);
-  const toolCount = useMemo(() => messages.filter((m) => m.type === 'tool_use').length, [messages]);
+  const [selectedToolIndex, setSelectedToolIndex] = useState<number | null>(null)
+  const toolCount = useMemo(() => messages.filter((m) => m.type === 'tool_use').length, [messages])
 
-  useEffect(() => { if (isRunning && toolCount > 0) setSelectedToolIndex(toolCount - 1); }, [toolCount, isRunning]);
-  useEffect(() => { setSelectedToolIndex(null); }, [taskId]);
+  useEffect(() => {
+    if (isRunning && toolCount > 0) setSelectedToolIndex(toolCount - 1)
+  }, [toolCount, isRunning])
+  useEffect(() => {
+    setSelectedToolIndex(null)
+  }, [taskId])
 
   const toolSelectionValue = useMemo(
     () => ({ selectedToolIndex, setSelectedToolIndex, showComputer: () => {} }),
     [selectedToolIndex]
-  );
+  )
 
   // ===========================================================================
   // Section 7: Scroll
   // ===========================================================================
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const userScrolledUpRef = useRef(false);
-  const lastScrollTopRef = useRef(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const userScrolledUpRef = useRef(false)
+  const lastScrollTopRef = useRef(0)
 
-  useEffect(() => { userScrolledUpRef.current = false; lastScrollTopRef.current = 0; }, [taskId]);
-  useEffect(() => { if (!userScrolledUpRef.current) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    userScrolledUpRef.current = false
+    lastScrollTopRef.current = 0
+  }, [taskId])
+  useEffect(() => {
+    if (!userScrolledUpRef.current) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   const checkScrollPosition = useCallback(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    if (scrollTop < lastScrollTopRef.current && distanceFromBottom > 100) userScrolledUpRef.current = true;
-    if (distanceFromBottom < 50) userScrolledUpRef.current = false;
-    lastScrollTopRef.current = scrollTop;
-  }, []);
+    const container = messagesContainerRef.current
+    if (!container) return
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+    if (scrollTop < lastScrollTopRef.current && distanceFromBottom > 100)
+      userScrolledUpRef.current = true
+    if (distanceFromBottom < 50) userScrolledUpRef.current = false
+    lastScrollTopRef.current = scrollTop
+  }, [])
 
   useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-    container.addEventListener('scroll', checkScrollPosition);
-    checkScrollPosition();
-    return () => container.removeEventListener('scroll', checkScrollPosition);
-  }, [checkScrollPosition]);
+    const container = messagesContainerRef.current
+    if (!container) return
+    container.addEventListener('scroll', checkScrollPosition)
+    checkScrollPosition()
+    return () => container.removeEventListener('scroll', checkScrollPosition)
+  }, [checkScrollPosition])
 
   useEffect(() => {
-    if (!isLoading && messages.length > 0) requestAnimationFrame(() => checkScrollPosition());
-  }, [checkScrollPosition, isLoading, messages.length]);
+    if (!isLoading && messages.length > 0) requestAnimationFrame(() => checkScrollPosition())
+  }, [checkScrollPosition, isLoading, messages.length])
 
   // ===========================================================================
   // Section 8: Working Dir
   // ===========================================================================
-  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([])
 
   const workingDir = useMemo(() => {
-    if (task?.workspace_path) return task.workspace_path;
-    if (task?.worktree_path) return task.worktree_path;
-    if (sessionFolder) return sessionFolder;
+    if (task?.workspace_path) return task.workspace_path
+    if (task?.worktree_path) return task.worktree_path
+    if (sessionFolder) return sessionFolder
     for (const artifact of artifacts) {
       if (artifact.path?.includes('/sessions/')) {
-        const match = artifact.path.match(/^(.+\/sessions\/[^/]+)/);
-        if (match) return match[1];
+        const match = artifact.path.match(/^(.+\/sessions\/[^/]+)/)
+        if (match) return match[1]
       }
     }
-    return '';
-  }, [artifacts, sessionFolder, task?.workspace_path, task?.worktree_path]);
+    return ''
+  }, [artifacts, sessionFolder, task?.workspace_path, task?.worktree_path])
 
   // ===========================================================================
   // Section 9: Pipeline
   // ===========================================================================
-  const [pipelineTemplate, setPipelineTemplate] = useState<PipelineTemplate | null>(null);
-  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus>('idle');
-  const [pipelineStageIndex, setPipelineStageIndex] = useState(0);
-  const [pipelineStageMessageStart, setPipelineStageMessageStart] = useState(0);
+  const [pipelineTemplate, setPipelineTemplate] = useState<PipelineTemplate | null>(null)
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus>('idle')
+  const [pipelineStageIndex, setPipelineStageIndex] = useState(0)
+  const [pipelineStageMessageStart, setPipelineStageMessageStart] = useState(0)
 
   useEffect(() => {
     if (!taskId || task?.task_mode !== 'workflow') {
-      setPipelineTemplate(null);
-      setPipelineStatus('idle');
-      return;
+      setPipelineTemplate(null)
+      setPipelineStatus('idle')
+      return
     }
 
-    let active = true;
+    let active = true
     const loadTemplate = async () => {
       try {
         const nodes = (await db.getTaskNodes(taskId)) as Array<{
-          id: string;
-          node_order: number;
-          name?: string;
-          prompt?: string;
-          requires_approval?: boolean | number;
-        }>;
+          id: string
+          node_order: number
+          name?: string
+          prompt?: string
+          requires_approval?: boolean | number
+        }>
         if (!nodes.length) {
           if (active) {
-            setPipelineTemplate(null);
-            setPipelineStatus('idle');
+            setPipelineTemplate(null)
+            setPipelineStatus('idle')
           }
-          return;
+          return
         }
 
-        const sortedNodes = [...nodes].sort((a, b) => a.node_order - b.node_order);
+        const sortedNodes = [...nodes].sort((a, b) => a.node_order - b.node_order)
 
         if (active) {
           setPipelineTemplate({
@@ -649,99 +722,101 @@ export function useTaskDetail({
               created_at: '',
               updated_at: ''
             }))
-          });
-          setPipelineStageIndex(0);
-          setPipelineStatus('idle');
+          })
+          setPipelineStageIndex(0)
+          setPipelineStatus('idle')
         }
       } catch {
         if (active) {
-          setPipelineTemplate(null);
-          setPipelineStatus('idle');
+          setPipelineTemplate(null)
+          setPipelineStatus('idle')
         }
       }
-    };
+    }
 
-    void loadTemplate();
+    void loadTemplate()
     return () => {
-      active = false;
-    };
-  }, [task?.project_id, task?.task_mode, taskId, t.task.stageLabel, t.task.workflowCardTitle]);
+      active = false
+    }
+  }, [task?.project_id, task?.task_mode, taskId, t.task.stageLabel, t.task.workflowCardTitle])
 
   // ===========================================================================
   // Section 10: Workflow
   // ===========================================================================
-  const [currentTaskNode, setCurrentTaskNode] = useState<WorkflowReviewNode | null>(null);
-  const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([]);
-  const [workflowCurrentNode, setWorkflowCurrentNode] = useState<WorkflowCurrentNode | null>(null);
-  const [selectedWorkflowNodeId, setSelectedWorkflowNodeId] = useState<string | null>(null);
+  const [currentTaskNode, setCurrentTaskNode] = useState<WorkflowReviewNode | null>(null)
+  const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([])
+  const [workflowCurrentNode, setWorkflowCurrentNode] = useState<WorkflowCurrentNode | null>(null)
+  const [selectedWorkflowNodeId, setSelectedWorkflowNodeId] = useState<string | null>(null)
 
-  const isMountedRef = useRef(true);
-  const workflowPrevTaskIdRef = useRef<string | undefined>(undefined);
-  const lastAutoRunTaskNodeIdRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true)
+  const workflowPrevTaskIdRef = useRef<string | undefined>(undefined)
+  const lastAutoRunTaskNodeIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (workflowPrevTaskIdRef.current !== taskId) {
       if (workflowPrevTaskIdRef.current !== undefined) {
-        setCurrentTaskNode(null);
-        setWorkflowNodes([]);
-        setWorkflowCurrentNode(null);
-        setSelectedWorkflowNodeId(null);
-        lastAutoRunTaskNodeIdRef.current = null;
+        setCurrentTaskNode(null)
+        setWorkflowNodes([])
+        setWorkflowCurrentNode(null)
+        setSelectedWorkflowNodeId(null)
+        lastAutoRunTaskNodeIdRef.current = null
       }
-      workflowPrevTaskIdRef.current = taskId;
+      workflowPrevTaskIdRef.current = taskId
     }
-  }, [taskId]);
+  }, [taskId])
 
   const resolveTaskNodePrompt = useCallback(
     async (taskNodeId?: string | null, nodeIndex?: number | null) => {
-      const sortedNodes = [...workflowNodes].sort((a, b) => a.node_order - b.node_order);
+      const sortedNodes = [...workflowNodes].sort((a, b) => a.node_order - b.node_order)
       const fromState =
         (taskNodeId ? sortedNodes.find((n) => n.id === taskNodeId) : null) ||
         (typeof nodeIndex === 'number' ? sortedNodes[nodeIndex] : null) ||
-        sortedNodes.find((n) => n.node_order === nodeIndex);
-      if (fromState?.prompt?.trim()) return fromState.prompt.trim();
+        sortedNodes.find((n) => n.node_order === nodeIndex)
+      if (fromState?.prompt?.trim()) return fromState.prompt.trim()
 
-      if (!taskId) return '';
+      if (!taskId) return ''
       try {
         const nodes = (await db.getTaskNodes(taskId)) as Array<{
-          id: string;
-          node_order: number;
-          prompt?: string;
-        }>;
-        const byId = taskNodeId ? nodes.find((n) => n.id === taskNodeId) : null;
+          id: string
+          node_order: number
+          prompt?: string
+        }>
+        const byId = taskNodeId ? nodes.find((n) => n.id === taskNodeId) : null
         const byIndex =
           typeof nodeIndex === 'number'
             ? [...nodes].sort((a, b) => a.node_order - b.node_order)[nodeIndex]
-            : null;
-        return (byId?.prompt || byIndex?.prompt || '').trim();
+            : null
+        return (byId?.prompt || byIndex?.prompt || '').trim()
       } catch {
-        return '';
+        return ''
       }
     },
     [taskId, workflowNodes]
-  );
+  )
 
   const resolveCurrentNodePrompt = useCallback(async () => {
-    if (!taskId) return '';
+    if (!taskId) return ''
 
     try {
       const currentNode = (await db.getCurrentTaskNode(taskId)) as {
-        id?: string;
-        node_order?: number;
-        prompt?: string;
-      } | null;
+        id?: string
+        node_order?: number
+        prompt?: string
+      } | null
 
       if (currentNode?.prompt?.trim()) {
-        return currentNode.prompt.trim();
+        return currentNode.prompt.trim()
       }
 
       if (currentNode?.id) {
         const resolved = await resolveTaskNodePrompt(
           currentNode.id,
-          typeof currentNode.node_order === 'number' ? Math.max(currentNode.node_order - 1, 0) : null
-        );
+          typeof currentNode.node_order === 'number'
+            ? Math.max(currentNode.node_order - 1, 0)
+            : null
+        )
         if (resolved.trim()) {
-          return resolved.trim();
+          return resolved.trim()
         }
       }
     } catch {
@@ -749,547 +824,738 @@ export function useTaskDetail({
     }
 
     if (workflowCurrentNode?.id) {
-      const fallback = await resolveTaskNodePrompt(workflowCurrentNode.id, workflowCurrentNode.index);
-      return fallback.trim();
+      const fallback = await resolveTaskNodePrompt(
+        workflowCurrentNode.id,
+        workflowCurrentNode.index
+      )
+      return fallback.trim()
     }
 
-    return '';
-  }, [resolveTaskNodePrompt, taskId, workflowCurrentNode?.id, workflowCurrentNode?.index]);
+    return ''
+  }, [resolveTaskNodePrompt, taskId, workflowCurrentNode?.id, workflowCurrentNode?.index])
 
   const loadWorkflowStatus = useCallback(async () => {
-    if (!taskId) return;
+    if (!taskId) return
     try {
       const nodes = (await db.getTaskNodes(taskId)) as Array<{
-        id: string;
-        node_order: number;
-        status: PipelineDisplayStatus;
-        name?: string;
-        prompt?: string;
-        session_id?: string | null;
-        cli_tool_id?: string | null;
-        agent_tool_config_id?: string | null;
-      }>;
+        id: string
+        node_order: number
+        status: PipelineDisplayStatus
+        name?: string
+        prompt?: string
+        session_id?: string | null
+        cli_tool_id?: string | null
+        agent_tool_config_id?: string | null
+      }>
       if (!nodes.length) {
         if (isMountedRef.current) {
-          setCurrentTaskNode(null);
-          setWorkflowNodes([]);
-          setWorkflowCurrentNode(null);
-          setSelectedWorkflowNodeId(null);
+          setCurrentTaskNode(null)
+          setWorkflowNodes([])
+          setWorkflowCurrentNode(null)
+          setSelectedWorkflowNodeId(null)
         }
-        return;
+        return
       }
 
-      const sortedNodes = [...nodes].sort((a, b) => a.node_order - b.node_order);
+      const sortedNodes = [...nodes].sort((a, b) => a.node_order - b.node_order)
 
       const runtimeCurrentNode = (await db.getCurrentTaskNode(taskId)) as {
-        id: string;
-        status: PipelineDisplayStatus;
-        name?: string;
-      } | null;
-      const currentNode = runtimeCurrentNode ?? sortedNodes[sortedNodes.length - 1];
+        id: string
+        status: PipelineDisplayStatus
+        name?: string
+      } | null
+      const currentNode = runtimeCurrentNode ?? sortedNodes[sortedNodes.length - 1]
       if (!currentNode) {
         if (isMountedRef.current) {
-          setCurrentTaskNode(null);
-          setWorkflowCurrentNode(null);
-          setWorkflowNodes(sortedNodes);
+          setCurrentTaskNode(null)
+          setWorkflowCurrentNode(null)
+          setWorkflowNodes(sortedNodes)
         }
-        return;
+        return
       }
 
       const currentNodeIndex = Math.max(
         0,
         sortedNodes.findIndex((node) => node.id === currentNode.id)
-      );
+      )
 
       if (isMountedRef.current) {
-        setWorkflowNodes(sortedNodes);
+        setWorkflowNodes(sortedNodes)
         setWorkflowCurrentNode({
           id: currentNode.id,
           status: currentNode.status,
           index: currentNodeIndex
-        });
+        })
         const hasSelectedNode =
           selectedWorkflowNodeId !== null &&
-          sortedNodes.some((node) => node.id === selectedWorkflowNodeId);
+          sortedNodes.some((node) => node.id === selectedWorkflowNodeId)
         if (!hasSelectedNode) {
-          setSelectedWorkflowNodeId(currentNode.id);
+          setSelectedWorkflowNodeId(currentNode.id)
         }
-        if (useCliSession) setPipelineStageIndex(currentNodeIndex);
+        if (useCliSession) setPipelineStageIndex(currentNodeIndex)
       }
 
       const selectedReviewNode = selectedWorkflowNodeId
-        ? sortedNodes.find((node) => node.id === selectedWorkflowNodeId && node.status === 'in_review')
-        : null;
+        ? sortedNodes.find(
+            (node) => node.id === selectedWorkflowNodeId && node.status === 'in_review'
+          )
+        : null
 
       const runtimeReviewNode =
         currentNode.status === 'in_review'
-          ? sortedNodes.find((node) => node.id === currentNode.id) ?? null
-          : null;
+          ? (sortedNodes.find((node) => node.id === currentNode.id) ?? null)
+          : null
 
-      const reviewNode = selectedReviewNode ?? runtimeReviewNode;
+      const reviewNode = selectedReviewNode ?? runtimeReviewNode
 
       if (reviewNode) {
-        const reviewNodeIndex = Math.max(0, sortedNodes.findIndex((node) => node.id === reviewNode.id));
-        const nodeTemplate = pipelineTemplate?.nodes.find((n) => n.id === reviewNode.id);
-        const fallbackName = `${t.task.stageLabel} ${reviewNodeIndex + 1}`;
+        const reviewNodeIndex = Math.max(
+          0,
+          sortedNodes.findIndex((node) => node.id === reviewNode.id)
+        )
+        const runtimeNode = workflowRunNodes.find((node) => node.id === reviewNode.id) ?? null
+        const definitionNode =
+          runtimeNode && backendWorkflowRun
+            ? (backendWorkflowRun.definition_snapshot.nodes.find(
+                (node) => node.id === runtimeNode.definition_node_id
+              ) ?? null)
+            : null
+        const fallbackName = `${t.task.stageLabel} ${reviewNodeIndex + 1}`
         if (isMountedRef.current) {
           setCurrentTaskNode({
             id: reviewNode.id,
-            name: reviewNode.name || nodeTemplate?.name || fallbackName,
+            name: reviewNode.name || runtimeNode?.name || definitionNode?.name || fallbackName,
             status: 'in_review'
-          });
+          })
         }
-        return;
+        return
       }
 
-      if (isMountedRef.current) setCurrentTaskNode(null);
+      if (isMountedRef.current) setCurrentTaskNode(null)
     } catch {
       /* ignore */
     }
-  }, [pipelineTemplate, selectedWorkflowNodeId, taskId, t.task.stageLabel, useCliSession]);
+  }, [
+    backendWorkflowRun,
+    selectedWorkflowNodeId,
+    taskId,
+    t.task.stageLabel,
+    useCliSession,
+    workflowRunNodes
+  ])
 
   // Assign to ref for use in handleCliStatusChange
-  loadWorkflowStatusRef.current = loadWorkflowStatus;
+  loadWorkflowStatusRef.current = loadWorkflowStatus
 
   useEffect(() => {
-    if (!taskId) return;
+    if (!taskId) return
 
     const refreshByTaskNodeEvent = async (eventTaskId?: string) => {
-      if (!eventTaskId || eventTaskId !== taskId) return;
-      await loadCurrentNodeRuntime();
-      await loadWorkflowStatus();
-      await refreshTask();
-    };
+      if (!eventTaskId || eventTaskId !== taskId) return
+      await loadCurrentNodeRuntime()
+      await loadWorkflowStatus()
+      await refreshTask()
+    }
 
     const offCompleted = window.api?.taskNode?.onCompleted?.((data) => {
-      void refreshByTaskNodeEvent(data?.taskId);
-    });
+      void refreshByTaskNodeEvent(data?.taskId)
+    })
     const offReview = window.api?.taskNode?.onReview?.((data) => {
-      void refreshByTaskNodeEvent(data?.taskId);
-    });
+      void refreshByTaskNodeEvent(data?.taskId)
+    })
 
     return () => {
-      offCompleted?.();
-      offReview?.();
-    };
-  }, [taskId, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask]);
-
-  useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, [taskId]);
+      offCompleted?.()
+      offReview?.()
+    }
+  }, [taskId, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask])
 
   useEffect(() => {
-    if (!taskId) return;
-    let active = true;
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [taskId])
+
+  useEffect(() => {
+    if (!taskId) return
+    let active = true
     void (async () => {
-      if (!active) return;
-      await loadCurrentNodeRuntime();
-      if (!active) return;
-      await loadWorkflowStatus();
-      if (!active) return;
-      await refreshTask();
-    })();
-    const shouldPoll = isRunning || cliStatus === 'running';
+      if (!active) return
+      await loadCurrentNodeRuntime()
+      if (!active) return
+      await loadWorkflowStatus()
+      if (!active) return
+      await refreshTask()
+    })()
+    const shouldPoll = isRunning || cliStatus === 'running'
     const interval = shouldPoll
       ? setInterval(() => {
-          if (!active) return;
-          void loadCurrentNodeRuntime();
-          void loadWorkflowStatus();
-          void refreshTask();
+          if (!active) return
+          void loadCurrentNodeRuntime()
+          void loadWorkflowStatus()
+          void refreshTask()
         }, 2000)
-      : null;
-    return () => { active = false; if (interval) clearInterval(interval); };
-  }, [taskId, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask, isRunning, cliStatus]);
+      : null
+    return () => {
+      active = false
+      if (interval) clearInterval(interval)
+    }
+  }, [taskId, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask, isRunning, cliStatus])
 
   useEffect(() => {
-    if (!taskId || isRunning || cliStatus === 'running') return;
-    let attempts = 0;
+    if (!taskId || isRunning || cliStatus === 'running') return
+    let attempts = 0
     const interval = setInterval(() => {
-      attempts++;
-      void loadCurrentNodeRuntime();
-      void loadWorkflowStatus();
-      void refreshTask();
-      if (attempts >= 8) clearInterval(interval);
-    }, 500);
-    return () => clearInterval(interval);
-  }, [taskId, isRunning, cliStatus, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask]);
+      attempts++
+      void loadCurrentNodeRuntime()
+      void loadWorkflowStatus()
+      void refreshTask()
+      if (attempts >= 8) clearInterval(interval)
+    }, 500)
+    return () => clearInterval(interval)
+  }, [taskId, isRunning, cliStatus, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask])
 
   const handleApproveTaskNode = useCallback(async () => {
-    if (!currentTaskNode) return;
-    await db.approveTaskNode(currentTaskNode.id);
-    await loadCurrentNodeRuntime();
-    setCurrentTaskNode(null);
-    setSelectedWorkflowNodeId(null);
-    lastAutoRunTaskNodeIdRef.current = null;
-    await loadWorkflowStatus();
+    if (!currentTaskNode) return
+    await db.approveTaskNode(currentTaskNode.id)
+    await loadCurrentNodeRuntime()
+    setCurrentTaskNode(null)
+    setSelectedWorkflowNodeId(null)
+    lastAutoRunTaskNodeIdRef.current = null
+    await loadWorkflowStatus()
     if (taskId) {
       try {
-        const updatedTask = await db.getTask(taskId);
-        if (updatedTask) setTask(updatedTask as Task);
-      } catch { /* ignore */ }
+        const updatedTask = await db.getTask(taskId)
+        if (updatedTask) setTask(updatedTask as Task)
+      } catch {
+        /* ignore */
+      }
     }
-  }, [currentTaskNode, loadCurrentNodeRuntime, loadWorkflowStatus, taskId]);
-
+  }, [currentTaskNode, loadCurrentNodeRuntime, loadWorkflowStatus, taskId])
 
   const handleSelectWorkflowNode = useCallback((nodeId: string) => {
-    setSelectedWorkflowNodeId(nodeId);
-  }, []);
+    setSelectedWorkflowNodeId(nodeId)
+  }, [])
 
   // ===========================================================================
   // Section 11: Pipeline Actions
   // ===========================================================================
   const appendPipelineNotice = useCallback(
-    async (content: string) => { if (taskId) setMessages((prev) => [...prev, { type: 'text', content }]); },
+    async (content: string) => {
+      if (taskId) setMessages((prev) => [...prev, { type: 'text', content }])
+    },
     [setMessages, taskId]
-  );
+  )
 
   const startPipelineStage = useCallback(
     async (index: number, approvalNote?: string) => {
-      if (!pipelineTemplate || !taskId) return;
-      const stage = pipelineTemplate.nodes?.[index];
+      if (!pipelineTemplate || !taskId) return
+      const stage = pipelineTemplate.nodes?.[index]
       if (!stage) {
-        setPipelineStatus('completed');
-        await appendPipelineNotice(t.task.pipelineCompleted);
-        return;
+        setPipelineStatus('completed')
+        await appendPipelineNotice(t.task.pipelineCompleted)
+        return
       }
 
-      const resolvedPrompt = await resolveTaskNodePrompt(stage.id, index);
-      const stagePrompt = buildCliPrompt(resolvedPrompt);
-      if (!stagePrompt) return;
+      const resolvedPrompt = await resolveTaskNodePrompt(stage.id, index)
+      const stagePrompt = buildCliPrompt(resolvedPrompt)
+      if (!stagePrompt) return
       const prompt = approvalNote
         ? `${stagePrompt}\n\n${t.task.pipelineApprovalNotePrefix}: ${approvalNote}`
-        : stagePrompt;
+        : stagePrompt
 
-      setPipelineStageIndex(index);
-      setPipelineStatus('running');
-      setPipelineStageMessageStart(messages.length);
+      setPipelineStageIndex(index)
+      setPipelineStatus('running')
+      setPipelineStageMessageStart(messages.length)
 
       if (useCliSession) {
         try {
-          const sessionId = await appendCliUserLog(prompt);
-          await runCliPrompt(prompt, sessionId);
+          const sessionId = await appendCliUserLog(prompt)
+          await runCliPrompt(prompt, sessionId)
         } catch {
-          setPipelineStatus('failed');
+          setPipelineStatus('failed')
         }
-        return;
+        return
       }
 
       const sessionInfo = currentNodeRuntime.sessionId
         ? { sessionId: currentNodeRuntime.sessionId }
-        : undefined;
+        : undefined
       if (messages.length === 0) {
-        await runAgent(prompt, taskId, sessionInfo, undefined, workingDir || undefined);
+        await runAgent(prompt, taskId, sessionInfo, undefined, workingDir || undefined)
       } else {
-        await continueConversation(prompt, undefined, workingDir || undefined);
+        await continueConversation(prompt, undefined, workingDir || undefined)
       }
     },
-    [appendCliUserLog, appendPipelineNotice, buildCliPrompt, continueConversation, currentNodeRuntime.sessionId, messages.length, pipelineTemplate, resolveTaskNodePrompt, runAgent, runCliPrompt, taskId, t.task.pipelineApprovalNotePrefix, t.task.pipelineCompleted, useCliSession, workingDir]
-  );
+    [
+      appendCliUserLog,
+      appendPipelineNotice,
+      buildCliPrompt,
+      continueConversation,
+      currentNodeRuntime.sessionId,
+      messages.length,
+      pipelineTemplate,
+      resolveTaskNodePrompt,
+      runAgent,
+      runCliPrompt,
+      taskId,
+      t.task.pipelineApprovalNotePrefix,
+      t.task.pipelineCompleted,
+      useCliSession,
+      workingDir
+    ]
+  )
 
   const startNextPipelineStage = useCallback(
-    async (approvalNote?: string) => { await startPipelineStage(pipelineStageIndex + 1, approvalNote); },
+    async (approvalNote?: string) => {
+      await startPipelineStage(pipelineStageIndex + 1, approvalNote)
+    },
     [pipelineStageIndex, startPipelineStage]
-  );
+  )
 
   const normalizedTaskStatus = useMemo<PipelineDisplayStatus>(() => {
-    const rawStatus = task?.status;
-    if (!rawStatus) return 'todo';
-    if (['todo', 'in_progress', 'in_review', 'done', 'failed'].includes(rawStatus)) return rawStatus as PipelineDisplayStatus;
-    return 'todo';
-  }, [task?.status]);
+    const rawStatus = task?.status
+    if (!rawStatus) return 'todo'
+    if (['todo', 'in_progress', 'in_review', 'done', 'failed'].includes(rawStatus))
+      return rawStatus as PipelineDisplayStatus
+    return 'todo'
+  }, [task?.status])
 
   // Auto-start pipeline
   useEffect(() => {
-    if (backendWorkflowRun) return;
-    if (!pipelineTemplate || pipelineStatus !== 'idle' || isRunning) return;
-    if (useCliSession && cliStatus === 'running') return;
-    if (!taskId || messages.length > 0) return;
-    if (normalizedTaskStatus !== 'in_progress') return;
+    if (backendWorkflowRun) return
+    if (!pipelineTemplate || pipelineStatus !== 'idle' || isRunning) return
+    if (useCliSession && cliStatus === 'running') return
+    if (!taskId || messages.length > 0) return
+    if (normalizedTaskStatus !== 'in_progress') return
 
-    let active = true;
+    let active = true
     const maybeStart = async () => {
       try {
         const currentNode = (await db.getCurrentTaskNode(taskId)) as {
-          status?: PipelineDisplayStatus;
-          session_id?: string | null;
-        } | null;
-        if (!currentNode) return;
-        if (currentNode.status !== 'in_progress') return;
-        if (currentNode.session_id) return;
-      } catch { return; }
-      if (!active) return;
-      startPipelineStage(workflowCurrentNode?.index ?? 0).catch(() => {});
-    };
-    void maybeStart();
-    return () => { active = false; };
-  }, [backendWorkflowRun, cliStatus, isRunning, messages.length, normalizedTaskStatus, pipelineStatus, pipelineTemplate, startPipelineStage, taskId, useCliSession, workflowCurrentNode?.index]);
+          status?: PipelineDisplayStatus
+          session_id?: string | null
+        } | null
+        if (!currentNode) return
+        if (currentNode.status !== 'in_progress') return
+        if (currentNode.session_id) return
+      } catch {
+        return
+      }
+      if (!active) return
+      startPipelineStage(workflowCurrentNode?.index ?? 0).catch(() => {})
+    }
+    void maybeStart()
+    return () => {
+      active = false
+    }
+  }, [
+    backendWorkflowRun,
+    cliStatus,
+    isRunning,
+    messages.length,
+    normalizedTaskStatus,
+    pipelineStatus,
+    pipelineTemplate,
+    startPipelineStage,
+    taskId,
+    useCliSession,
+    workflowCurrentNode?.index
+  ])
 
   // Handle pipeline stage completion
   useEffect(() => {
-    if (backendWorkflowRun) return;
-    if (!pipelineTemplate || pipelineStatus !== 'running' || isRunning) return;
-    const stageMessages = messages.slice(pipelineStageMessageStart);
-    let outcome: (typeof stageMessages)[number] | undefined;
+    if (backendWorkflowRun) return
+    if (!pipelineTemplate || pipelineStatus !== 'running' || isRunning) return
+    const stageMessages = messages.slice(pipelineStageMessageStart)
+    let outcome: (typeof stageMessages)[number] | undefined
     for (let i = stageMessages.length - 1; i >= 0; i--) {
-      if (stageMessages[i].type === 'result' || stageMessages[i].type === 'error') { outcome = stageMessages[i]; break; }
+      if (stageMessages[i].type === 'result' || stageMessages[i].type === 'error') {
+        outcome = stageMessages[i]
+        break
+      }
     }
-    if (!outcome || !taskId) return;
+    if (!outcome || !taskId) return
 
-    const stage = pipelineTemplate.nodes?.[pipelineStageIndex];
-    const stageName = stage?.name || `${t.task.stageLabel} ${pipelineStageIndex + 1}`;
+    const stage = pipelineTemplate.nodes?.[pipelineStageIndex]
+    const stageName = stage?.name || `${t.task.stageLabel} ${pipelineStageIndex + 1}`
 
     if (outcome.type === 'result' && outcome.subtype === 'success') {
-      setPipelineStatus('waiting_approval');
-      appendPipelineNotice(t.task.pipelineStageCompleted.replace('{name}', stageName));
+      setPipelineStatus('waiting_approval')
+      appendPipelineNotice(t.task.pipelineStageCompleted.replace('{name}', stageName))
     } else {
-      setPipelineStatus('failed');
-      appendPipelineNotice(t.task.pipelineStageFailed.replace('{name}', stageName));
+      setPipelineStatus('failed')
+      appendPipelineNotice(t.task.pipelineStageFailed.replace('{name}', stageName))
     }
-  }, [appendPipelineNotice, backendWorkflowRun, isRunning, messages, pipelineStageIndex, pipelineStageMessageStart, pipelineStatus, pipelineTemplate, taskId, t.task.pipelineStageCompleted, t.task.pipelineStageFailed, t.task.stageLabel]);
+  }, [
+    appendPipelineNotice,
+    backendWorkflowRun,
+    isRunning,
+    messages,
+    pipelineStageIndex,
+    pipelineStageMessageStart,
+    pipelineStatus,
+    pipelineTemplate,
+    taskId,
+    t.task.pipelineStageCompleted,
+    t.task.pipelineStageFailed,
+    t.task.stageLabel
+  ])
 
   const pipelineBanner = useMemo(() => {
-    if (!pipelineTemplate) return null;
-    const stage = pipelineTemplate.nodes?.[pipelineStageIndex];
-    const stageName = stage?.name || `${t.task.stageLabel} ${pipelineStageIndex + 1}`;
-    if (pipelineStatus === 'waiting_approval') return t.task.pipelineStageCompleted.replace('{name}', stageName);
-    if (pipelineStatus === 'failed') return t.task.pipelineStageFailed.replace('{name}', stageName);
-    if (pipelineStatus === 'completed') return t.task.pipelineCompleted;
-    return null;
-  }, [pipelineStageIndex, pipelineStatus, pipelineTemplate, t.task.pipelineCompleted, t.task.pipelineStageCompleted, t.task.pipelineStageFailed, t.task.stageLabel]);
+    if (!pipelineTemplate) return null
+    const stage = pipelineTemplate.nodes?.[pipelineStageIndex]
+    const stageName = stage?.name || `${t.task.stageLabel} ${pipelineStageIndex + 1}`
+    if (pipelineStatus === 'waiting_approval')
+      return t.task.pipelineStageCompleted.replace('{name}', stageName)
+    if (pipelineStatus === 'failed') return t.task.pipelineStageFailed.replace('{name}', stageName)
+    if (pipelineStatus === 'completed') return t.task.pipelineCompleted
+    return null
+  }, [
+    pipelineStageIndex,
+    pipelineStatus,
+    pipelineTemplate,
+    t.task.pipelineCompleted,
+    t.task.pipelineStageCompleted,
+    t.task.pipelineStageFailed,
+    t.task.stageLabel
+  ])
 
   // Auto-run workflow node for CLI session
   useEffect(() => {
-    if (backendWorkflowRun) return;
-    if (!useCliSession || !workflowCurrentNode || workflowCurrentNode.status !== 'in_progress' || cliStatus === 'running') return;
-    if (lastAutoRunTaskNodeIdRef.current === workflowCurrentNode.id) return;
-    let active = true;
+    if (backendWorkflowRun) return
+    if (
+      !useCliSession ||
+      !workflowCurrentNode ||
+      workflowCurrentNode.status !== 'in_progress' ||
+      cliStatus === 'running'
+    )
+      return
+    if (lastAutoRunTaskNodeIdRef.current === workflowCurrentNode.id) return
+    let active = true
     const run = async () => {
-      const sessionId = currentNodeRuntime.sessionId;
+      const sessionId = currentNodeRuntime.sessionId
       if (sessionId && window.api?.cliSession?.getSession) {
         try {
-          const existingSession = await window.api.cliSession.getSession(sessionId);
-          if (!active) return;
-          if (existingSession?.status === 'running') return;
-        } catch { /* ignore */ }
+          const existingSession = await window.api.cliSession.getSession(sessionId)
+          if (!active) return
+          if (existingSession?.status === 'running') return
+        } catch {
+          /* ignore */
+        }
       }
 
       try {
         const currentNode = (await db.getTaskNode(workflowCurrentNode.id)) as {
-          status?: PipelineDisplayStatus;
-          session_id?: string | null;
-        } | null;
-        if (!active) return;
-        if (!currentNode || currentNode.status !== 'in_progress') return;
-        if (currentNode.session_id) return;
-      } catch { if (!active) return; }
+          status?: PipelineDisplayStatus
+          session_id?: string | null
+        } | null
+        if (!active) return
+        if (!currentNode || currentNode.status !== 'in_progress') return
+        if (currentNode.session_id) return
+      } catch {
+        if (!active) return
+      }
 
-      const resolvedPrompt = await resolveTaskNodePrompt(workflowCurrentNode.id, workflowCurrentNode.index);
-      const prompt = buildCliPrompt(resolvedPrompt);
-      if (!prompt || !active) return;
+      const resolvedPrompt = await resolveTaskNodePrompt(
+        workflowCurrentNode.id,
+        workflowCurrentNode.index
+      )
+      const prompt = buildCliPrompt(resolvedPrompt)
+      if (!prompt || !active) return
 
-      lastAutoRunTaskNodeIdRef.current = workflowCurrentNode.id;
-      const newSessionId = await appendCliUserLog(prompt);
-      await runCliPrompt(prompt, newSessionId);
-    };
-    void run();
-    return () => { active = false; };
-  }, [appendCliUserLog, backendWorkflowRun, buildCliPrompt, cliStatus, currentNodeRuntime.sessionId, resolveTaskNodePrompt, runCliPrompt, useCliSession, workflowCurrentNode]);
+      lastAutoRunTaskNodeIdRef.current = workflowCurrentNode.id
+      const newSessionId = await appendCliUserLog(prompt)
+      await runCliPrompt(prompt, newSessionId)
+    }
+    void run()
+    return () => {
+      active = false
+    }
+  }, [
+    appendCliUserLog,
+    backendWorkflowRun,
+    buildCliPrompt,
+    cliStatus,
+    currentNodeRuntime.sessionId,
+    resolveTaskNodePrompt,
+    runCliPrompt,
+    useCliSession,
+    workflowCurrentNode
+  ])
 
   // ===========================================================================
   // Section 12: Artifacts
   // ===========================================================================
-  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
-  const [isPreviewVisible, setIsPreviewVisible] = useState(true);
-  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null)
+  const [isPreviewVisible, setIsPreviewVisible] = useState(true)
+  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0)
 
-  const lastWorkspaceRefreshMessageIndexRef = useRef(0);
-  const prevRunStateRef = useRef<{ isRunning: boolean; cliStatus: ExecutionStatus }>({ isRunning: false, cliStatus: 'idle' });
-  const artifactsPrevTaskIdRef = useRef<string | undefined>(undefined);
+  const lastWorkspaceRefreshMessageIndexRef = useRef(0)
+  const prevRunStateRef = useRef<{ isRunning: boolean; cliStatus: ExecutionStatus }>({
+    isRunning: false,
+    cliStatus: 'idle'
+  })
+  const artifactsPrevTaskIdRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     if (artifactsPrevTaskIdRef.current !== taskId) {
       if (artifactsPrevTaskIdRef.current !== undefined) {
-        setIsPreviewVisible(false);
-        setSelectedArtifact(null);
-        setArtifacts([]);
-        lastWorkspaceRefreshMessageIndexRef.current = 0;
-        setWorkspaceRefreshToken(0);
+        setIsPreviewVisible(false)
+        setSelectedArtifact(null)
+        setArtifacts([])
+        lastWorkspaceRefreshMessageIndexRef.current = 0
+        setWorkspaceRefreshToken(0)
       }
-      artifactsPrevTaskIdRef.current = taskId;
+      artifactsPrevTaskIdRef.current = taskId
     }
-  }, [taskId]);
+  }, [taskId])
 
   const handleSelectArtifact = useCallback((artifact: Artifact | null) => {
-    setSelectedArtifact(artifact);
-    if (artifact) setIsPreviewVisible(true);
-  }, []);
+    setSelectedArtifact(artifact)
+    if (artifact) setIsPreviewVisible(true)
+  }, [])
 
-  const handleClosePreview = useCallback(() => { setSelectedArtifact(null); }, []);
+  const handleClosePreview = useCallback(() => {
+    setSelectedArtifact(null)
+  }, [])
 
   // Extract artifacts from messages
   useEffect(() => {
-    const extractedArtifacts: Artifact[] = [];
-    const seenPaths = new Set<string>();
+    const extractedArtifacts: Artifact[] = []
+    const seenPaths = new Set<string>()
 
     messages.forEach((msg) => {
       if (msg.type === 'tool_use' && msg.name === 'Write') {
-        const input = msg.input as Record<string, unknown> | undefined;
-        const filePath = input?.file_path as string | undefined;
-        const content = input?.content as string | undefined;
+        const input = msg.input as Record<string, unknown> | undefined
+        const filePath = input?.file_path as string | undefined
+        const content = input?.content as string | undefined
         if (filePath && !seenPaths.has(filePath)) {
-          seenPaths.add(filePath);
-          const filename = filePath.split('/').pop() || filePath;
-          const ext = filename.split('.').pop()?.toLowerCase();
-          extractedArtifacts.push({ id: filePath, name: filename, type: getArtifactTypeFromExt(ext), content, path: filePath });
+          seenPaths.add(filePath)
+          const filename = filePath.split('/').pop() || filePath
+          const ext = filename.split('.').pop()?.toLowerCase()
+          extractedArtifacts.push({
+            id: filePath,
+            name: filename,
+            type: getArtifactTypeFromExt(ext),
+            content,
+            path: filePath
+          })
         }
       }
 
       if (msg.type === 'tool_use' && msg.name === 'WebSearch') {
-        const input = msg.input as Record<string, unknown> | undefined;
-        const query = input?.query as string | undefined;
-        const toolUseId = msg.id;
+        const input = msg.input as Record<string, unknown> | undefined
+        const query = input?.query as string | undefined
+        const toolUseId = msg.id
         if (query) {
-          let output = '';
+          let output = ''
           if (toolUseId) {
-            const resultMsg = messages.find((m) => m.type === 'tool_result' && m.toolUseId === toolUseId);
-            output = resultMsg?.output || '';
+            const resultMsg = messages.find(
+              (m) => m.type === 'tool_result' && m.toolUseId === toolUseId
+            )
+            output = resultMsg?.output || ''
           }
           if (!output) {
-            const msgIndex = messages.indexOf(msg);
+            const msgIndex = messages.indexOf(msg)
             for (let i = msgIndex + 1; i < messages.length; i++) {
-              if (messages[i].type === 'tool_result') { output = messages[i].output || ''; break; }
-              if (messages[i].type === 'tool_use') break;
+              if (messages[i].type === 'tool_result') {
+                output = messages[i].output || ''
+                break
+              }
+              if (messages[i].type === 'tool_use') break
             }
           }
-          const artifactId = `websearch-${query}`;
+          const artifactId = `websearch-${query}`
           if (!seenPaths.has(artifactId) && output && hasValidSearchResults(output)) {
-            seenPaths.add(artifactId);
-            extractedArtifacts.push({ id: artifactId, name: `Search: ${query.slice(0, 50)}${query.length > 50 ? '...' : ''}`, type: 'websearch', content: output });
+            seenPaths.add(artifactId)
+            extractedArtifacts.push({
+              id: artifactId,
+              name: `Search: ${query.slice(0, 50)}${query.length > 50 ? '...' : ''}`,
+              type: 'websearch',
+              content: output
+            })
           }
         }
       }
-    });
+    })
 
     messages.forEach((msg) => {
-      const textToSearch = msg.type === 'tool_result' ? msg.output : msg.type === 'text' ? msg.content : null;
+      const textToSearch =
+        msg.type === 'tool_result' ? msg.output : msg.type === 'text' ? msg.content : null
       if (textToSearch) {
-        const filePaths = extractFilePaths(textToSearch);
+        const filePaths = extractFilePaths(textToSearch)
         for (const filePath of filePaths) {
           if (filePath && !seenPaths.has(filePath)) {
-            seenPaths.add(filePath);
-            const filename = filePath.split('/').pop() || filePath;
-            const ext = filename.split('.').pop()?.toLowerCase();
-            extractedArtifacts.push({ id: filePath, name: filename, type: getArtifactTypeFromExt(ext), path: filePath });
+            seenPaths.add(filePath)
+            const filename = filePath.split('/').pop() || filePath
+            const ext = filename.split('.').pop()?.toLowerCase()
+            extractedArtifacts.push({
+              id: filePath,
+              name: filename,
+              type: getArtifactTypeFromExt(ext),
+              path: filePath
+            })
           }
         }
       }
-    });
+    })
 
-    setArtifacts(extractedArtifacts);
-  }, [messages, taskId]);
+    setArtifacts(extractedArtifacts)
+  }, [messages, taskId])
 
   // Workspace refresh tracking
   useEffect(() => {
-    if (messages.length < lastWorkspaceRefreshMessageIndexRef.current) lastWorkspaceRefreshMessageIndexRef.current = 0;
-    if (messages.length === 0) return;
-    const startIndex = lastWorkspaceRefreshMessageIndexRef.current;
-    if (startIndex >= messages.length) return;
+    if (messages.length < lastWorkspaceRefreshMessageIndexRef.current)
+      lastWorkspaceRefreshMessageIndexRef.current = 0
+    if (messages.length === 0) return
+    const startIndex = lastWorkspaceRefreshMessageIndexRef.current
+    if (startIndex >= messages.length) return
 
-    const newMessages = messages.slice(startIndex);
-    lastWorkspaceRefreshMessageIndexRef.current = messages.length;
+    const newMessages = messages.slice(startIndex)
+    lastWorkspaceRefreshMessageIndexRef.current = messages.length
 
-    let shouldRefresh = false;
+    let shouldRefresh = false
     for (const msg of newMessages) {
-      if (msg.type === 'tool_use' && msg.name === 'Write') { shouldRefresh = true; break; }
-      const textToSearch = msg.type === 'tool_result' ? msg.output : msg.type === 'text' ? msg.content : null;
-      if (textToSearch && hasFilePathMatch(textToSearch)) { shouldRefresh = true; break; }
+      if (msg.type === 'tool_use' && msg.name === 'Write') {
+        shouldRefresh = true
+        break
+      }
+      const textToSearch =
+        msg.type === 'tool_result' ? msg.output : msg.type === 'text' ? msg.content : null
+      if (textToSearch && hasFilePathMatch(textToSearch)) {
+        shouldRefresh = true
+        break
+      }
     }
-    if (shouldRefresh) setWorkspaceRefreshToken((prev) => prev + 1);
-  }, [messages]);
+    if (shouldRefresh) setWorkspaceRefreshToken((prev) => prev + 1)
+  }, [messages])
 
   useEffect(() => {
-    const prev = prevRunStateRef.current;
-    const wasRunning = prev.isRunning || prev.cliStatus === 'running';
-    const isNowRunning = isRunning || cliStatus === 'running';
-    if (wasRunning && !isNowRunning) setWorkspaceRefreshToken((prevToken) => prevToken + 1);
-    prevRunStateRef.current = { isRunning, cliStatus };
-  }, [cliStatus, isRunning]);
+    const prev = prevRunStateRef.current
+    const wasRunning = prev.isRunning || prev.cliStatus === 'running'
+    const isNowRunning = isRunning || cliStatus === 'running'
+    if (wasRunning && !isNowRunning) setWorkspaceRefreshToken((prevToken) => prevToken + 1)
+    prevRunStateRef.current = { isRunning, cliStatus }
+  }, [cliStatus, isRunning])
 
   // ===========================================================================
   // Section 13: View State
   // ===========================================================================
-  const [hasStartedOnce, setHasStartedOnce] = useState(false);
+  const [hasStartedOnce, setHasStartedOnce] = useState(false)
 
   const isCliTaskReviewPending = useMemo(
     () => Boolean(useCliSession && task?.task_mode !== 'workflow' && task?.status === 'in_review'),
     [task?.status, task?.task_mode, useCliSession]
-  );
+  )
 
-  useEffect(() => { if (task?.status && normalizedTaskStatus !== 'todo') setHasStartedOnce(true); }, [normalizedTaskStatus, task?.status]);
-  useEffect(() => { if (messages.length > 0) setHasStartedOnce(true); }, [messages.length]);
-  useEffect(() => { setHasStartedOnce(false); }, [taskId]);
+  useEffect(() => {
+    if (task?.status && normalizedTaskStatus !== 'todo') setHasStartedOnce(true)
+  }, [normalizedTaskStatus, task?.status])
+  useEffect(() => {
+    if (messages.length > 0) setHasStartedOnce(true)
+  }, [messages.length])
+  useEffect(() => {
+    setHasStartedOnce(false)
+  }, [taskId])
 
-  const markStartedOnce = useCallback(() => { setHasStartedOnce(true); }, []);
+  const markStartedOnce = useCallback(() => {
+    setHasStartedOnce(true)
+  }, [])
 
-  const displayTitle = task?.title || task?.prompt || initialPrompt;
+  const displayTitle = task?.title || task?.prompt || initialPrompt
 
   const startDisabled = useMemo(() => {
-    if (!taskId) return true;
+    if (!taskId) return true
     if (task?.task_mode === 'workflow') {
-      return !pipelineTemplate || pipelineStatus !== 'idle' || isRunning || (useCliSession && cliStatus === 'running');
+      return (
+        !pipelineTemplate ||
+        pipelineStatus !== 'idle' ||
+        isRunning ||
+        (useCliSession && cliStatus === 'running')
+      )
     }
-    if (useCliSession) return cliStatus === 'running';
-    return isRunning;
-  }, [cliStatus, isRunning, pipelineStatus, pipelineTemplate, task?.task_mode, taskId, useCliSession]);
+    if (useCliSession) return cliStatus === 'running'
+    return isRunning
+  }, [
+    cliStatus,
+    isRunning,
+    pipelineStatus,
+    pipelineTemplate,
+    task?.task_mode,
+    taskId,
+    useCliSession
+  ])
 
   const hasExecuted = useMemo(() => {
-    if (messages.length > 0) return true;
-    if (hasStartedOnce) return true;
-    if (isRunning) return true;
-    if (!task) return false;
-    if (task.status && normalizedTaskStatus !== 'todo') return true;
-    return false;
-  }, [hasStartedOnce, isRunning, messages.length, normalizedTaskStatus, task]);
+    if (messages.length > 0) return true
+    if (hasStartedOnce) return true
+    if (isRunning) return true
+    if (!task) return false
+    if (task.status && normalizedTaskStatus !== 'todo') return true
+    return false
+  }, [hasStartedOnce, isRunning, messages.length, normalizedTaskStatus, task])
 
-  const showStartButton = !hasExecuted;
+  const showStartButton = !hasExecuted
 
   const displayStatus = useMemo<PipelineDisplayStatus | null>(() => {
-    if (!task?.status) return null;
-    return normalizedTaskStatus;
-  }, [normalizedTaskStatus, task?.status]);
+    if (!task?.status) return null
+    return normalizedTaskStatus
+  }, [normalizedTaskStatus, task?.status])
 
-  const statusInfo = displayStatus ? statusConfig[displayStatus] : null;
-  const StatusIcon = statusInfo?.icon || Clock;
+  const statusInfo = displayStatus ? statusConfig[displayStatus] : null
+  const StatusIcon = statusInfo?.icon || Clock
 
   const executionStatus = useMemo<ExecutionStatus>(() => {
-    if (useCliSession) return cliStatus;
-    if (isRunning) return 'running';
-    return 'idle';
-  }, [cliStatus, isRunning, useCliSession]);
+    if (useCliSession) return cliStatus
+    if (isRunning) return 'running'
+    return 'idle'
+  }, [cliStatus, isRunning, useCliSession])
 
   const cliStatusInfo = useMemo(() => {
     const statusMap = {
       idle: { label: t.task.cliStatusIdle || 'Idle', color: 'text-muted-foreground bg-muted/60' },
-      running: { label: t.task.cliStatusRunning || 'Running', color: 'text-blue-600 bg-blue-500/10' },
-      stopped: { label: t.task.cliStatusStopped || 'Stopped', color: 'text-emerald-600 bg-emerald-500/10' },
-      error: { label: t.task.cliStatusError || 'Error', color: 'text-red-600 bg-red-500/10' },
-    };
-    return statusMap[executionStatus];
-  }, [executionStatus, t.task.cliStatusError, t.task.cliStatusIdle, t.task.cliStatusRunning, t.task.cliStatusStopped]);
+      running: {
+        label: t.task.cliStatusRunning || 'Running',
+        color: 'text-blue-600 bg-blue-500/10'
+      },
+      stopped: {
+        label: t.task.cliStatusStopped || 'Stopped',
+        color: 'text-emerald-600 bg-emerald-500/10'
+      },
+      error: { label: t.task.cliStatusError || 'Error', color: 'text-red-600 bg-red-500/10' }
+    }
+    return statusMap[executionStatus]
+  }, [
+    executionStatus,
+    t.task.cliStatusError,
+    t.task.cliStatusIdle,
+    t.task.cliStatusRunning,
+    t.task.cliStatusStopped
+  ])
 
   const showWorkflowCard = useMemo(
     () =>
       task?.task_mode === 'workflow' &&
-      (Boolean(workflowNodes.length || pipelineTemplate?.nodes?.length) || currentTaskNode?.status === 'in_review'),
-    [currentTaskNode?.status, pipelineTemplate?.nodes?.length, task?.task_mode, workflowNodes.length]
-  );
+      (Boolean(
+        workflowNodes.length ||
+        pipelineTemplate?.nodes?.length ||
+        backendWorkflowRun?.definition_snapshot.nodes.length
+      ) ||
+        currentTaskNode?.status === 'in_review'),
+    [
+      backendWorkflowRun?.definition_snapshot.nodes.length,
+      currentTaskNode?.status,
+      pipelineTemplate?.nodes?.length,
+      task?.task_mode,
+      workflowNodes.length
+    ]
+  )
 
-  const workflowTemplateNodeMap = useMemo(() => {
-    const map = new Map<string, { id: string; name?: string; prompt?: string }>();
-    pipelineTemplate?.nodes?.forEach((node) => { map.set(node.id, node); });
-    return map;
-  }, [pipelineTemplate?.nodes]);
-
-  const workflowNodesForDisplay = useMemo(() => {
-    if (workflowNodes.length > 0) return [...workflowNodes].sort((a, b) => a.node_order - b.node_order);
+  const workflowLinearNodes = useMemo(() => {
+    if (workflowNodes.length > 0)
+      return [...workflowNodes].sort((a, b) => a.node_order - b.node_order)
     if (pipelineTemplate?.nodes?.length) {
       return pipelineTemplate.nodes.map((node, index) => ({
         id: node.id,
@@ -1297,181 +1563,244 @@ export function useTaskDetail({
         status: 'todo' as const,
         name: node.name,
         prompt: node.prompt
-      }));
+      }))
     }
-    return [];
-  }, [pipelineTemplate?.nodes, workflowNodes]);
+    return []
+  }, [pipelineTemplate?.nodes, workflowNodes])
+
+  const nextWorkflowGraph = useMemo<WorkflowGraph>(
+    () =>
+      buildWorkflowGraph({
+        definition: backendWorkflowRun?.definition_snapshot ?? null,
+        runNodes: workflowRunNodes,
+        taskNodes: workflowLinearNodes,
+        currentNodeId: workflowCurrentNode?.id ?? null,
+        stageLabel: t.task.stageLabel
+      }),
+    [
+      backendWorkflowRun?.definition_snapshot,
+      t.task.stageLabel,
+      workflowCurrentNode?.id,
+      workflowLinearNodes,
+      workflowRunNodes
+    ]
+  )
+
+  useEffect(() => {
+    if (task?.task_mode !== 'workflow') {
+      setWorkflowGraph({ nodes: [], edges: [] })
+      return
+    }
+
+    if (nextWorkflowGraph.nodes.length > 0) {
+      setWorkflowGraph(nextWorkflowGraph)
+      return
+    }
+
+    if (!backendWorkflowRun && workflowLinearNodes.length === 0 && !currentTaskNode) {
+      setWorkflowGraph({ nodes: [], edges: [] })
+    }
+  }, [
+    backendWorkflowRun,
+    currentTaskNode,
+    nextWorkflowGraph,
+    task?.task_mode,
+    workflowLinearNodes.length
+  ])
 
   const selectedWorkflowNode = useMemo(() => {
-    if (task?.task_mode !== 'workflow') return null;
-    const sortedNodes = [...workflowNodes].sort((a, b) => a.node_order - b.node_order);
-    if (!sortedNodes.length) return null;
+    if (task?.task_mode !== 'workflow') return null
+    const sortedNodes = [...workflowNodes].sort((a, b) => a.node_order - b.node_order)
+    if (!sortedNodes.length) return null
 
-    const fallbackNodeId = workflowCurrentNode?.id ?? currentTaskNode?.id ?? sortedNodes[0]?.id ?? null;
-    const targetNodeId = selectedWorkflowNodeId ?? fallbackNodeId;
-    if (!targetNodeId) return null;
+    const fallbackNodeId =
+      workflowCurrentNode?.id ?? currentTaskNode?.id ?? sortedNodes[0]?.id ?? null
+    const targetNodeId = selectedWorkflowNodeId ?? fallbackNodeId
+    if (!targetNodeId) return null
 
-    return sortedNodes.find((node) => node.id === targetNodeId) ?? sortedNodes[0];
-  }, [currentTaskNode?.id, selectedWorkflowNodeId, task?.task_mode, workflowCurrentNode?.id, workflowNodes]);
+    return sortedNodes.find((node) => node.id === targetNodeId) ?? sortedNodes[0]
+  }, [
+    currentTaskNode?.id,
+    selectedWorkflowNodeId,
+    task?.task_mode,
+    workflowCurrentNode?.id,
+    workflowNodes
+  ])
 
   const selectedWorkflowNodeIsDone = useMemo(
     () => Boolean(task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'done'),
     [selectedWorkflowNode?.status, task?.task_mode]
-  );
+  )
 
   const selectedWorkflowNodeIsFailed = useMemo(
     () => Boolean(task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'failed'),
     [selectedWorkflowNode?.status, task?.task_mode]
-  );
+  )
 
-  const showActionButton = showStartButton || isCliTaskReviewPending || selectedWorkflowNodeIsFailed;
+  const showActionButton = showStartButton || isCliTaskReviewPending || selectedWorkflowNodeIsFailed
   const actionLabel = selectedWorkflowNodeIsFailed
     ? 'Retry node'
     : isCliTaskReviewPending
-      ? (t.task.completeTask || 'Complete task')
-      : (t.task.startExecution || 'Start');
-  const actionDisabled = selectedWorkflowNodeIsFailed ? false : isCliTaskReviewPending ? false : startDisabled;
+      ? t.task.completeTask || 'Complete task'
+      : t.task.startExecution || 'Start'
+  const actionDisabled = selectedWorkflowNodeIsFailed
+    ? false
+    : isCliTaskReviewPending
+      ? false
+      : startDisabled
 
   const runtimeWorkflowNode = useMemo(() => {
-    if (task?.task_mode !== 'workflow') return null;
+    if (task?.task_mode !== 'workflow') return null
 
-    const sortedNodes = [...workflowNodes].sort((a, b) => a.node_order - b.node_order);
-    if (!sortedNodes.length) return null;
+    const sortedNodes = [...workflowNodes].sort((a, b) => a.node_order - b.node_order)
+    if (!sortedNodes.length) return null
 
-    const runtimeNodeId = workflowCurrentNode?.id ?? currentTaskNode?.id ?? null;
-    if (!runtimeNodeId) return sortedNodes[0] ?? null;
+    const runtimeNodeId = workflowCurrentNode?.id ?? currentTaskNode?.id ?? null
+    if (!runtimeNodeId) return sortedNodes[0] ?? null
 
-    return sortedNodes.find((node) => node.id === runtimeNodeId) ?? sortedNodes[0] ?? null;
-  }, [currentTaskNode?.id, task?.task_mode, workflowCurrentNode?.id, workflowNodes]);
+    return sortedNodes.find((node) => node.id === runtimeNodeId) ?? sortedNodes[0] ?? null
+  }, [currentTaskNode?.id, task?.task_mode, workflowCurrentNode?.id, workflowNodes])
 
   const executionTaskNodeId = useMemo(() => {
     if (task?.task_mode === 'workflow') {
-      return runtimeWorkflowNode?.id ?? workflowCurrentNode?.id ?? currentTaskNode?.id ?? currentNodeRuntime.taskNodeId ?? null;
+      return (
+        runtimeWorkflowNode?.id ??
+        workflowCurrentNode?.id ??
+        currentTaskNode?.id ??
+        currentNodeRuntime.taskNodeId ??
+        null
+      )
     }
-    return currentNodeRuntime.taskNodeId ?? currentTaskNode?.id ?? null;
+    return currentNodeRuntime.taskNodeId ?? currentTaskNode?.id ?? null
   }, [
     currentNodeRuntime.taskNodeId,
     currentTaskNode?.id,
     runtimeWorkflowNode?.id,
     task?.task_mode,
     workflowCurrentNode?.id
-  ]);
+  ])
 
   const executionLogTaskNodeId = useMemo(() => {
     if (task?.task_mode === 'workflow') {
-      return selectedWorkflowNode?.id ?? executionTaskNodeId ?? null;
+      return selectedWorkflowNode?.id ?? executionTaskNodeId ?? null
     }
-    return executionTaskNodeId;
-  }, [executionTaskNodeId, selectedWorkflowNode?.id, task?.task_mode]);
+    return executionTaskNodeId
+  }, [executionTaskNodeId, selectedWorkflowNode?.id, task?.task_mode])
 
   const executionLogSource = useMemo(() => {
-    if (task?.task_mode !== 'workflow') return 'session' as const;
-    if (!executionTaskNodeId || !executionLogTaskNodeId) return 'session' as const;
-    return executionLogTaskNodeId === executionTaskNodeId ? ('session' as const) : ('file' as const);
-  }, [executionLogTaskNodeId, executionTaskNodeId, task?.task_mode]);
+    if (task?.task_mode !== 'workflow') return 'session' as const
+    if (!executionTaskNodeId || !executionLogTaskNodeId) return 'session' as const
+    return executionLogTaskNodeId === executionTaskNodeId ? ('session' as const) : ('file' as const)
+  }, [executionLogTaskNodeId, executionTaskNodeId, task?.task_mode])
 
   const executionSessionId = useMemo(() => {
     if (task?.task_mode !== 'workflow') {
-      return currentNodeRuntime.sessionId || '';
+      return currentNodeRuntime.sessionId || ''
     }
 
-    if (!executionTaskNodeId) return '';
+    if (!executionTaskNodeId) return ''
 
     if (runtimeWorkflowNode?.session_id) {
-      return runtimeWorkflowNode.session_id;
+      return runtimeWorkflowNode.session_id
     }
 
-    const runtimeMatchesExecutionNode = currentNodeRuntime.taskNodeId === executionTaskNodeId;
-    return runtimeMatchesExecutionNode ? (currentNodeRuntime.sessionId || '') : '';
+    const runtimeMatchesExecutionNode = currentNodeRuntime.taskNodeId === executionTaskNodeId
+    return runtimeMatchesExecutionNode ? currentNodeRuntime.sessionId || '' : ''
   }, [
     currentNodeRuntime.sessionId,
     currentNodeRuntime.taskNodeId,
     executionTaskNodeId,
     runtimeWorkflowNode?.session_id,
     task?.task_mode
-  ]);
+  ])
 
   const executionCliToolId = useMemo(() => {
     if (task?.task_mode !== 'workflow') {
-      return currentNodeRuntime.cliToolId || '';
+      return currentNodeRuntime.cliToolId || ''
     }
-    return runtimeWorkflowNode?.cli_tool_id || currentNodeRuntime.cliToolId || '';
-  }, [currentNodeRuntime.cliToolId, runtimeWorkflowNode?.cli_tool_id, task?.task_mode]);
+    return runtimeWorkflowNode?.cli_tool_id || currentNodeRuntime.cliToolId || ''
+  }, [currentNodeRuntime.cliToolId, runtimeWorkflowNode?.cli_tool_id, task?.task_mode])
 
   const executionAgentToolConfigId = useMemo(() => {
     if (task?.task_mode !== 'workflow') {
-      return currentNodeRuntime.agentToolConfigId ?? null;
+      return currentNodeRuntime.agentToolConfigId ?? null
     }
-    return runtimeWorkflowNode?.agent_tool_config_id ?? currentNodeRuntime.agentToolConfigId ?? null;
+    return runtimeWorkflowNode?.agent_tool_config_id ?? currentNodeRuntime.agentToolConfigId ?? null
   }, [
     currentNodeRuntime.agentToolConfigId,
     runtimeWorkflowNode?.agent_tool_config_id,
     task?.task_mode
-  ]);
+  ])
 
   const executionLogToolId = useMemo(() => {
     if (task?.task_mode !== 'workflow') {
-      return executionCliToolId;
+      return executionCliToolId
     }
 
-    return selectedWorkflowNode?.cli_tool_id || executionCliToolId || currentNodeRuntime.cliToolId || '';
+    return (
+      selectedWorkflowNode?.cli_tool_id || executionCliToolId || currentNodeRuntime.cliToolId || ''
+    )
   }, [
     currentNodeRuntime.cliToolId,
     executionCliToolId,
     selectedWorkflowNode?.cli_tool_id,
     task?.task_mode
-  ]);
+  ])
 
   const useCliSessionPanel = useMemo(() => {
     if (task?.task_mode === 'workflow') {
-      return Boolean(executionLogToolId || executionCliToolId || currentNodeRuntime.cliToolId);
+      return Boolean(executionLogToolId || executionCliToolId || currentNodeRuntime.cliToolId)
     }
-    return useCliSession;
+    return useCliSession
   }, [
     currentNodeRuntime.cliToolId,
     executionCliToolId,
     executionLogToolId,
     task?.task_mode,
     useCliSession
-  ]);
+  ])
 
-  const isTaskDone = task?.status === 'done';
+  const isTaskDone = task?.status === 'done'
 
-  const replyDisabled = Boolean(isTaskDone || selectedWorkflowNodeIsDone);
+  const replyDisabled = Boolean(isTaskDone || selectedWorkflowNodeIsDone)
 
   const replyPlaceholder = useMemo(() => {
-    if (isTaskDone) return '任务已结束';
-    if (selectedWorkflowNodeIsDone) return '当前节点已结束，请切换到进行中的节点继续提问';
-    return '有疑问，继续问我…';
-  }, [isTaskDone, selectedWorkflowNodeIsDone]);
+    if (isTaskDone) return '任务已结束'
+    if (selectedWorkflowNodeIsDone) return '当前节点已结束，请切换到进行中的节点继续提问'
+    return '有疑问，继续问我…'
+  }, [isTaskDone, selectedWorkflowNodeIsDone])
 
   const cliToolName = useMemo(() => {
-    if (!executionLogToolId) return null;
-    const match = cliTools.find((tool) => tool.id === executionLogToolId);
-    return match?.displayName || match?.name || executionLogToolId;
-  }, [cliTools, executionLogToolId]);
+    if (!executionLogToolId) return null
+    const match = cliTools.find((tool) => tool.id === executionLogToolId)
+    return match?.displayName || match?.name || executionLogToolId
+  }, [cliTools, executionLogToolId])
 
-  const cliToolLabel = cliToolName || t.task.detailCli || 'CLI';
+  const cliToolLabel = cliToolName || t.task.detailCli || 'CLI'
 
   const metaRows = useMemo<TaskMetaRow[]>(
     () => [
       {
         key: 'branch',
         icon: GitBranch,
-        value: task?.branch_name ? <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{task.branch_name}</code> : null,
-        visible: Boolean(task?.branch_name),
+        value: task?.branch_name ? (
+          <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{task.branch_name}</code>
+        ) : null,
+        visible: Boolean(task?.branch_name)
       },
       {
         key: 'status',
         icon: StatusIcon,
-        value: statusInfo ? <span className="text-foreground text-xs font-medium">{statusInfo.label}</span> : null,
-        visible: Boolean(statusInfo),
-      },
+        value: statusInfo ? (
+          <span className="text-foreground text-xs font-medium">{statusInfo.label}</span>
+        ) : null,
+        visible: Boolean(statusInfo)
+      }
     ],
     [statusInfo, StatusIcon, task?.branch_name]
-  );
+  )
 
-  const visibleMetaRows = filterVisibleMetaRows(metaRows);
+  const visibleMetaRows = filterVisibleMetaRows(metaRows)
 
   // ===========================================================================
   // Section 14: Actions
@@ -1479,161 +1808,242 @@ export function useTaskDetail({
   const handleReply = useCallback(
     async (text: string, messageAttachments?: MessageAttachment[]) => {
       if ((text.trim() || (messageAttachments && messageAttachments.length > 0)) && taskId) {
-        if (!useCliSession && isRunning) return;
+        if (!useCliSession && isRunning) return
         if (useCliSession) {
-          if (task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'done') return;
+          if (task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'done') return
 
-          const content = text.trim();
-          let sessionId: string | null = null;
+          const content = text.trim()
+          let sessionId: string | null = null
           if (content) {
-            sessionId = await appendCliUserLog(content);
+            sessionId = await appendCliUserLog(content)
           }
           if (task?.task_mode !== 'workflow' && task?.status === 'in_review') {
             try {
-              const reviewNode = (await db.getCurrentTaskNode(taskId)) as { id?: string; status?: string } | null;
+              const reviewNode = (await db.getCurrentTaskNode(taskId)) as {
+                id?: string
+                status?: string
+              } | null
               if (reviewNode?.id && reviewNode.status === 'in_review') {
-                await db.rerunTaskNode(reviewNode.id);
+                await db.rerunTaskNode(reviewNode.id)
               }
-              const updatedTask = await db.getTask(taskId);
-              if (updatedTask) setTask(updatedTask);
-            } catch { /* ignore */ }
+              const updatedTask = await db.getTask(taskId)
+              if (updatedTask) setTask(updatedTask)
+            } catch {
+              /* ignore */
+            }
           }
-          if (task?.task_mode === 'workflow' && selectedWorkflowNode?.id && selectedWorkflowNode.status === 'failed') {
+          if (
+            task?.task_mode === 'workflow' &&
+            selectedWorkflowNode?.id &&
+            selectedWorkflowNode.status === 'failed'
+          ) {
             try {
-              await db.rerunTaskNode(selectedWorkflowNode.id);
-              const updatedTask = await db.getTask(taskId);
-              if (updatedTask) setTask(updatedTask);
-            } catch { /* ignore */ }
+              await db.rerunTaskNode(selectedWorkflowNode.id)
+              const updatedTask = await db.getTask(taskId)
+              if (updatedTask) setTask(updatedTask)
+            } catch {
+              /* ignore */
+            }
           }
           try {
             if (content) {
-              if (!cliSessionRef.current) throw new Error('CLI session not initialized');
-              await runCliPrompt(content, sessionId);
+              if (!cliSessionRef.current) throw new Error('CLI session not initialized')
+              await runCliPrompt(content, sessionId)
             }
           } catch {
             await appendCliSystemLog(
               t.common.errors.serverNotRunning || 'CLI session is not running.',
               sessionId
-            );
+            )
           }
-          return;
+          return
         }
-        if (activeTaskId !== taskId) await loadMessages(taskId);
-        if (pipelineTemplate && (pipelineStatus === 'waiting_approval' || pipelineStatus === 'failed')) {
-          const approvalNote = text.trim();
-          if (approvalNote) setMessages((prev) => [...prev, { type: 'user', content: approvalNote }]);
-          await startNextPipelineStage(approvalNote);
-          return;
+        if (activeTaskId !== taskId) await loadMessages(taskId)
+        if (
+          pipelineTemplate &&
+          (pipelineStatus === 'waiting_approval' || pipelineStatus === 'failed')
+        ) {
+          const approvalNote = text.trim()
+          if (approvalNote)
+            setMessages((prev) => [...prev, { type: 'user', content: approvalNote }])
+          await startNextPipelineStage(approvalNote)
+          return
         }
-        await continueConversation(text.trim(), messageAttachments, workingDir || undefined);
+        await continueConversation(text.trim(), messageAttachments, workingDir || undefined)
       }
     },
-    [activeTaskId, appendCliSystemLog, appendCliUserLog, continueConversation, isRunning, loadMessages, pipelineStatus, pipelineTemplate, runCliPrompt, selectedWorkflowNode?.id, selectedWorkflowNode?.status, setMessages, setTask, startNextPipelineStage, t.common.errors.serverNotRunning, task?.status, task?.task_mode, taskId, useCliSession, workingDir]
-  );
+    [
+      activeTaskId,
+      appendCliSystemLog,
+      appendCliUserLog,
+      continueConversation,
+      isRunning,
+      loadMessages,
+      pipelineStatus,
+      pipelineTemplate,
+      runCliPrompt,
+      selectedWorkflowNode?.id,
+      selectedWorkflowNode?.status,
+      setMessages,
+      setTask,
+      startNextPipelineStage,
+      t.common.errors.serverNotRunning,
+      task?.status,
+      task?.task_mode,
+      taskId,
+      useCliSession,
+      workingDir
+    ]
+  )
 
   const handleStartTask = useCallback(async () => {
-    if (!taskId) return;
+    if (!taskId) return
 
     if (selectedWorkflowNodeIsFailed && selectedWorkflowNode?.id) {
-      await db.rerunTaskNode(selectedWorkflowNode.id);
-      await loadCurrentNodeRuntime();
-      await loadWorkflowStatus();
-      const refreshedTask = await db.getTask(taskId);
-      if (refreshedTask) setTask(refreshedTask);
-      return;
+      await db.rerunTaskNode(selectedWorkflowNode.id)
+      await loadCurrentNodeRuntime()
+      await loadWorkflowStatus()
+      const refreshedTask = await db.getTask(taskId)
+      if (refreshedTask) setTask(refreshedTask)
+      return
     }
 
-    markStartedOnce();
+    markStartedOnce()
 
     try {
-      await db.startTaskExecution(taskId);
-      const refreshedTask = await db.getTask(taskId);
-      if (refreshedTask) setTask(refreshedTask);
-      const workflowRun = await db.getWorkflowRunByTask(taskId);
-      setBackendWorkflowRun(workflowRun ? { id: workflowRun.id, status: workflowRun.status } : null);
+      await db.startTaskExecution(taskId)
+      const refreshedTask = await db.getTask(taskId)
+      if (refreshedTask) setTask(refreshedTask)
+      const workflowRun = await db.getWorkflowRunByTask(taskId)
+      setBackendWorkflowRun(workflowRun)
+      if (workflowRun) {
+        const runNodes = await db.listWorkflowRunNodes(workflowRun.id)
+        setWorkflowRunNodes(Array.isArray(runNodes) ? runNodes : [])
+      } else {
+        setWorkflowRunNodes([])
+      }
     } catch {
       /* ignore */
     }
 
     if (task?.task_mode === 'workflow') {
       if (backendWorkflowRun) {
-        await loadCurrentNodeRuntime();
-        await loadWorkflowStatus();
-        return;
+        await loadCurrentNodeRuntime()
+        await loadWorkflowStatus()
+        return
       }
-      if (!pipelineTemplate || pipelineStatus !== 'idle' || isRunning) return;
-      await startPipelineStage(0);
-      return;
+      if (!pipelineTemplate || pipelineStatus !== 'idle' || isRunning) return
+      await startPipelineStage(0)
+      return
     }
 
     if (useCliSession) {
       try {
-        if (!cliSessionRef.current) throw new Error('CLI session not initialized');
-        const prompt = buildCliPrompt(await resolveCurrentNodePrompt());
-        let sessionId: string | null = null;
+        if (!cliSessionRef.current) throw new Error('CLI session not initialized')
+        const prompt = buildCliPrompt(await resolveCurrentNodePrompt())
+        let sessionId: string | null = null
         if (prompt) {
-          sessionId = await appendCliUserLog(prompt);
+          sessionId = await appendCliUserLog(prompt)
         }
-        await runCliPrompt(prompt || undefined, sessionId);
+        await runCliPrompt(prompt || undefined, sessionId)
       } catch {
-        await appendCliSystemLog(t.common.errors.serverNotRunning || 'CLI session is not running.');
+        await appendCliSystemLog(t.common.errors.serverNotRunning || 'CLI session is not running.')
       }
-      return;
+      return
     }
 
     const sessionInfo = currentNodeRuntime.sessionId
       ? { sessionId: currentNodeRuntime.sessionId }
-      : undefined;
-    const pendingAttachments = initialAttachmentsRef.current;
-    initialAttachmentsRef.current = undefined;
-    await runAgent(task?.prompt || initialPrompt, taskId, sessionInfo, pendingAttachments, workingDir || undefined);
-  }, [appendCliSystemLog, appendCliUserLog, backendWorkflowRun, buildCliPrompt, currentNodeRuntime.sessionId, initialPrompt, initialAttachmentsRef, isRunning, loadCurrentNodeRuntime, loadWorkflowStatus, markStartedOnce, pipelineStatus, pipelineTemplate, resolveCurrentNodePrompt, runAgent, runCliPrompt, selectedWorkflowNode?.id, selectedWorkflowNodeIsFailed, setTask, setBackendWorkflowRun, startPipelineStage, t.common.errors.serverNotRunning, task?.prompt, task?.task_mode, taskId, useCliSession, workingDir]);
+      : undefined
+    const pendingAttachments = initialAttachmentsRef.current
+    initialAttachmentsRef.current = undefined
+    await runAgent(
+      task?.prompt || initialPrompt,
+      taskId,
+      sessionInfo,
+      pendingAttachments,
+      workingDir || undefined
+    )
+  }, [
+    appendCliSystemLog,
+    appendCliUserLog,
+    backendWorkflowRun,
+    buildCliPrompt,
+    currentNodeRuntime.sessionId,
+    initialPrompt,
+    initialAttachmentsRef,
+    isRunning,
+    loadCurrentNodeRuntime,
+    loadWorkflowStatus,
+    markStartedOnce,
+    pipelineStatus,
+    pipelineTemplate,
+    resolveCurrentNodePrompt,
+    runAgent,
+    runCliPrompt,
+    selectedWorkflowNode?.id,
+    selectedWorkflowNodeIsFailed,
+    setTask,
+    setBackendWorkflowRun,
+    startPipelineStage,
+    t.common.errors.serverNotRunning,
+    task?.prompt,
+    task?.task_mode,
+    taskId,
+    useCliSession,
+    workingDir
+  ])
 
   const handleApproveCliTask = useCallback(async () => {
-    if (!taskId) return;
+    if (!taskId) return
     try {
-      const reviewNode = (await db.getCurrentTaskNode(taskId)) as { id?: string; status?: string } | null;
+      const reviewNode = (await db.getCurrentTaskNode(taskId)) as {
+        id?: string
+        status?: string
+      } | null
       if (reviewNode?.id && reviewNode.status === 'in_review') {
-        await db.approveTaskNode(reviewNode.id);
+        await db.approveTaskNode(reviewNode.id)
       }
-      const updatedTask = await db.getTask(taskId);
-      if (updatedTask) setTask(updatedTask);
-    } catch { /* ignore */ }
-  }, [setTask, taskId]);
+      const updatedTask = await db.getTask(taskId)
+      if (updatedTask) setTask(updatedTask)
+    } catch {
+      /* ignore */
+    }
+  }, [setTask, taskId])
 
   const handleStopExecution = useCallback(async () => {
     if (useCliSession) {
-      await stopCli();
+      await stopCli()
       if (taskId) {
         try {
-          await db.stopTaskExecution(taskId);
-          const refreshedTask = await db.getTask(taskId);
-          if (refreshedTask) setTask(refreshedTask);
+          await db.stopTaskExecution(taskId)
+          const refreshedTask = await db.getTask(taskId)
+          if (refreshedTask) setTask(refreshedTask)
         } catch {
           /* ignore */
         }
       }
-      return;
+      return
     }
 
-    await stopAgent();
+    await stopAgent()
     if (taskId) {
       try {
-        await db.stopTaskExecution(taskId);
-        const refreshedTask = await db.getTask(taskId);
-        if (refreshedTask) setTask(refreshedTask);
+        await db.stopTaskExecution(taskId)
+        const refreshedTask = await db.getTask(taskId)
+        if (refreshedTask) setTask(refreshedTask)
       } catch {
         /* ignore */
       }
     }
-  }, [stopAgent, stopCli, useCliSession, taskId, setTask]);
+  }, [stopAgent, stopCli, useCliSession, taskId, setTask])
 
   const replyIsRunning = useMemo(() => {
-    if (useCliSession) return cliStatus === 'running';
-    return isRunning;
-  }, [cliStatus, isRunning, useCliSession]);
+    if (useCliSession) return cliStatus === 'running'
+    return isRunning
+  }, [cliStatus, isRunning, useCliSession])
 
-  const agentToolConfigId = executionAgentToolConfigId;
+  const agentToolConfigId = executionAgentToolConfigId
 
   // ===========================================================================
   // Return
@@ -1723,8 +2133,7 @@ export function useTaskDetail({
     actionLabel,
     actionDisabled,
     showWorkflowCard,
-    workflowTemplateNodeMap,
-    workflowNodesForDisplay,
+    workflowGraph,
     visibleMetaRows,
 
     // Actions
@@ -1735,6 +2144,6 @@ export function useTaskDetail({
     replyIsRunning,
     replyDisabled,
     replyPlaceholder,
-    isCliTaskReviewPending,
-  };
+    isCliTaskReviewPending
+  }
 }

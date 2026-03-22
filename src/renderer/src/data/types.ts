@@ -92,8 +92,38 @@ export interface WorkflowRun {
   id: string
   task_id: string
   workflow_definition_id: string
+  definition_snapshot: WorkflowDefinitionDocument
   status: 'waiting' | 'running' | 'review' | 'done' | 'failed'
   current_wave: number
+  started_at: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type WorkflowRunNodeStatus = 'waiting' | 'running' | 'review' | 'done' | 'failed'
+
+export interface WorkflowRunNode {
+  id: string
+  workflow_run_id: string
+  definition_node_id: string
+  node_key: string
+  name: string
+  node_type: WorkflowDefinitionNodeType
+  prompt: string | null
+  command: string | null
+  cli_tool_id: string | null
+  agent_tool_config_id: string | null
+  requires_approval_after_run: boolean
+  status: WorkflowRunNodeStatus
+  failure_reason: 'execution_error' | 'cancelled' | null
+  session_id: string | null
+  resume_session_id: string | null
+  result_summary: string | null
+  error_message: string | null
+  cost: number | null
+  duration: number | null
+  attempt_count: number
   started_at: string | null
   completed_at: string | null
   created_at: string

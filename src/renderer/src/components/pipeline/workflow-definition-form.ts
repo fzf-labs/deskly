@@ -75,7 +75,11 @@ export const workflowDefinitionToFormValues = (
       cliToolId: node.cliToolId ?? '',
       agentToolConfigId: node.agentToolConfigId ?? '',
       requiresApproval: Boolean(node.requiresApprovalAfterRun),
-      dependsOnIds: dependencyMap.get(node.id) ?? []
+      dependsOnIds: dependencyMap.get(node.id) ?? [],
+      position: node.position ?? {
+        x: index * 280,
+        y: 0
+      }
     }))
   }
 }
@@ -96,7 +100,7 @@ export const buildWorkflowDefinitionFromForm = (
       cliToolId: node.type === 'agent' ? node.cliToolId || null : null,
       agentToolConfigId: node.type === 'agent' ? node.agentToolConfigId || null : null,
       requiresApprovalAfterRun: Boolean(node.requiresApproval),
-      position: {
+      position: node.position ?? {
         x: index * 280,
         y: 0
       }

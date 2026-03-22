@@ -1,9 +1,7 @@
-export { WorkflowTemplateDialog } from './WorkflowTemplateDialog';
-export type {
-  WorkflowTemplateFormValues,
-  TaskNodeTemplateDraft,
-} from './WorkflowTemplateDialog';
+export { WorkflowTemplateDialog, WorkflowTemplateEditor } from './WorkflowTemplateDialog'
+export type { WorkflowTemplateFormValues, TaskNodeTemplateDraft } from './WorkflowTemplateDialog'
+export { buildWorkflowTemplateEditorRoute } from './routes'
 export {
   buildWorkflowDefinitionFromForm,
   workflowDefinitionToFormValues
-} from './workflow-definition-form';
+} from './workflow-definition-form'

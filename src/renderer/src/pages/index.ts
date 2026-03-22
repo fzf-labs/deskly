@@ -1,13 +1,14 @@
-export { HomePage } from './Home';
-export { TaskDetailPage } from './task-detail/TaskDetailPage';
-export { SetupPage } from './Setup';
-export { DashboardPage } from './dashboard/DashboardPage';
-export { BoardPage } from './board/BoardPage';
-export { PipelineTemplatesPage } from './pipeline/PipelineTemplatesPage';
-export { SettingsPage } from './settings/SettingsPage';
-export { SkillsPage } from './skills/SkillsPage';
-export { McpPage } from './mcp/McpPage';
-export { ProjectsPage } from './projects/ProjectsPage';
-export { AutomationsPage } from './automations/AutomationsPage';
+export { HomePage } from './Home'
+export { TaskDetailPage } from './task-detail/TaskDetailPage'
+export { SetupPage } from './Setup'
+export { DashboardPage } from './dashboard/DashboardPage'
+export { BoardPage } from './board/BoardPage'
+export { PipelineTemplatesPage } from './pipeline/PipelineTemplatesPage'
+export { WorkflowTemplateEditorPage } from './pipeline/WorkflowTemplateEditorPage'
+export { SettingsPage } from './settings/SettingsPage'
+export { SkillsPage } from './skills/SkillsPage'
+export { McpPage } from './mcp/McpPage'
+export { ProjectsPage } from './projects/ProjectsPage'
+export { AutomationsPage } from './automations/AutomationsPage'
 
-export { TasksPage } from './tasks/TasksPage';
+export { TasksPage } from './tasks/TasksPage'

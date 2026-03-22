@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import type { WorkflowDefinitionNodePosition, WorkflowDefinitionNodeType } from '@/data'
 import type { useLanguage } from '@/providers/language-provider'
 import type { MessageAttachment } from '@/hooks/useAgent'
 
@@ -14,8 +15,7 @@ export type TaskMetaRow = {
 
 export type PipelineDisplayStatus = 'todo' | 'in_progress' | 'in_review' | 'done' | 'failed'
 
-export const filterVisibleMetaRows = (rows: TaskMetaRow[]) =>
-  rows.filter((row) => row.visible)
+export const filterVisibleMetaRows = (rows: TaskMetaRow[]) => rows.filter((row) => row.visible)
 
 export type LocationState = {
   prompt?: string
@@ -51,12 +51,7 @@ export type CLIToolInfo = {
   displayName?: string
 }
 
-export type PipelineStatus =
-  | 'idle'
-  | 'running'
-  | 'waiting_approval'
-  | 'failed'
-  | 'completed'
+export type PipelineStatus = 'idle' | 'running' | 'waiting_approval' | 'failed' | 'completed'
 
 export type ExecutionStatus = 'idle' | 'running' | 'stopped' | 'error'
 
@@ -81,6 +76,31 @@ export type WorkflowReviewNode = {
   id: string
   name: string
   status: PipelineDisplayStatus
+}
+
+export type WorkflowGraphNode = {
+  id: string
+  definitionId: string
+  node_order: number
+  status: PipelineDisplayStatus
+  type: WorkflowDefinitionNodeType
+  name: string
+  prompt: string
+  command?: string | null
+  requiresApproval: boolean
+  position: WorkflowDefinitionNodePosition
+  isCurrent: boolean
+}
+
+export type WorkflowGraphEdge = {
+  id: string
+  source: string
+  target: string
+}
+
+export type WorkflowGraph = {
+  nodes: WorkflowGraphNode[]
+  edges: WorkflowGraphEdge[]
 }
 
 export type CurrentNodeRuntime = {

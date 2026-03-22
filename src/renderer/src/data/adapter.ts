@@ -11,7 +11,8 @@ import type {
   TaskNode,
   UpdateTaskInput,
   WorkflowDefinition,
-  WorkflowRun
+  WorkflowRun,
+  WorkflowRunNode
 } from './types'
 import type { Automation, AutomationRun } from './types'
 
@@ -111,7 +112,10 @@ export const db = {
   },
 
   copyGlobalWorkflowToProject: (globalTemplateId: string, projectId: string): Promise<unknown> => {
-    return window.api.database.copyGlobalWorkflowToProject(globalTemplateId, projectId) as Promise<unknown>
+    return window.api.database.copyGlobalWorkflowToProject(
+      globalTemplateId,
+      projectId
+    ) as Promise<unknown>
   },
 
   getTaskNodes: (taskId: string): Promise<TaskNode[]> => {
@@ -135,7 +139,10 @@ export const db = {
       agent_tool_config_id?: string | null
     }
   ): Promise<TaskNode | null> => {
-    return window.api.database.updateCurrentTaskNodeRuntime(taskId, updates) as Promise<TaskNode | null>
+    return window.api.database.updateCurrentTaskNodeRuntime(
+      taskId,
+      updates
+    ) as Promise<TaskNode | null>
   },
 
   getTaskNodesByStatus: (taskId: string, status: string): Promise<TaskNode[]> => {
@@ -182,9 +189,14 @@ export const db = {
     return window.api.workflow.getRunByTask(taskId) as Promise<WorkflowRun | null>
   },
 
-  listWorkflowDefinitions: (
-    filter?: { scope?: 'global' | 'project'; projectId?: string | null }
-  ): Promise<WorkflowDefinition[]> => {
+  listWorkflowRunNodes: (runId: string): Promise<WorkflowRunNode[]> => {
+    return window.api.workflow.listRunNodes(runId) as Promise<WorkflowRunNode[]>
+  },
+
+  listWorkflowDefinitions: (filter?: {
+    scope?: 'global' | 'project'
+    projectId?: string | null
+  }): Promise<WorkflowDefinition[]> => {
     return window.api.workflow.listDefinitions(filter) as Promise<WorkflowDefinition[]>
   },
 
@@ -195,7 +207,9 @@ export const db = {
   generateWorkflowDefinition: (
     input: GenerateWorkflowDefinitionInput
   ): Promise<GeneratedWorkflowDefinitionResult> => {
-    return window.api.workflow.generateDefinition(input) as Promise<GeneratedWorkflowDefinitionResult>
+    return window.api.workflow.generateDefinition(
+      input
+    ) as Promise<GeneratedWorkflowDefinitionResult>
   },
 
   createWorkflowDefinition: (input: Record<string, unknown>): Promise<WorkflowDefinition> => {

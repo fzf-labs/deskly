@@ -1,30 +1,30 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
-import { useAgent, type MessageAttachment } from '@/hooks/useAgent';
-import { cn } from '@/lib/utils';
-import { useLanguage } from '@/providers/language-provider';
-import { useAppShell, useSidebar } from '@/components/layout';
-import { ToolSelectionContext } from '@/components/task';
+import { useAgent, type MessageAttachment } from '@/hooks/useAgent'
+import { cn } from '@/lib/utils'
+import { useLanguage } from '@/providers/language-provider'
+import { useAppShell, useSidebar } from '@/components/layout'
+import { ToolSelectionContext } from '@/components/task'
 
-import { ExecutionPanel } from './components/ExecutionPanel';
-import { ReplyCard } from './components/ReplyCard';
-import { RightPanelSection } from './components/RightPanelSection';
-import { TaskCard } from './components/TaskCard';
-import { TaskDialogs } from './components/TaskDialogs';
-import { WorkflowCard } from './components/WorkflowCard';
-import { useTaskDetail } from './useTaskDetail';
-import type { LocationState } from './types';
+import { ExecutionPanel } from './components/ExecutionPanel'
+import { ReplyCard } from './components/ReplyCard'
+import { RightPanelSection } from './components/RightPanelSection'
+import { TaskCard } from './components/TaskCard'
+import { TaskDialogs } from './components/TaskDialogs'
+import { WorkflowCard } from './components/WorkflowCard'
+import { useTaskDetail } from './useTaskDetail'
+import type { LocationState } from './types'
 
 export function TaskDetailContainer() {
-  const { t } = useLanguage();
-  const { taskId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const state = location.state as LocationState | null;
-  const initialPrompt = state?.prompt || '';
-  const initialSessionId = state?.sessionId;
-  const initialAttachments = state?.attachments;
+  const { t } = useLanguage()
+  const { taskId } = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const state = location.state as LocationState | null
+  const initialPrompt = state?.prompt || ''
+  const initialSessionId = state?.sessionId
+  const initialAttachments = state?.attachments
 
   const {
     taskId: activeTaskId,
@@ -39,18 +39,16 @@ export function TaskDetailContainer() {
     phase,
     approvePlan,
     rejectPlan,
-    sessionFolder,
-  } = useAgent();
-  const { toggleLeft } = useSidebar();
+    sessionFolder
+  } = useAgent()
+  const { toggleLeft } = useSidebar()
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const initialAttachmentsRef = useRef<MessageAttachment[] | undefined>(
-    initialAttachments
-  );
+  const containerRef = useRef<HTMLDivElement>(null)
+  const initialAttachmentsRef = useRef<MessageAttachment[] | undefined>(initialAttachments)
 
   useEffect(() => {
-    initialAttachmentsRef.current = initialAttachments;
-  }, [initialAttachments]);
+    initialAttachmentsRef.current = initialAttachments
+  }, [initialAttachments])
 
   // Single consolidated hook for all task detail logic
   const detail = useTaskDetail({
@@ -69,12 +67,12 @@ export function TaskDetailContainer() {
     loadTask,
     loadMessages,
     sessionFolder,
-    t,
-  });
+    t
+  })
 
   const handleAction = detail.isCliTaskReviewPending
     ? detail.handleApproveCliTask
-    : detail.handleStartTask;
+    : detail.handleStartTask
 
   const shellConfig = useMemo(
     () => ({
@@ -117,7 +115,9 @@ export function TaskDetailContainer() {
   return (
     <ToolSelectionContext.Provider value={detail.toolSelectionValue}>
       <div ref={containerRef} className="flex h-full min-w-0 overflow-hidden">
-        <div className={cn('bg-background flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl')}>
+        <div
+          className={cn('bg-background flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl')}
+        >
           <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
             <TaskCard
               t={t}
@@ -136,8 +136,7 @@ export function TaskDetailContainer() {
             {detail.showWorkflowCard && (
               <WorkflowCard
                 t={t}
-                nodes={detail.workflowNodesForDisplay}
-                templateNodeMap={detail.workflowTemplateNodeMap}
+                graph={detail.workflowGraph}
                 currentTaskNode={detail.currentTaskNode}
                 selectedNodeId={detail.selectedWorkflowNodeId}
                 onSelectNode={detail.handleSelectWorkflowNode}
@@ -203,5 +202,5 @@ export function TaskDetailContainer() {
         onDelete={detail.handleDeleteTask}
       />
     </ToolSelectionContext.Provider>
-  );
+  )
 }

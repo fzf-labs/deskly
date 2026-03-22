@@ -1,4 +1,4 @@
-import { createHashRouter, Navigate } from 'react-router-dom';
+import { createHashRouter, Navigate } from 'react-router-dom'
 import {
   HomePage,
   SetupPage,
@@ -9,13 +9,14 @@ import {
   McpPage,
   ProjectsPage,
   PipelineTemplatesPage,
+  WorkflowTemplateEditorPage,
   SettingsPage,
   TasksPage,
-  AutomationsPage,
-} from '@/pages';
+  AutomationsPage
+} from '@/pages'
 
-import { SetupGuard } from '@/components/shared/SetupGuard';
-import { MainLayout } from '@/components/layout';
+import { SetupGuard } from '@/components/shared/SetupGuard'
+import { MainLayout } from '@/components/layout'
 
 export const router = createHashRouter([
   {
@@ -28,53 +29,57 @@ export const router = createHashRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/tasks" replace />,
+        element: <Navigate to="/tasks" replace />
       },
       {
         path: 'dashboard',
-        element: <DashboardPage />,
+        element: <DashboardPage />
       },
       {
         path: 'board',
-        element: <BoardPage />,
+        element: <BoardPage />
       },
       {
         path: 'tasks',
-        element: <TasksPage />,
+        element: <TasksPage />
       },
       {
         path: 'automations',
-        element: <AutomationsPage />,
+        element: <AutomationsPage />
       },
       {
         path: 'pipeline-templates',
-        element: <PipelineTemplatesPage />,
+        element: <PipelineTemplatesPage />
+      },
+      {
+        path: 'pipeline-templates/editor',
+        element: <WorkflowTemplateEditorPage />
       },
       {
         path: 'skills',
-        element: <SkillsPage />,
+        element: <SkillsPage />
       },
       {
         path: 'mcp',
-        element: <McpPage />,
+        element: <McpPage />
       },
       {
         path: 'projects',
-        element: <ProjectsPage />,
+        element: <ProjectsPage />
       },
       {
         path: 'settings',
-        element: <SettingsPage />,
+        element: <SettingsPage />
       },
       {
         path: 'home',
-        element: <HomePage />,
+        element: <HomePage />
       },
       {
         path: 'task/:taskId',
-        element: <TaskDetailPage />,
-      },
-    ],
+        element: <TaskDetailPage />
+      }
+    ]
   },
   {
     path: '/setup',
@@ -82,6 +87,6 @@ export const router = createHashRouter([
       <SetupGuard>
         <SetupPage />
       </SetupGuard>
-    ),
-  },
-]);
+    )
+  }
+])

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -11,22 +12,16 @@ import { useProjects } from '@/hooks/useProjects'
 import { db, type WorkflowDefinition } from '@/data'
 import { useLanguage } from '@/providers/language-provider'
 import { EmptyStatePanel, PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
-import {
-  buildWorkflowDefinitionFromForm,
-  WorkflowTemplateDialog,
-  type WorkflowTemplateFormValues,
-  workflowDefinitionToFormValues
-} from '@/components/pipeline'
+import { buildWorkflowTemplateEditorRoute } from '@/components/pipeline'
 import { Select } from '@/components/ui/select'
 
 export function PipelineTemplatesPage() {
   const { t } = useLanguage()
+  const navigate = useNavigate()
   const { currentProject } = useProjects()
   const [templates, setTemplates] = useState<WorkflowDefinition[]>([])
   const [globalTemplates, setGlobalTemplates] = useState<WorkflowDefinition[]>([])
   const [copyTemplateId, setCopyTemplateId] = useState('')
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState<WorkflowDefinition | null>(null)
 
   const projectId = currentProject?.id
 
@@ -60,37 +55,20 @@ export function PipelineTemplatesPage() {
   }, [loadGlobalTemplates])
 
   const handleCreate = () => {
-    setEditingTemplate(null)
-    setDialogOpen(true)
+    navigate(
+      buildWorkflowTemplateEditorRoute({
+        scope: 'project'
+      })
+    )
   }
 
   const handleEdit = (template: WorkflowDefinition) => {
-    setEditingTemplate(template)
-    setDialogOpen(true)
-  }
-
-  const handleSubmit = async (values: WorkflowTemplateFormValues) => {
-    if (!projectId) return
-    const definition = buildWorkflowDefinitionFromForm(values)
-    if (editingTemplate) {
-      await db.updateWorkflowDefinition({
-        id: editingTemplate.id,
+    navigate(
+      buildWorkflowTemplateEditorRoute({
         scope: 'project',
-        project_id: projectId,
-        name: values.name,
-        description: values.description,
-        definition
+        templateId: template.id
       })
-    } else {
-      await db.createWorkflowDefinition({
-        scope: 'project',
-        project_id: projectId,
-        name: values.name,
-        description: values.description,
-        definition
-      })
-    }
-    await loadTemplates()
+    )
   }
 
   const handleDelete = async (template: WorkflowDefinition) => {
@@ -117,12 +95,10 @@ export function PipelineTemplatesPage() {
   }
 
   const stageCount = (template: WorkflowDefinition) =>
-    t.task.pipelineTemplateStageCount.replace('{count}', `${template.definition.nodes?.length || 0}`)
-
-  const dialogTitle = editingTemplate
-    ? t.task.pipelineTemplateEditTitle
-    : t.task.pipelineTemplateCreateTitle
-
+    t.task.pipelineTemplateStageCount.replace(
+      '{count}',
+      `${template.definition.nodes?.length || 0}`
+    )
   return (
     <PageFrame>
       <PageHeader
@@ -220,16 +196,6 @@ export function PipelineTemplatesPage() {
           </div>
         )}
       </PageBody>
-
-      <WorkflowTemplateDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        title={dialogTitle}
-        initialValues={
-          editingTemplate ? workflowDefinitionToFormValues(editingTemplate) : null
-        }
-        onSubmit={handleSubmit}
-      />
     </PageFrame>
   )
 }
