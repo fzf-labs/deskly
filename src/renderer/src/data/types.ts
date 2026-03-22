@@ -176,6 +176,7 @@ export interface WorkflowDefinition {
 export interface GenerateWorkflowDefinitionInput {
   prompt: string
   name?: string | null
+  mode?: 'ai' | 'rules'
 }
 
 export interface GeneratedWorkflowDefinitionResult {

@@ -649,6 +649,49 @@ const mapGeneratedDefinitionToDrafts = (
   }
 }
 
+const resolveWorkflowGenerationErrorMessage = (
+  error: unknown,
+  taskMessages: Record<string, string | undefined>
+): string => {
+  const message = error instanceof Error ? error.message : String(error)
+
+  if (message.includes('WORKFLOW_AI_CLI_UNAVAILABLE')) {
+    return taskMessages.workflowGenerationCliUnavailable || '未检测到可用的 AI CLI 工具。'
+  }
+
+  if (message.includes('WORKFLOW_AI_GENERATION_RUNTIME_UNAVAILABLE')) {
+    return (
+      taskMessages.workflowGenerationRuntimeUnavailable ||
+      '当前工作流生成功能暂不可用，请稍后重试。'
+    )
+  }
+
+  if (
+    message.includes('CLI_ONE_SHOT_TIMEOUT') ||
+    message.includes('WORKFLOW_AI_GENERATION_TIMEOUT')
+  ) {
+    return taskMessages.workflowGenerationFailed || 'AI 生成失败，请稍后重试。'
+  }
+
+  if (message.includes('WORKFLOW_AI_GENERATION_NO_OUTPUT')) {
+    return taskMessages.workflowGenerationNoOutput || 'AI 没有返回可解析的工作流结果。'
+  }
+
+  if (message.includes('WORKFLOW_AI_GENERATION_INVALID_DOCUMENT')) {
+    return taskMessages.workflowGenerationInvalidResult || 'AI 返回的工作流结果无效。'
+  }
+
+  if (message.includes('WORKFLOW_AI_GENERATION_PARSE_FAILED')) {
+    return taskMessages.workflowGenerationParseFailed || 'AI 返回的结果无法解析为工作流。'
+  }
+
+  if (message.includes('WORKFLOW_AI_GENERATION_FAILED')) {
+    return taskMessages.workflowGenerationFailed || 'AI 生成失败，请稍后重试。'
+  }
+
+  return message
+}
+
 export function WorkflowTemplateEditor({
   active = true,
   initialValues,
@@ -1045,6 +1088,21 @@ export function WorkflowTemplateEditor({
     }
   }, [handleRemoveSelectedEdge, removeNode, selectedEdgeId, selectedNodeId, templateNodes.length])
 
+  const applyGeneratedDraft = useCallback(
+    (generated: GeneratedWorkflowDefinitionResult) => {
+      const draft = mapGeneratedDefinitionToDrafts(generated)
+      const nextNodes = draft.nodes.length > 0 ? draft.nodes : [createDefaultNode(0)]
+
+      setTemplateName((current) => current.trim() || draft.name)
+      setTemplateDescription((current) => current.trim() || draft.description || '')
+      setTemplateNodes(nextNodes)
+      setSelectedNodeId(nextNodes[0]?.id ?? null)
+      setSelectedEdgeId(null)
+      fitCanvas()
+    },
+    [fitCanvas]
+  )
+
   const handleGenerate = async () => {
     if (!generationPrompt.trim()) {
       setError(t.task.workflowGenerationPromptRequired || '请先输入工作流目标。')
@@ -1057,19 +1115,33 @@ export function WorkflowTemplateEditor({
     try {
       const generated = await db.generateWorkflowDefinition({
         prompt: generationPrompt.trim(),
-        name: templateName.trim() || undefined
+        name: templateName.trim() || undefined,
+        mode: 'ai'
       })
-      const draft = mapGeneratedDefinitionToDrafts(generated)
-      const nextNodes = draft.nodes.length > 0 ? draft.nodes : [createDefaultNode(0)]
-
-      setTemplateName((current) => current.trim() || draft.name)
-      setTemplateDescription((current) => current.trim() || draft.description || '')
-      setTemplateNodes(nextNodes)
-      setSelectedNodeId(nextNodes[0]?.id ?? null)
-      setSelectedEdgeId(null)
-      fitCanvas()
+      applyGeneratedDraft(generated)
     } catch (err) {
-      setError(String(err))
+      const errorMessage = resolveWorkflowGenerationErrorMessage(err, t.task)
+      const shouldFallback = window.confirm(
+        `${errorMessage}\n\n${
+          t.task.workflowGenerationFallbackConfirm || 'AI 生成失败，是否改用规则生成？'
+        }`
+      )
+
+      if (!shouldFallback) {
+        setError(errorMessage)
+        return
+      }
+
+      try {
+        const fallbackGenerated = await db.generateWorkflowDefinition({
+          prompt: generationPrompt.trim(),
+          name: templateName.trim() || undefined,
+          mode: 'rules'
+        })
+        applyGeneratedDraft(fallbackGenerated)
+      } catch (fallbackError) {
+        setError(resolveWorkflowGenerationErrorMessage(fallbackError, t.task))
+      }
     } finally {
       setIsGenerating(false)
     }

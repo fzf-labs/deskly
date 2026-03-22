@@ -32,7 +32,7 @@ export class WorkflowDefinitionService {
 
   createDefinition(input: CreateWorkflowDefinitionInput): WorkflowDefinition {
     this.validateScope(input.scope, input.project_id ?? null)
-    this.validateDocument(input.definition)
+    this.validateDefinitionDocument(input.definition)
     return this.repo.createDefinition(input)
   }
 
@@ -43,7 +43,7 @@ export class WorkflowDefinitionService {
     }
 
     this.validateScope(input.scope, input.project_id ?? null)
-    this.validateDocument(input.definition)
+    this.validateDefinitionDocument(input.definition)
     return this.repo.updateDefinition(input)
   }
 
@@ -61,7 +61,7 @@ export class WorkflowDefinitionService {
     }
   }
 
-  private validateDocument(document: WorkflowDefinitionDocument): void {
+  validateDefinitionDocument(document: WorkflowDefinitionDocument): void {
     if (document.version !== 1) {
       throw new Error('Workflow definition version must be 1')
     }
@@ -129,7 +129,9 @@ export class WorkflowDefinitionService {
       outgoing.get(edge.from)!.push(edge.to)
     })
 
-    const queue = [...document.nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0).map((node) => node.id)]
+    const queue = [
+      ...document.nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0).map((node) => node.id)
+    ]
     let visited = 0
 
     while (queue.length > 0) {

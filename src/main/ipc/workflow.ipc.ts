@@ -30,11 +30,12 @@ export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): 
     [
       v.shape({
         prompt: v.string(),
-        name: v.optional(v.nullable(v.string({ allowEmpty: true })))
+        name: v.optional(v.nullable(v.string({ allowEmpty: true }))),
+        mode: v.optional(v.enum(['ai', 'rules'] as const))
       })
     ],
-    (_, input) =>
-      databaseService.generateWorkflowDefinition(
+    async (_, input) =>
+      await databaseService.generateWorkflowDefinition(
         input as unknown as Parameters<DatabaseService['generateWorkflowDefinition']>[0]
       )
   )
@@ -81,8 +82,10 @@ export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): 
     databaseService.listWorkflowRunNodes(runId)
   )
 
-  handle(IPC_CHANNELS.workflow.startRun, [v.string()], async (_, runId) =>
-    await databaseService.startWorkflowRun(runId)
+  handle(
+    IPC_CHANNELS.workflow.startRun,
+    [v.string()],
+    async (_, runId) => await databaseService.startWorkflowRun(runId)
   )
 
   handle(
@@ -104,7 +107,9 @@ export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): 
     databaseService.retryWorkflowRunNode(nodeId)
   )
 
-  handle(IPC_CHANNELS.workflow.stopRun, [v.string()], async (_, runId) =>
-    await databaseService.stopWorkflowRun(runId)
+  handle(
+    IPC_CHANNELS.workflow.stopRun,
+    [v.string()],
+    async (_, runId) => await databaseService.stopWorkflowRun(runId)
   )
 }

@@ -317,7 +317,10 @@ export interface IpcContracts {
   'cli:stopSession': IpcContract<[string], unknown>
   'cli:getOutput': IpcContract<[string], OutputSnapshot>
 
-  'terminal:startSession': IpcContract<[string, string, number?, number?, string?], { paneId: string; isNew: boolean }>
+  'terminal:startSession': IpcContract<
+    [string, string, number?, number?, string?],
+    { paneId: string; isNew: boolean }
+  >
   'terminal:write': IpcContract<[string, string], unknown>
   'terminal:resize': IpcContract<[string, number, number], unknown>
   'terminal:signal': IpcContract<[string, string?], unknown>
@@ -386,7 +389,15 @@ export interface IpcContracts {
   'preview:clearInstance': IpcContract<[string], unknown>
 
   'notification:show': IpcContract<
-    [{ title: string; body: string; icon?: string; silent?: boolean; urgency?: 'normal' | 'critical' | 'low' }],
+    [
+      {
+        title: string
+        body: string
+        icon?: string
+        silent?: boolean
+        urgency?: 'normal' | 'critical' | 'low'
+      }
+    ],
     boolean
   >
   'notification:setEnabled': IpcContract<[boolean], unknown>
@@ -467,6 +478,7 @@ export interface IpcContracts {
       {
         prompt: string
         name?: string | null
+        mode?: 'ai' | 'rules'
       }
     ],
     unknown

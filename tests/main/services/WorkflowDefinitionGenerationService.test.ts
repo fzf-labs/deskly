@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { WorkflowDefinitionGenerationService } from '../../../src/main/services/WorkflowDefinitionGenerationService'
 
 describe('WorkflowDefinitionGenerationService', () => {
-  it('generates linear agent steps when the prompt contains multiple bullet points', () => {
+  it('generates linear agent steps when the prompt contains multiple bullet points', async () => {
     const service = new WorkflowDefinitionGenerationService()
 
-    const result = service.generateDefinition({
+    const result = await service.generateDefinition({
       name: 'Ship feature',
+      mode: 'rules',
       prompt: `
         1. Analyze the current implementation
         2. Implement the feature
@@ -31,10 +32,11 @@ describe('WorkflowDefinitionGenerationService', () => {
     )
   })
 
-  it('detects command nodes from command-like prompts', () => {
+  it('detects command nodes from command-like prompts', async () => {
     const service = new WorkflowDefinitionGenerationService()
 
-    const result = service.generateDefinition({
+    const result = await service.generateDefinition({
+      mode: 'rules',
       prompt: 'Analyze the repo then run `npm test` then summarize the failures'
     })
 

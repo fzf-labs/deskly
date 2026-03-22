@@ -57,6 +57,7 @@ export interface UpdateWorkflowDefinitionInput extends CreateWorkflowDefinitionI
 export interface GenerateWorkflowDefinitionInput {
   prompt: string
   name?: string | null
+  mode?: 'ai' | 'rules'
 }
 
 export interface GeneratedWorkflowDefinitionResult {

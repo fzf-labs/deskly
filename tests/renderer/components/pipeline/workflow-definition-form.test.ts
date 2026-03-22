@@ -133,7 +133,11 @@ describe('workflow-definition-form', () => {
           cliToolId: '',
           agentToolConfigId: '',
           requiresApproval: false,
-          dependsOnIds: []
+          dependsOnIds: [],
+          position: {
+            x: 0,
+            y: 0
+          }
         },
         {
           id: 'node-b',
@@ -145,7 +149,11 @@ describe('workflow-definition-form', () => {
           cliToolId: '',
           agentToolConfigId: '',
           requiresApproval: false,
-          dependsOnIds: ['node-a']
+          dependsOnIds: ['node-a'],
+          position: {
+            x: 280,
+            y: 0
+          }
         },
         {
           id: 'node-c',
@@ -157,7 +165,11 @@ describe('workflow-definition-form', () => {
           cliToolId: '',
           agentToolConfigId: '',
           requiresApproval: true,
-          dependsOnIds: ['node-a', 'node-b']
+          dependsOnIds: ['node-a', 'node-b'],
+          position: {
+            x: 560,
+            y: 0
+          }
         }
       ]
     })

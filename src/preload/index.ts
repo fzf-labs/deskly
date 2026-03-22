@@ -65,11 +65,8 @@ const api = {
     getBranches: (repoPath: string) => invoke(IPC_CHANNELS.git.getBranches, repoPath),
     getCurrentBranch: (repoPath: string) => invoke(IPC_CHANNELS.git.getCurrentBranch, repoPath),
     getChangedFiles: (repoPath: string) => invoke(IPC_CHANNELS.git.getChangedFiles, repoPath),
-    getBranchDiffFiles: (
-      repoPath: string,
-      baseBranch: string,
-      compareBranch?: string
-    ) => invoke(IPC_CHANNELS.git.getBranchDiffFiles, repoPath, baseBranch, compareBranch),
+    getBranchDiffFiles: (repoPath: string, baseBranch: string, compareBranch?: string) =>
+      invoke(IPC_CHANNELS.git.getBranchDiffFiles, repoPath, baseBranch, compareBranch),
     getBranchDiff: (
       repoPath: string,
       baseBranch: string,
@@ -139,10 +136,8 @@ const api = {
       return () => ipcRenderer.removeListener(IPC_EVENTS.terminal.data, listener)
     },
     onExit: (callback: (data: { paneId: string; exitCode: number; signal?: number }) => void) => {
-      const listener = (
-        _: unknown,
-        data: { paneId: string; exitCode: number; signal?: number }
-      ) => callback(data)
+      const listener = (_: unknown, data: { paneId: string; exitCode: number; signal?: number }) =>
+        callback(data)
       ipcRenderer.on(IPC_EVENTS.terminal.exit, listener)
       return () => ipcRenderer.removeListener(IPC_EVENTS.terminal.exit, listener)
     },
@@ -157,16 +152,27 @@ const api = {
       sessionId: string,
       toolId: string,
       workdir: string,
-      options?: { model?: string; prompt?: string; projectId?: string | null; taskId?: string; taskNodeId?: string; configId?: string | null }
+      options?: {
+        model?: string
+        prompt?: string
+        projectId?: string | null
+        taskId?: string
+        taskNodeId?: string
+        configId?: string | null
+      }
     ) => invoke(IPC_CHANNELS.cliSession.startSession, sessionId, toolId, workdir, options),
     stopSession: (sessionId: string) => invoke(IPC_CHANNELS.cliSession.stopSession, sessionId),
     sendInput: (sessionId: string, input: string) =>
       invoke(IPC_CHANNELS.cliSession.sendInput, sessionId, input),
     getSessions: () => invoke(IPC_CHANNELS.cliSession.getSessions),
     getSession: (sessionId: string) => invoke(IPC_CHANNELS.cliSession.getSession, sessionId),
-    onStatus: (callback: (data: { sessionId: string; status: string; forced?: boolean }) => void) => {
-      const listener = (_: unknown, data: { sessionId: string; status: string; forced?: boolean }) =>
-        callback(data)
+    onStatus: (
+      callback: (data: { sessionId: string; status: string; forced?: boolean }) => void
+    ) => {
+      const listener = (
+        _: unknown,
+        data: { sessionId: string; status: string; forced?: boolean }
+      ) => callback(data)
       ipcRenderer.on(IPC_EVENTS.cliSession.status, listener)
       return () => ipcRenderer.removeListener(IPC_EVENTS.cliSession.status, listener)
     },
@@ -176,8 +182,13 @@ const api = {
       ipcRenderer.on(IPC_EVENTS.cliSession.output, listener)
       return () => ipcRenderer.removeListener(IPC_EVENTS.cliSession.output, listener)
     },
-    onClose: (callback: (data: { sessionId: string; code: number; forcedStatus?: string }) => void) => {
-      const listener = (_: unknown, data: { sessionId: string; code: number; forcedStatus?: string }) => callback(data)
+    onClose: (
+      callback: (data: { sessionId: string; code: number; forcedStatus?: string }) => void
+    ) => {
+      const listener = (
+        _: unknown,
+        data: { sessionId: string; code: number; forcedStatus?: string }
+      ) => callback(data)
       ipcRenderer.on(IPC_EVENTS.cliSession.close, listener)
       return () => ipcRenderer.removeListener(IPC_EVENTS.cliSession.close, listener)
     },
@@ -200,12 +211,14 @@ const api = {
   },
   taskNode: {
     onCompleted: (callback: (data: { id: string; name?: string; taskId: string }) => void) => {
-      const listener = (_: unknown, data: { id: string; name?: string; taskId: string }) => callback(data)
+      const listener = (_: unknown, data: { id: string; name?: string; taskId: string }) =>
+        callback(data)
       ipcRenderer.on(IPC_EVENTS.taskNode.completed, listener)
       return () => ipcRenderer.removeListener(IPC_EVENTS.taskNode.completed, listener)
     },
     onReview: (callback: (data: { id: string; name?: string; taskId: string }) => void) => {
-      const listener = (_: unknown, data: { id: string; name?: string; taskId: string }) => callback(data)
+      const listener = (_: unknown, data: { id: string; name?: string; taskId: string }) =>
+        callback(data)
       ipcRenderer.on(IPC_EVENTS.taskNode.review, listener)
       return () => ipcRenderer.removeListener(IPC_EVENTS.taskNode.review, listener)
     }
@@ -246,8 +259,7 @@ const api = {
   },
   previewConfig: {
     getAll: () => invoke(IPC_CHANNELS.previewConfig.getAll),
-    getByProject: (projectId: string) =>
-      invoke(IPC_CHANNELS.previewConfig.getByProject, projectId),
+    getByProject: (projectId: string) => invoke(IPC_CHANNELS.previewConfig.getByProject, projectId),
     get: (id: string) => invoke(IPC_CHANNELS.previewConfig.get, id),
     add: (config: Record<string, unknown>) => invoke(IPC_CHANNELS.previewConfig.add, config),
     update: (id: string, updates: Record<string, unknown>) =>
@@ -310,8 +322,7 @@ const api = {
     deleteAgentToolConfig: (id: string) => invoke(IPC_CHANNELS.database.deleteAgentToolConfig, id),
     setDefaultAgentToolConfig: (id: string) =>
       invoke(IPC_CHANNELS.database.setDefaultAgentToolConfig, id),
-    getGlobalWorkflowTemplates: () =>
-      invoke(IPC_CHANNELS.database.getGlobalWorkflowTemplates),
+    getGlobalWorkflowTemplates: () => invoke(IPC_CHANNELS.database.getGlobalWorkflowTemplates),
     getWorkflowTemplatesByProject: (projectId: string) =>
       invoke(IPC_CHANNELS.database.getWorkflowTemplatesByProject, projectId),
     getWorkflowTemplate: (templateId: string) =>
@@ -359,7 +370,7 @@ const api = {
     listDefinitions: (filter?: { scope?: 'global' | 'project'; projectId?: string | null }) =>
       invoke(IPC_CHANNELS.workflow.listDefinitions, filter),
     getDefinition: (id: string) => invoke(IPC_CHANNELS.workflow.getDefinition, id),
-    generateDefinition: (input: { prompt: string; name?: string | null }) =>
+    generateDefinition: (input: { prompt: string; name?: string | null; mode?: 'ai' | 'rules' }) =>
       invoke(IPC_CHANNELS.workflow.generateDefinition, input),
     createDefinition: (input: unknown) => invoke(IPC_CHANNELS.workflow.createDefinition, input),
     updateDefinition: (input: unknown) => invoke(IPC_CHANNELS.workflow.updateDefinition, input),
@@ -445,8 +456,7 @@ const api = {
     stopExecution: (taskId: string) => invoke(IPC_CHANNELS.task.stopExecution, taskId)
   },
   automation: {
-    create: (input: Record<string, unknown>) =>
-      invoke(IPC_CHANNELS.automation.create, input),
+    create: (input: Record<string, unknown>) => invoke(IPC_CHANNELS.automation.create, input),
     update: (id: string, updates: Record<string, unknown>) =>
       invoke(IPC_CHANNELS.automation.update, id, updates),
     delete: (id: string) => invoke(IPC_CHANNELS.automation.delete, id),
@@ -455,11 +465,9 @@ const api = {
     setEnabled: (id: string, enabled: boolean) =>
       invoke(IPC_CHANNELS.automation.setEnabled, id, enabled),
     runNow: (id: string) => invoke(IPC_CHANNELS.automation.runNow, id),
-    listRuns: (id: string, limit?: number) =>
-      invoke(IPC_CHANNELS.automation.listRuns, id, limit)
+    listRuns: (id: string, limit?: number) => invoke(IPC_CHANNELS.automation.listRuns, id, limit)
   }
 }
-
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

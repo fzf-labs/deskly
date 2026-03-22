@@ -17,10 +17,9 @@ import { WorkflowDefinitionGenerationService } from './WorkflowDefinitionGenerat
 import { WorkflowDefinitionService } from './WorkflowDefinitionService'
 import { WorkflowRunService } from './WorkflowRunService'
 import type { WorkflowSchedulerService } from './WorkflowSchedulerService'
-import {
-  getWorkflowCurrentNodeId,
-  getWorkflowNodeOrderMap
-} from './workflow-graph'
+import type { CliSessionService } from './cli/CliSessionService'
+import type { CLIToolDetectorService } from './CLIToolDetectorService'
+import { getWorkflowCurrentNodeId, getWorkflowNodeOrderMap } from './workflow-graph'
 import type { CreateProjectInput, Project, UpdateProjectInput } from '../types/project'
 import type {
   CreateTaskInput,
@@ -130,6 +129,17 @@ export class DatabaseService {
     this.workflowSchedulerService = service
   }
 
+  setWorkflowGenerationRuntime(
+    cliSessionService: CliSessionService,
+    cliToolDetectorService: CLIToolDetectorService
+  ): void {
+    this.workflowDefinitionGenerationService.setCliRuntime(
+      cliSessionService,
+      cliToolDetectorService,
+      this.workflowDefinitionService
+    )
+  }
+
   // ============ Task 操作 ============
   createTask(input: CreateTaskInput): Task {
     const task = this.taskRepo.createTask(input)
@@ -213,7 +223,8 @@ export class DatabaseService {
         name: node.name,
         prompt: composeTaskNodePrompt(task.prompt, node.prompt),
         cli_tool_id: node.cli_tool_id ?? fallbackRuntime?.cliToolId ?? null,
-        agent_tool_config_id: node.agent_tool_config_id ?? fallbackRuntime?.agentToolConfigId ?? null,
+        agent_tool_config_id:
+          node.agent_tool_config_id ?? fallbackRuntime?.agentToolConfigId ?? null,
         requires_approval: Boolean(node.requires_approval)
       }))
 
@@ -225,7 +236,10 @@ export class DatabaseService {
   getTaskNodes(taskId: string): TaskNode[] {
     const workflowRun = this.workflowRunService.getRunByTask(taskId)
     if (workflowRun) {
-      return this.mapWorkflowRunNodesToTaskNodes(workflowRun, this.workflowRunService.listRunNodes(workflowRun.id))
+      return this.mapWorkflowRunNodesToTaskNodes(
+        workflowRun,
+        this.workflowRunService.listRunNodes(workflowRun.id)
+      )
     }
     return this.taskNodeRepo.getTaskNodes(taskId)
   }
@@ -622,10 +636,10 @@ export class DatabaseService {
     return this.workflowDefinitionService.createDefinition(input)
   }
 
-  generateWorkflowDefinition(
+  async generateWorkflowDefinition(
     input: GenerateWorkflowDefinitionInput
-  ): GeneratedWorkflowDefinitionResult {
-    return this.workflowDefinitionGenerationService.generateDefinition(input)
+  ): Promise<GeneratedWorkflowDefinitionResult> {
+    return await this.workflowDefinitionGenerationService.generateDefinition(input)
   }
 
   updateWorkflowDefinition(input: UpdateWorkflowDefinitionInput): WorkflowDefinition {
@@ -636,10 +650,7 @@ export class DatabaseService {
     return this.workflowDefinitionService.deleteDefinition(id)
   }
 
-  createWorkflowRunForTask(input: {
-    taskId: string
-    workflowDefinitionId: string
-  }): WorkflowRun {
+  createWorkflowRunForTask(input: { taskId: string; workflowDefinitionId: string }): WorkflowRun {
     return this.workflowRunService.createRunForTask(input)
   }
 
@@ -854,7 +865,6 @@ export class DatabaseService {
         return 'failed'
     }
   }
-
 
   // ============ 清理和关闭 ============
   close(): void {

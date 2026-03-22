@@ -102,6 +102,17 @@ export default {
   workflowGenerationPromptLabel: 'Generate from goal',
   workflowGenerationPromptPlaceholder: 'Describe the workflow you want to generate.',
   workflowGenerationPromptRequired: 'Please enter a workflow goal first.',
+  workflowGenerationCliUnavailable:
+    'No supported AI CLI tool was found. Please install Claude Code or Codex first.',
+  workflowGenerationRuntimeUnavailable:
+    'Workflow generation is temporarily unavailable. Please try again.',
+  workflowGenerationNoOutput: 'The AI tool did not return a parsable workflow result.',
+  workflowGenerationParseFailed: 'The AI response could not be parsed as a workflow.',
+  workflowGenerationInvalidResult:
+    'The generated workflow result is invalid. Please refine the goal and try again.',
+  workflowGenerationFailed: 'AI workflow generation failed. Please try again.',
+  workflowGenerationFallbackConfirm:
+    'AI generation failed. Do you want to fall back to rule-based generation?',
   workflowNodeContentRequired: 'Each workflow node needs prompt or command content.',
   workflowMoveUp: 'Up',
   workflowMoveDown: 'Down',
@@ -146,5 +157,5 @@ export default {
   pipelineStageCompleted: 'Stage "{name}" completed. Reply to continue.',
   pipelineStageFailed: 'Stage "{name}" failed. Reply to continue.',
   pipelineCompleted: 'Pipeline completed.',
-  pipelineApprovalNotePrefix: 'Approval note',
-};
+  pipelineApprovalNotePrefix: 'Approval note'
+}

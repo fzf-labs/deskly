@@ -130,7 +130,14 @@ interface CliSessionAPI {
     sessionId: string,
     toolId: string,
     workdir: string,
-    options?: { model?: string; prompt?: string; projectId?: string | null; taskId?: string; taskNodeId?: string; configId?: string | null }
+    options?: {
+      model?: string
+      prompt?: string
+      projectId?: string | null
+      taskId?: string
+      taskNodeId?: string
+      configId?: string | null
+    }
   ) => Promise<unknown>
   stopSession: (sessionId: string) => Promise<unknown>
   sendInput: (sessionId: string, input: string) => Promise<unknown>
@@ -151,15 +158,26 @@ interface CliSessionAPI {
 interface LogStreamAPI {
   subscribe: (sessionId: string) => Promise<{ success: boolean; error?: string }>
   unsubscribe: (sessionId: string) => Promise<unknown>
-  getHistory: (taskId: string, sessionId?: string | null, taskNodeId?: string | null) => Promise<unknown[]>
+  getHistory: (
+    taskId: string,
+    sessionId?: string | null,
+    taskNodeId?: string | null
+  ) => Promise<unknown[]>
   onMessage: (callback: (sessionId: string, msg: unknown) => void) => () => void
 }
 
 interface CLIToolsAPI {
   getAll: () => Promise<unknown[]>
   getSnapshot: () => Promise<unknown[]>
-  refresh: (options?: { level?: 'fast' | 'full'; force?: boolean; toolIds?: string[] }) => Promise<unknown[]>
-  detect: (toolId: string, options?: { level?: 'fast' | 'full'; force?: boolean }) => Promise<unknown>
+  refresh: (options?: {
+    level?: 'fast' | 'full'
+    force?: boolean
+    toolIds?: string[]
+  }) => Promise<unknown[]>
+  detect: (
+    toolId: string,
+    options?: { level?: 'fast' | 'full'; force?: boolean }
+  ) => Promise<unknown>
   detectAll: (options?: { level?: 'fast' | 'full'; force?: boolean }) => Promise<unknown[]>
   onUpdated: (callback: (tools: unknown[]) => void) => () => void
 }
@@ -234,7 +252,9 @@ interface NotificationAPI {
 }
 
 interface TaskNodeAPI {
-  onCompleted: (callback: (data: { id: string; name?: string; taskId: string }) => void) => () => void
+  onCompleted: (
+    callback: (data: { id: string; name?: string; taskId: string }) => void
+  ) => () => void
   onReview: (callback: (data: { id: string; name?: string; taskId: string }) => void) => () => void
 }
 
@@ -287,9 +307,16 @@ interface DatabaseAPI {
 }
 
 interface WorkflowAPI {
-  listDefinitions: (filter?: { scope?: 'global' | 'project'; projectId?: string | null }) => Promise<unknown[]>
+  listDefinitions: (filter?: {
+    scope?: 'global' | 'project'
+    projectId?: string | null
+  }) => Promise<unknown[]>
   getDefinition: (id: string) => Promise<unknown>
-  generateDefinition: (input: { prompt: string; name?: string | null }) => Promise<unknown>
+  generateDefinition: (input: {
+    prompt: string
+    name?: string | null
+    mode?: 'ai' | 'rules'
+  }) => Promise<unknown>
   createDefinition: (input: unknown) => Promise<unknown>
   updateDefinition: (input: unknown) => Promise<unknown>
   deleteDefinition: (id: string) => Promise<boolean>
@@ -313,10 +340,7 @@ interface FSAPI {
   writeTextFile: (path: string, content: string) => Promise<void>
   appendTextFile: (path: string, content: string) => Promise<void>
   stat: (path: string) => Promise<{ size: number; isFile: boolean; isDirectory: boolean }>
-  readDir: (
-    path: string,
-    options?: { maxDepth?: number }
-  ) => Promise<FileEntry[]>
+  readDir: (path: string, options?: { maxDepth?: number }) => Promise<FileEntry[]>
   exists: (path: string) => Promise<boolean>
   remove: (path: string, options?: { recursive?: boolean }) => Promise<void>
   mkdir: (path: string) => Promise<void>

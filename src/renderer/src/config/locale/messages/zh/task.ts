@@ -100,8 +100,16 @@ export default {
   workflowGenerateButton: '生成工作流',
   workflowGenerateLoading: '生成中...',
   workflowGenerationPromptLabel: '根据目标生成',
-  workflowGenerationPromptPlaceholder: '描述你想生成的 workflow，比如先分析需求，再实现，再验证结果。',
+  workflowGenerationPromptPlaceholder:
+    '描述你想生成的 workflow，比如先分析需求，再实现，再验证结果。',
   workflowGenerationPromptRequired: '请先填写用于生成 workflow 的目标描述。',
+  workflowGenerationCliUnavailable: '未检测到可用的 AI CLI 工具，请先安装 Claude Code 或 Codex。',
+  workflowGenerationRuntimeUnavailable: '当前工作流生成功能暂不可用，请稍后重试。',
+  workflowGenerationNoOutput: 'AI 没有返回可解析的工作流结果。',
+  workflowGenerationParseFailed: 'AI 返回的结果无法解析为工作流。',
+  workflowGenerationInvalidResult: 'AI 返回的工作流结果无效，请尝试调整目标描述。',
+  workflowGenerationFailed: 'AI 生成失败，请稍后重试。',
+  workflowGenerationFallbackConfirm: 'AI 生成失败，是否改用规则生成？',
   workflowNodeContentRequired: '每个工作节点都需要填写提示词或命令。',
   workflowMoveUp: '上移',
   workflowMoveDown: '下移',
@@ -146,5 +154,5 @@ export default {
   pipelineStageCompleted: '环节 “{name}” 已完成，回复以继续。',
   pipelineStageFailed: '环节 “{name}” 失败，回复以继续。',
   pipelineCompleted: '任务工作流已完成。',
-  pipelineApprovalNotePrefix: '确认备注',
-};
+  pipelineApprovalNotePrefix: '确认备注'
+}

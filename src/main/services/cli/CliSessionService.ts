@@ -10,6 +10,7 @@ import { CLIToolConfigService } from '../CLIToolConfigService'
 import { DatabaseService } from '../DatabaseService'
 import { LogMsg } from '../../types/log'
 import { normalizeCliToolConfig } from '../../../shared/cli-config-spec'
+import { newUlid } from '../../utils/ids'
 
 interface SessionRecord {
   handle: CliSessionHandle
@@ -19,6 +20,25 @@ interface SessionRecord {
   taskId?: string
   taskNodeId?: string
   projectId?: string | null
+}
+
+interface CliOneShotRunOptions {
+  toolId: string
+  workdir: string
+  prompt: string
+  model?: string
+  timeoutMs?: number
+  toolConfig?: Record<string, unknown>
+}
+
+interface CliOneShotRunResult {
+  sessionId: string
+  toolId: string
+  code: number | null
+  status: CliSessionStatus
+  stdout: string
+  stderr: string
+  logs: LogMsg[]
 }
 
 export class CliSessionService extends EventEmitter {
@@ -125,8 +145,7 @@ export class CliSessionService extends EventEmitter {
       if (typeof model !== 'string' || !model.trim()) {
         toolConfig.model = 'auto'
       }
-      const configuredResume =
-        typeof toolConfig.resume === 'string' ? toolConfig.resume.trim() : ''
+      const configuredResume = typeof toolConfig.resume === 'string' ? toolConfig.resume.trim() : ''
       if (
         !configuredResume &&
         typeof taskNode?.resume_session_id === 'string' &&
@@ -137,8 +156,7 @@ export class CliSessionService extends EventEmitter {
     }
 
     if (toolId === 'gemini-cli') {
-      const configuredResume =
-        typeof toolConfig.resume === 'string' ? toolConfig.resume.trim() : ''
+      const configuredResume = typeof toolConfig.resume === 'string' ? toolConfig.resume.trim() : ''
       if (
         !configuredResume &&
         typeof taskNode?.resume_session_id === 'string' &&
@@ -197,9 +215,10 @@ export class CliSessionService extends EventEmitter {
     )
 
     const appendPrompt = resolveConfigString(toolConfig.append_prompt)
-    const resolvedPrompt = [prompt?.trim(), appendPrompt]
-      .filter((entry): entry is string => Boolean(entry))
-      .join('\n\n') || undefined
+    const resolvedPrompt =
+      [prompt?.trim(), appendPrompt]
+        .filter((entry): entry is string => Boolean(entry))
+        .join('\n\n') || undefined
 
     const pendingMsgStore = this.pendingMsgStores.get(sessionId)
     const msgStore =
@@ -249,13 +268,19 @@ export class CliSessionService extends EventEmitter {
       this.pendingMsgStores.delete(sessionId)
     }
 
-    handle.on('status', (data: { sessionId: string; status: CliSessionStatus; forced?: boolean }) => {
-      this.emit('status', data)
-    })
+    handle.on(
+      'status',
+      (data: { sessionId: string; status: CliSessionStatus; forced?: boolean }) => {
+        this.emit('status', data)
+      }
+    )
 
-    handle.on('output', (data: { sessionId: string; type: 'stdout' | 'stderr'; content: string }) => {
-      this.emit('output', data)
-    })
+    handle.on(
+      'output',
+      (data: { sessionId: string; type: 'stdout' | 'stderr'; content: string }) => {
+        this.emit('output', data)
+      }
+    )
 
     handle.on(
       'close',
@@ -320,9 +345,7 @@ export class CliSessionService extends EventEmitter {
     session.handle.sendInput(input)
   }
 
-  getSession(
-    sessionId: string
-  ): {
+  getSession(sessionId: string): {
     id: string
     status: CliSessionStatus
     workdir: string
@@ -389,7 +412,8 @@ export class CliSessionService extends EventEmitter {
     }
 
     const task = this.databaseService.getTask(taskId)
-    const resolvedTaskNodeId = taskNodeId ?? this.databaseService.getCurrentTaskNode(taskId)?.id ?? null
+    const resolvedTaskNodeId =
+      taskNodeId ?? this.databaseService.getCurrentTaskNode(taskId)?.id ?? null
 
     return MsgStoreService.loadFromFile(taskId, resolvedTaskNodeId, task?.project_id)
   }
@@ -403,9 +427,128 @@ export class CliSessionService extends EventEmitter {
     this.configService.saveConfig(toolId, { ...current, ...updates })
   }
 
-  getSessionOutput(sessionId: string, taskId?: string | null, taskNodeId?: string | null): string[] {
+  async runOneShotSession(options: CliOneShotRunOptions): Promise<CliOneShotRunResult> {
+    const adapter = this.adapters.get(options.toolId)
+    if (!adapter) {
+      throw new Error(`Unsupported CLI tool: ${options.toolId}`)
+    }
+
+    const sessionId = newUlid()
+    const baseConfig = this.configService.getConfig(options.toolId)
+    const normalizedBase: Record<string, unknown> = { ...baseConfig }
+    if (typeof baseConfig.defaultModel === 'string' && !('model' in normalizedBase)) {
+      normalizedBase.model = baseConfig.defaultModel
+    }
+
+    const toolConfig = this.sanitizeToolConfig(options.toolId, {
+      ...normalizedBase,
+      ...(options.toolConfig ?? {})
+    })
+
+    const msgStore = new MsgStoreService()
+    const handle = await adapter.startSession({
+      sessionId,
+      toolId: options.toolId,
+      workdir: options.workdir,
+      prompt: options.prompt,
+      toolConfig,
+      model: options.model,
+      msgStore,
+      env: process.env
+    } as CliStartOptions)
+
+    return await new Promise<CliOneShotRunResult>((resolve, reject) => {
+      const stdoutChunks: string[] = []
+      const stderrChunks: string[] = []
+      let settled = false
+
+      const cleanup = () => {
+        handle.off('output', onOutput)
+        handle.off('close', onClose)
+        handle.off('error', onError)
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+      }
+
+      const finish = (runner: () => void) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        runner()
+      }
+
+      const onOutput = (data: {
+        sessionId: string
+        type: 'stdout' | 'stderr'
+        content: string
+      }) => {
+        if (data.sessionId !== sessionId) return
+        if (data.type === 'stdout') {
+          stdoutChunks.push(data.content)
+        } else {
+          stderrChunks.push(data.content)
+        }
+      }
+
+      const onClose = (data: {
+        sessionId: string
+        code: number | null
+        forcedStatus?: CliSessionStatus
+      }) => {
+        if (data.sessionId !== sessionId) return
+        finish(() =>
+          resolve({
+            sessionId,
+            toolId: options.toolId,
+            code: data.code,
+            status: data.forcedStatus ?? handle.status,
+            stdout: stdoutChunks.join(''),
+            stderr: stderrChunks.join(''),
+            logs: msgStore.getHistory()
+          })
+        )
+      }
+
+      const onError = (data: { sessionId: string; error: string | Error }) => {
+        if (data.sessionId !== sessionId) return
+        finish(() =>
+          reject(
+            data.error instanceof Error
+              ? data.error
+              : new Error(typeof data.error === 'string' ? data.error : 'CLI session failed')
+          )
+        )
+      }
+
+      const timeoutMs = options.timeoutMs ?? 45000
+      const timeoutId =
+        timeoutMs > 0
+          ? setTimeout(() => {
+              try {
+                handle.stop()
+              } catch {
+                // ignore stop errors on timeout
+              }
+              finish(() => reject(new Error(`CLI_ONE_SHOT_TIMEOUT:${options.toolId}:${timeoutMs}`)))
+            }, timeoutMs)
+          : null
+
+      handle.on('output', onOutput)
+      handle.on('close', onClose)
+      handle.on('error', onError)
+    })
+  }
+
+  getSessionOutput(
+    sessionId: string,
+    taskId?: string | null,
+    taskNodeId?: string | null
+  ): string[] {
     const history = this.getSessionLogHistory(sessionId, taskId, taskNodeId)
-    return history.filter((msg) => msg.type === 'stdout').map((msg) => (msg as { content: string }).content)
+    return history
+      .filter((msg) => msg.type === 'stdout')
+      .map((msg) => (msg as { content: string }).content)
   }
 
   private reconcileInProgressNodes(): void {

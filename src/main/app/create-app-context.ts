@@ -29,6 +29,7 @@ export const createAppContext = (): AppContext => {
   const cliToolDetectorService = new CLIToolDetectorService()
   const cliToolConfigService = new CLIToolConfigService()
   const cliSessionService = new CliSessionService(cliToolConfigService, databaseService)
+  databaseService.setWorkflowGenerationRuntime(cliSessionService, cliToolDetectorService)
   const workflowSchedulerService = new WorkflowSchedulerService(databaseService, cliSessionService)
   databaseService.setWorkflowSchedulerService(workflowSchedulerService)
   const terminalService = new TerminalService()
