@@ -8,10 +8,15 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { shell } from '@/lib/electron-api'
-import { getLocalizedSystemCliText } from '@/lib/system-cli-tools'
+import {
+  getLocalizedSystemCliText,
+  getSystemCliSupportedSources,
+  isSystemCliToolInstalled
+} from '@/lib/system-cli-tools'
 import { useLanguage } from '@/providers/language-provider'
 import {
   resolveSystemCliInstallMethods,
+  type SystemCliPackageManager,
   type SystemCliToolInfo
 } from '../../../../../shared/system-cli-tools'
 
@@ -49,22 +54,22 @@ export function SystemCliToolDetailDialog({
   }
 
   const installMethods = resolveSystemCliInstallMethods(tool.installMethods, tool.platform)
-  const homepageUrl = tool.homepageUrl
+  const docsUrl = tool.docsUrl
+  const installed = isSystemCliToolInstalled(tool)
+  const sources = installed
+    ? (tool.installedVia ? [tool.installedVia] : getSystemCliSupportedSources(tool))
+    : getSystemCliSupportedSources(tool)
 
-  const getCategoryLabel = (): string => {
-    switch (tool.category) {
-      case 'media':
-        return t.settings.cliToolsCategoryMedia
-      case 'data':
-        return t.settings.cliToolsCategoryData
-      case 'search':
-        return t.settings.cliToolsCategorySearch
-      case 'download':
-        return t.settings.cliToolsCategoryDownload
-      case 'document':
-        return t.settings.cliToolsCategoryDocument
-      default:
-        return tool.category
+  const getSourceLabel = (source: SystemCliPackageManager): string => {
+    switch (source) {
+      case 'brew':
+        return t.settings.cliToolsSourceBrew
+      case 'pipx':
+        return t.settings.cliToolsSourcePipx
+      case 'npm':
+        return t.settings.cliToolsSourceNpm
+      case 'cargo':
+        return t.settings.cliToolsSourceCargo
     }
   }
 
@@ -83,9 +88,14 @@ export function SystemCliToolDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span>{tool.displayName}</span>
-            <span className="text-muted-foreground rounded-full border px-2 py-0.5 text-[10px] uppercase">
-              {getCategoryLabel()}
-            </span>
+            {sources.map((source) => (
+              <span
+                key={`${tool.id}-${source}`}
+                className="text-muted-foreground rounded-full border px-2 py-0.5 text-[10px] uppercase"
+              >
+                {getSourceLabel(source)}
+              </span>
+            ))}
           </DialogTitle>
         </DialogHeader>
 
@@ -101,74 +111,88 @@ export function SystemCliToolDetailDialog({
             <h3 className="text-sm font-medium">{t.settings.cliToolsToolInfo}</h3>
             <div className="grid gap-3 text-sm sm:grid-cols-2">
               <div className="border-border bg-muted/20 rounded-lg border px-3 py-2">
+                <div className="text-muted-foreground text-xs">
+                  {installed ? t.settings.cliToolsInstalledVia : t.settings.cliToolsAvailableVia}
+                </div>
+                <div className="mt-1 font-mono text-sm">
+                  {sources.length > 0 ? sources.map((source) => getSourceLabel(source)).join(' / ') : '—'}
+                </div>
+              </div>
+              <div className="border-border bg-muted/20 rounded-lg border px-3 py-2">
                 <div className="text-muted-foreground text-xs">{t.settings.cliToolsVersion}</div>
                 <div className="mt-1 font-mono text-sm">{tool.version || '—'}</div>
               </div>
-              <div className="border-border bg-muted/20 rounded-lg border px-3 py-2">
+              <div className="border-border bg-muted/20 rounded-lg border px-3 py-2 sm:col-span-2">
                 <div className="text-muted-foreground text-xs">{t.settings.cliToolsPath}</div>
                 <div className="mt-1 break-all font-mono text-sm">{tool.installPath || '—'}</div>
               </div>
             </div>
           </section>
 
-          <section className="space-y-2">
-            <h3 className="text-sm font-medium">{t.settings.cliToolsUseCases}</h3>
-            <ul className="text-muted-foreground space-y-1 text-sm">
-              {tool.useCases.map((item) => (
-                <li key={`${tool.id}-${item.en}`}>• {getLocalizedSystemCliText(item, language)}</li>
-              ))}
-            </ul>
-          </section>
+          {tool.useCases.length > 0 ? (
+            <section className="space-y-2">
+              <h3 className="text-sm font-medium">{t.settings.cliToolsUseCases}</h3>
+              <ul className="text-muted-foreground space-y-1 text-sm">
+                {tool.useCases.map((item) => (
+                  <li key={`${tool.id}-${item.en}`}>• {getLocalizedSystemCliText(item, language)}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
-          <section className="space-y-2">
-            <h3 className="text-sm font-medium">{t.settings.cliToolsGuideSteps}</h3>
-            <ol className="text-muted-foreground space-y-1 text-sm">
-              {tool.guideSteps.map((item, index) => (
-                <li key={`${tool.id}-guide-${item.en}`} className="flex gap-2">
-                  <span className="text-foreground w-5 shrink-0">{index + 1}.</span>
-                  <span>{getLocalizedSystemCliText(item, language)}</span>
-                </li>
-              ))}
-            </ol>
-          </section>
+          {tool.guideSteps.length > 0 ? (
+            <section className="space-y-2">
+              <h3 className="text-sm font-medium">{t.settings.cliToolsGuideSteps}</h3>
+              <ol className="text-muted-foreground space-y-1 text-sm">
+                {tool.guideSteps.map((item, index) => (
+                  <li key={`${tool.id}-guide-${item.en}`} className="flex gap-2">
+                    <span className="text-foreground w-5 shrink-0">{index + 1}.</span>
+                    <span>{getLocalizedSystemCliText(item, language)}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : null}
 
-          <section className="space-y-2">
-            <h3 className="text-sm font-medium">{t.settings.cliToolsExamplePrompts}</h3>
-            <div className="space-y-2">
-              {tool.examplePrompts.map((item) => {
-                const prompt = getLocalizedSystemCliText(item.prompt, language)
-                const isCopied = copiedValue === prompt
+          {tool.examplePrompts.length > 0 ? (
+            <section className="space-y-2">
+              <h3 className="text-sm font-medium">{t.settings.cliToolsExamplePrompts}</h3>
+              <div className="space-y-2">
+                {tool.examplePrompts.map((item) => {
+                  const prompt = getLocalizedSystemCliText(item.prompt, language)
+                  const isCopied = copiedValue === prompt
 
-                return (
-                  <div
-                    key={`${tool.id}-${item.label.en}`}
-                    className="border-border bg-muted/20 rounded-lg border p-3"
-                  >
-                    <div className="mb-1 flex items-start justify-between gap-3">
-                      <div className="text-sm font-medium">
-                        {getLocalizedSystemCliText(item.label, language)}
+                  return (
+                    <div
+                      key={`${tool.id}-${item.label.en}`}
+                      className="border-border bg-muted/20 rounded-lg border p-3"
+                    >
+                      <div className="mb-1 flex items-start justify-between gap-3">
+                        <div className="text-sm font-medium">
+                          {getLocalizedSystemCliText(item.label, language)}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => void copyText(prompt)}
+                        >
+                          {isCopied ? (
+                            <Check className="mr-1 size-3.5" />
+                          ) : (
+                            <Copy className="mr-1 size-3.5" />
+                          )}
+                          {isCopied ? t.settings.cliToolsCopied : t.settings.cliToolsCopy}
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2"
-                        onClick={() => void copyText(prompt)}
-                      >
-                        {isCopied ? (
-                          <Check className="mr-1 size-3.5" />
-                        ) : (
-                          <Copy className="mr-1 size-3.5" />
-                        )}
-                        {isCopied ? t.settings.cliToolsCopied : t.settings.cliToolsCopy}
-                      </Button>
+                      <p className="text-muted-foreground text-sm">{prompt}</p>
                     </div>
-                    <p className="text-muted-foreground text-sm">{prompt}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
+                  )
+                })}
+              </div>
+            </section>
+          ) : null}
 
           <section className="space-y-2">
             <h3 className="text-sm font-medium">{t.settings.cliToolsInstallCommand}</h3>
@@ -210,24 +234,15 @@ export function SystemCliToolDetailDialog({
           </section>
 
           <section className="flex flex-wrap gap-2 border-t pt-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void openExternalUrl(tool.docsUrl)}
-            >
-              <ArrowUpRight className="mr-1 size-3.5" />
-              {t.settings.cliToolsDocs}
-            </Button>
-            {homepageUrl ? (
+            {docsUrl ? (
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                onClick={() => void openExternalUrl(homepageUrl)}
+                onClick={() => void openExternalUrl(docsUrl)}
               >
                 <ArrowUpRight className="mr-1 size-3.5" />
-                {t.settings.cliToolsHomepage}
+                {t.settings.cliToolsDocs}
               </Button>
             ) : null}
           </section>

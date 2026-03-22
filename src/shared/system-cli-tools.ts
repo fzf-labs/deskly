@@ -5,6 +5,14 @@ export type SystemCliPlatform = 'darwin' | 'linux' | 'win32'
 export type SystemCliToolInstallState = 'unknown' | 'checking' | 'installed' | 'missing' | 'error'
 
 export type SystemCliToolDetectionLevel = 'fast' | 'full'
+export type SystemCliPackageManager = 'brew' | 'pipx' | 'npm' | 'cargo'
+
+export const SYSTEM_CLI_PACKAGE_MANAGERS: SystemCliPackageManager[] = [
+  'brew',
+  'npm',
+  'pipx',
+  'cargo'
+]
 
 export interface LocalizedText {
   zh: string
@@ -22,6 +30,11 @@ export interface SystemCliToolExamplePrompt {
   prompt: LocalizedText
 }
 
+export interface SystemCliToolPackageSource {
+  manager: SystemCliPackageManager
+  packages: string[]
+}
+
 export interface SystemCliToolDefinition {
   id: string
   command: string
@@ -33,6 +46,7 @@ export interface SystemCliToolDefinition {
   useCases: LocalizedText[]
   guideSteps: LocalizedText[]
   examplePrompts: SystemCliToolExamplePrompt[]
+  packageSources?: SystemCliToolPackageSource[]
   installMethods: SystemCliToolInstallMethod[]
   docsUrl: string
   homepageUrl?: string
@@ -48,6 +62,7 @@ export interface SystemCliToolInfo extends SystemCliToolDefinition {
   lastCheckedAt?: string
   latencyMs?: number
   errorMessage?: string
+  installedVia?: SystemCliPackageManager
 }
 
 export const SYSTEM_CLI_TOOLS: SystemCliToolDefinition[] = [
@@ -89,6 +104,9 @@ export const SYSTEM_CLI_TOOLS: SystemCliToolDefinition[] = [
           en: 'Use FFmpeg to extract audio from a video and export it as MP3.'
         }
       }
+    ],
+    packageSources: [
+      { manager: 'brew', packages: ['ffmpeg'] }
     ],
     installMethods: [
       { label: 'Homebrew', command: 'brew install ffmpeg', platforms: ['darwin', 'linux'] },
@@ -137,6 +155,9 @@ export const SYSTEM_CLI_TOOLS: SystemCliToolDefinition[] = [
         }
       }
     ],
+    packageSources: [
+      { manager: 'brew', packages: ['jq'] }
+    ],
     installMethods: [
       { label: 'Homebrew', command: 'brew install jq', platforms: ['darwin', 'linux'] },
       { label: 'APT', command: 'sudo apt install jq', platforms: ['linux'] },
@@ -183,6 +204,10 @@ export const SYSTEM_CLI_TOOLS: SystemCliToolDefinition[] = [
           en: 'Use rg to find which files call a specific function.'
         }
       }
+    ],
+    packageSources: [
+      { manager: 'brew', packages: ['ripgrep'] },
+      { manager: 'cargo', packages: ['ripgrep'] }
     ],
     installMethods: [
       { label: 'Homebrew', command: 'brew install ripgrep', platforms: ['darwin', 'linux'] },
@@ -231,6 +256,10 @@ export const SYSTEM_CLI_TOOLS: SystemCliToolDefinition[] = [
         }
       }
     ],
+    packageSources: [
+      { manager: 'brew', packages: ['yt-dlp'] },
+      { manager: 'pipx', packages: ['yt-dlp'] }
+    ],
     installMethods: [
       { label: 'Homebrew', command: 'brew install yt-dlp', platforms: ['darwin', 'linux'] },
       { label: 'pipx', command: 'pipx install yt-dlp', platforms: ['darwin', 'linux', 'win32'] },
@@ -277,6 +306,9 @@ export const SYSTEM_CLI_TOOLS: SystemCliToolDefinition[] = [
           en: 'Use Pandoc to convert an HTML page into Markdown.'
         }
       }
+    ],
+    packageSources: [
+      { manager: 'brew', packages: ['pandoc'] }
     ],
     installMethods: [
       { label: 'Homebrew', command: 'brew install pandoc', platforms: ['darwin', 'linux'] },

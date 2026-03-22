@@ -5,9 +5,14 @@ import { safeExecFile } from '../utils/safe-exec'
 import {
   resolveSystemCliInstallMethods,
   SYSTEM_CLI_TOOLS,
+  SYSTEM_CLI_PACKAGE_MANAGERS,
+  type LocalizedText,
+  type SystemCliPackageManager,
+  type SystemCliToolCategory,
   type SystemCliPlatform,
   type SystemCliToolDefinition,
   type SystemCliToolDetectionLevel,
+  type SystemCliToolInstallMethod,
   type SystemCliToolInfo
 } from '../../shared/system-cli-tools'
 
@@ -22,12 +27,30 @@ export interface SystemCliToolRefreshOptions extends SystemCliToolDetectOptions 
   toolIds?: string[]
 }
 
+interface SystemCliPackageSnapshot {
+  brew: Set<string>
+  pipx: Set<string>
+  npm: Set<string>
+  cargo: Set<string>
+  checkedLevel: SystemCliToolDetectionLevel
+  lastCheckedAt: string
+}
+
+const PACKAGE_MANAGER_DOCS: Record<SystemCliPackageManager, string> = {
+  brew: 'https://brew.sh',
+  pipx: 'https://pipx.pypa.io',
+  npm: 'https://docs.npmjs.com/cli/v10/commands/npm-install',
+  cargo: 'https://doc.rust-lang.org/cargo/commands/cargo-install.html'
+}
+
 export class SystemCliToolService extends EventEmitter {
   private readonly fastTimeoutMs = config.cliToolDetection.fastTimeoutMs
   private readonly fullTimeoutMs = config.cliToolDetection.fullTimeoutMs
   private readonly fastCacheMs = config.cliToolDetection.fastCacheMs
   private readonly fullCacheMs = config.cliToolDetection.fullCacheMs
   private readonly inFlightDetections = new Map<string, Promise<SystemCliToolInfo | null>>()
+  private inFlightPackageSnapshot: Promise<SystemCliPackageSnapshot> | null = null
+  private packageSnapshot: SystemCliPackageSnapshot | null = null
   private tools: SystemCliToolInfo[] = []
 
   constructor() {
@@ -62,6 +85,122 @@ export class SystemCliToolService extends EventEmitter {
     }
   }
 
+  private createText(zh: string, en: string): LocalizedText {
+    return { zh, en }
+  }
+
+  private getPackageKey(manager: SystemCliPackageManager, packageName: string): string {
+    return `${manager}:${packageName}`.toLowerCase()
+  }
+
+  private getPackageCategory(definition?: SystemCliToolDefinition): SystemCliToolCategory {
+    return definition?.category ?? 'data'
+  }
+
+  private getGenericInstallMethods(
+    manager: SystemCliPackageManager,
+    packageName: string
+  ): SystemCliToolInstallMethod[] {
+    switch (manager) {
+      case 'brew':
+        return [{ label: 'Homebrew', command: `brew install ${packageName}`, platforms: ['darwin'] }]
+      case 'pipx':
+        return [{ label: 'pipx', command: `pipx install ${packageName}`, platforms: ['darwin'] }]
+      case 'npm':
+        return [{ label: 'npm', command: `npm install -g ${packageName}`, platforms: ['darwin'] }]
+      case 'cargo':
+        return [{ label: 'cargo', command: `cargo install ${packageName}`, platforms: ['darwin'] }]
+    }
+  }
+
+  private findDefinitionForPackage(
+    manager: SystemCliPackageManager,
+    packageName: string
+  ): SystemCliToolDefinition | undefined {
+    return SYSTEM_CLI_TOOLS.find((definition) =>
+      definition.packageSources?.some(
+        (source) => source.manager === manager && source.packages.includes(packageName)
+      )
+    )
+  }
+
+  private isDefinitionInstalled(
+    definition: SystemCliToolDefinition,
+    snapshot: SystemCliPackageSnapshot
+  ): boolean {
+    return (definition.packageSources ?? []).some((source) =>
+      source.packages.some((packageName) => snapshot[source.manager].has(packageName))
+    )
+  }
+
+  private createInstalledToolFromPackage(
+    manager: SystemCliPackageManager,
+    packageName: string,
+    platform: SystemCliPlatform,
+    checkedLevel: SystemCliToolDetectionLevel,
+    lastCheckedAt: string
+  ): SystemCliToolInfo {
+    const definition = this.findDefinitionForPackage(manager, packageName)
+
+    if (definition) {
+      const base = this.createInitialTool(definition, platform)
+      return {
+        ...base,
+        id: this.getPackageKey(manager, packageName),
+        installed: true,
+        installedVia: manager,
+        installState: 'installed',
+        checkedLevel,
+        lastCheckedAt
+      }
+    }
+
+    return {
+      id: this.getPackageKey(manager, packageName),
+      command: packageName,
+      binNames: [packageName],
+      displayName: packageName,
+      category: this.getPackageCategory(),
+      summary: this.createText('', ''),
+      detailIntro: this.createText(
+        `这是一个通过 ${manager} 检测到的已安装软件包，当前还没有内置的工具说明，仍然可以作为系统 CLI 工具展示。`,
+        `This installed package was detected via ${manager}. It does not have built-in tool metadata yet, but it is still surfaced as an available system CLI package.`
+      ),
+      useCases: [],
+      guideSteps: [],
+      examplePrompts: [],
+      packageSources: [{ manager, packages: [packageName] }],
+      installMethods: this.getGenericInstallMethods(manager, packageName),
+      docsUrl: PACKAGE_MANAGER_DOCS[manager],
+      platform,
+      installed: true,
+      installedVia: manager,
+      installState: 'installed',
+      checkedLevel,
+      lastCheckedAt
+    }
+  }
+
+  private createRecommendedTool(
+    definition: SystemCliToolDefinition,
+    platform: SystemCliPlatform,
+    checkedLevel: SystemCliToolDetectionLevel,
+    lastCheckedAt: string
+  ): SystemCliToolInfo {
+    const base = this.createInitialTool(definition, platform)
+    return {
+      ...base,
+      installed: false,
+      installedVia: undefined,
+      installState: 'missing',
+      installPath: undefined,
+      version: undefined,
+      checkedLevel,
+      lastCheckedAt,
+      errorMessage: undefined
+    }
+  }
+
   private isToolFresh(tool: SystemCliToolInfo, level: SystemCliToolDetectionLevel): boolean {
     if (!tool.lastCheckedAt) return false
 
@@ -75,6 +214,24 @@ export class SystemCliToolService extends EventEmitter {
     if (tool.checkedLevel === 'full') {
       return age <= this.fullCacheMs
     }
+    return age <= this.fastCacheMs
+  }
+
+  private isPackageSnapshotFresh(level: SystemCliToolDetectionLevel): boolean {
+    if (!this.packageSnapshot) return false
+
+    const checkedAt = Date.parse(this.packageSnapshot.lastCheckedAt)
+    if (Number.isNaN(checkedAt)) return false
+
+    const age = Date.now() - checkedAt
+    if (level === 'full') {
+      return this.packageSnapshot.checkedLevel === 'full' && age <= this.fullCacheMs
+    }
+
+    if (this.packageSnapshot.checkedLevel === 'full') {
+      return age <= this.fullCacheMs
+    }
+
     return age <= this.fastCacheMs
   }
 
@@ -135,11 +292,244 @@ export class SystemCliToolService extends EventEmitter {
     }
   }
 
+  private createEmptyPackageSnapshot(
+    level: SystemCliToolDetectionLevel
+  ): SystemCliPackageSnapshot {
+    return {
+      brew: new Set<string>(),
+      pipx: new Set<string>(),
+      npm: new Set<string>(),
+      cargo: new Set<string>(),
+      checkedLevel: level,
+      lastCheckedAt: new Date().toISOString()
+    }
+  }
+
+  private parseLineSet(stdout: string): Set<string> {
+    return new Set(
+      stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+    )
+  }
+
+  private async listBrewPackages(timeoutMs: number): Promise<Set<string>> {
+    try {
+      const { stdout } = await safeExecFile('brew', ['list', '--formula'], {
+        allowlist: commandAllowlist,
+        timeoutMs,
+        label: 'SystemCliToolService'
+      })
+      return this.parseLineSet(stdout)
+    } catch {
+      return new Set<string>()
+    }
+  }
+
+  private async listPipxPackages(timeoutMs: number): Promise<Set<string>> {
+    try {
+      const { stdout } = await safeExecFile('pipx', ['list'], {
+        allowlist: commandAllowlist,
+        timeoutMs,
+        label: 'SystemCliToolService'
+      })
+
+      return new Set(
+        stdout
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .map((line) => {
+            const match = line.match(/^package\s+([A-Za-z0-9._-]+)/)
+            return match ? match[1] : ''
+          })
+          .filter(Boolean)
+      )
+    } catch {
+      return new Set<string>()
+    }
+  }
+
+  private async listNpmPackages(timeoutMs: number): Promise<Set<string>> {
+    try {
+      const { stdout } = await safeExecFile('npm', ['-g', 'ls', '--depth=0', '--json', '--silent'], {
+        allowlist: commandAllowlist,
+        timeoutMs,
+        label: 'SystemCliToolService',
+        maxBuffer: 1024 * 1024
+      })
+
+      const parsed = JSON.parse(stdout) as { dependencies?: Record<string, unknown> }
+      return new Set(Object.keys(parsed.dependencies ?? {}))
+    } catch {
+      return new Set<string>()
+    }
+  }
+
+  private async listCargoPackages(timeoutMs: number): Promise<Set<string>> {
+    try {
+      const { stdout } = await safeExecFile('cargo', ['install', '--list'], {
+        allowlist: commandAllowlist,
+        timeoutMs,
+        label: 'SystemCliToolService',
+        maxBuffer: 1024 * 1024
+      })
+
+      return new Set(
+        stdout
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .map((line) => {
+            const match = line.match(/^([A-Za-z0-9._-]+)\s+v[^:]+:$/)
+            return match ? match[1] : ''
+          })
+          .filter(Boolean)
+      )
+    } catch {
+      return new Set<string>()
+    }
+  }
+
+  private async loadPackageSnapshot(
+    level: SystemCliToolDetectionLevel
+  ): Promise<SystemCliPackageSnapshot> {
+    if (this.resolvePlatform() !== 'darwin') {
+      const snapshot = this.createEmptyPackageSnapshot(level)
+      this.packageSnapshot = snapshot
+      return snapshot
+    }
+
+    const timeoutMs = Math.max(level === 'full' ? this.fullTimeoutMs * 4 : this.fullTimeoutMs * 2, 4000)
+    const [brew, pipx, npm, cargo] = await Promise.all([
+      this.listBrewPackages(timeoutMs),
+      this.listPipxPackages(timeoutMs),
+      this.listNpmPackages(timeoutMs),
+      this.listCargoPackages(timeoutMs)
+    ])
+
+    const snapshot = {
+      brew,
+      pipx,
+      npm,
+      cargo,
+      checkedLevel: level,
+      lastCheckedAt: new Date().toISOString()
+    }
+    this.packageSnapshot = snapshot
+    return snapshot
+  }
+
+  private async getPackageSnapshot(
+    level: SystemCliToolDetectionLevel,
+    force = false
+  ): Promise<SystemCliPackageSnapshot> {
+    if (!force && this.isPackageSnapshotFresh(level) && this.packageSnapshot) {
+      return this.packageSnapshot
+    }
+
+    if (this.inFlightPackageSnapshot) {
+      return this.inFlightPackageSnapshot
+    }
+
+    const snapshotPromise = this.loadPackageSnapshot(level)
+    this.inFlightPackageSnapshot = snapshotPromise
+
+    try {
+      return await snapshotPromise
+    } finally {
+      this.inFlightPackageSnapshot = null
+    }
+  }
+
+  private detectInstalledViaPackages(
+    tool: SystemCliToolInfo,
+    snapshot: SystemCliPackageSnapshot
+  ): SystemCliPackageManager | null {
+    for (const source of tool.packageSources ?? []) {
+      const installedPackages = snapshot[source.manager]
+      if (source.packages.some((pkg) => installedPackages.has(pkg))) {
+        return source.manager
+      }
+    }
+
+    return null
+  }
+
+  private async enrichInstalledTool(
+    tool: SystemCliToolInfo,
+    level: SystemCliToolDetectionLevel,
+    startedAt: number
+  ): Promise<SystemCliToolInfo> {
+    const installPath = await this.resolveInstallPath(tool)
+    const version = level === 'full' && installPath ? await this.resolveVersion(installPath) : tool.version
+
+    return {
+      ...tool,
+      installPath,
+      version,
+      latencyMs: Date.now() - startedAt
+    }
+  }
+
+  private async rebuildDarwinTools(
+    level: SystemCliToolDetectionLevel,
+    force = false
+  ): Promise<SystemCliToolInfo[]> {
+    const platform = this.resolvePlatform()
+    const snapshot = await this.getPackageSnapshot(level, force)
+    const lastCheckedAt = snapshot.lastCheckedAt
+
+    const installedEntries = SYSTEM_CLI_PACKAGE_MANAGERS.flatMap((manager) =>
+      Array.from(snapshot[manager])
+        .sort((left, right) => left.localeCompare(right))
+        .map((packageName) =>
+          this.createInstalledToolFromPackage(manager, packageName, platform, level, lastCheckedAt)
+        )
+    )
+
+    const enrichedInstalledEntries = await Promise.all(
+      installedEntries.map((tool) => {
+        const isKnownTool = SYSTEM_CLI_TOOLS.some((definition) =>
+          definition.packageSources?.some(
+            (source) =>
+              source.manager === tool.installedVia &&
+              source.packages.some((packageName) => tool.id === this.getPackageKey(source.manager, packageName))
+          )
+        )
+
+        if (!isKnownTool) {
+          return Promise.resolve(tool)
+        }
+
+        return this.enrichInstalledTool(tool, level, Date.now()).catch(() => tool)
+      })
+    )
+
+    const recommendedEntries = SYSTEM_CLI_TOOLS
+      .filter((definition) => !this.isDefinitionInstalled(definition, snapshot))
+      .map((definition) => this.createRecommendedTool(definition, platform, level, lastCheckedAt))
+
+    this.tools = [...enrichedInstalledEntries, ...recommendedEntries]
+    this.emit('updated', this.getSnapshot())
+    return this.getSnapshot()
+  }
+
   async detectTool(
     toolId: string,
     options: SystemCliToolDetectOptions = {}
   ): Promise<SystemCliToolInfo | null> {
     const level = options.level ?? 'full'
+
+    if (this.resolvePlatform() === 'darwin') {
+      const existing = this.tools.find((entry) => entry.id === toolId)
+      if (existing && !options.force && this.isToolFresh(existing, level)) {
+        return { ...existing }
+      }
+
+      const tools = await this.rebuildDarwinTools(level, Boolean(options.force))
+      return tools.find((entry) => entry.id === toolId) ?? null
+    }
+
     const tool = this.tools.find((entry) => entry.id === toolId)
     if (!tool) return null
 
@@ -150,7 +540,7 @@ export class SystemCliToolService extends EventEmitter {
     const inFlight = this.inFlightDetections.get(toolId)
     if (inFlight) return inFlight
 
-    const detectionPromise = this.runDetection(toolId, level)
+    const detectionPromise = this.runDetection(toolId, level, Boolean(options.force))
     this.inFlightDetections.set(toolId, detectionPromise)
 
     try {
@@ -162,7 +552,8 @@ export class SystemCliToolService extends EventEmitter {
 
   private async runDetection(
     toolId: string,
-    level: SystemCliToolDetectionLevel
+    level: SystemCliToolDetectionLevel,
+    force = false
   ): Promise<SystemCliToolInfo | null> {
     const tool = this.tools.find((entry) => entry.id === toolId)
     if (!tool) return null
@@ -173,10 +564,46 @@ export class SystemCliToolService extends EventEmitter {
       errorMessage: undefined
     })
 
+    if (tool.platform === 'darwin') {
+      const packageSnapshot = await this.getPackageSnapshot(level, force)
+      const installedVia = this.detectInstalledViaPackages(tool, packageSnapshot)
+
+      if (!installedVia) {
+        const updated = this.updateTool(toolId, {
+          installed: false,
+          installedVia: undefined,
+          installState: 'missing',
+          installPath: undefined,
+          version: undefined,
+          checkedLevel: level,
+          lastCheckedAt: new Date().toISOString(),
+          latencyMs: Date.now() - startedAt,
+          errorMessage: undefined
+        })
+        return updated ? { ...updated } : null
+      }
+
+      const installPath = await this.resolveInstallPath(tool)
+      const version = level === 'full' && installPath ? await this.resolveVersion(installPath) : tool.version
+      const updated = this.updateTool(toolId, {
+        installed: true,
+        installedVia,
+        installState: 'installed',
+        installPath,
+        version,
+        checkedLevel: level,
+        lastCheckedAt: new Date().toISOString(),
+        latencyMs: Date.now() - startedAt,
+        errorMessage: undefined
+      })
+      return updated ? { ...updated } : null
+    }
+
     const installPath = await this.resolveInstallPath(tool)
     if (!installPath) {
       const updated = this.updateTool(toolId, {
         installed: false,
+        installedVia: undefined,
         installState: 'missing',
         installPath: undefined,
         version: undefined,
@@ -191,6 +618,7 @@ export class SystemCliToolService extends EventEmitter {
     const version = level === 'full' ? await this.resolveVersion(installPath) : tool.version
     const updated = this.updateTool(toolId, {
       installed: true,
+      installedVia: undefined,
       installState: 'installed',
       installPath,
       version,
@@ -203,11 +631,19 @@ export class SystemCliToolService extends EventEmitter {
   }
 
   async detectAllTools(options: SystemCliToolDetectOptions = {}): Promise<SystemCliToolInfo[]> {
+    if (this.resolvePlatform() === 'darwin') {
+      return this.rebuildDarwinTools(options.level ?? 'full', Boolean(options.force))
+    }
+
     const results = await Promise.all(this.tools.map((tool) => this.detectTool(tool.id, options)))
     return results.filter((tool): tool is SystemCliToolInfo => tool !== null)
   }
 
   async refreshTools(options: SystemCliToolRefreshOptions = {}): Promise<SystemCliToolInfo[]> {
+    if (this.resolvePlatform() === 'darwin') {
+      return this.rebuildDarwinTools(options.level ?? 'fast', Boolean(options.force))
+    }
+
     const toolIds = Array.isArray(options.toolIds) && options.toolIds.length > 0
       ? options.toolIds
       : this.tools.map((tool) => tool.id)

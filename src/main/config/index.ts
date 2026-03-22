@@ -47,6 +47,9 @@ const defaultCommandAllowlist = [
   'rg',
   'yt-dlp',
   'pandoc',
+  'brew',
+  'pipx',
+  'cargo',
   'which',
   'where'
 ]

@@ -1,5 +1,6 @@
 import type {
   LocalizedText,
+  SystemCliPackageManager,
   SystemCliToolInfo,
   SystemCliToolInstallState
 } from '../../../shared/system-cli-tools'
@@ -32,18 +33,28 @@ export const normalizeSystemCliTools = (value: unknown): SystemCliToolInfo[] => 
 }
 
 export const isSystemCliToolInstalled = (tool: SystemCliToolInfo): boolean =>
-  tool.installState === 'installed'
+  tool.installed === true || tool.installState === 'installed'
 
 export const getLocalizedSystemCliText = (
   value: LocalizedText,
   language: string
 ): string => (language.startsWith('zh') ? value.zh : value.en)
 
+export const getSystemCliSupportedSources = (
+  tool: SystemCliToolInfo
+): SystemCliPackageManager[] => {
+  const sources = tool.packageSources?.map((source) => source.manager) ?? []
+  return Array.from(new Set(sources))
+}
+
 export const getSystemCliSearchText = (tool: SystemCliToolInfo): string =>
   [
     tool.id,
     tool.displayName,
     tool.category,
+    tool.installedVia ?? '',
+    ...getSystemCliSupportedSources(tool),
+    ...(tool.packageSources?.flatMap((source) => source.packages) ?? []),
     tool.summary.zh,
     tool.summary.en,
     tool.detailIntro.zh,
