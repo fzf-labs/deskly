@@ -133,6 +133,10 @@
   .page-shell-scroll {
     scrollbar-gutter: stable both-edges;
   }
+
+  .page-shell-scroll.page-shell-scroll-no-gutter {
+    scrollbar-gutter: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

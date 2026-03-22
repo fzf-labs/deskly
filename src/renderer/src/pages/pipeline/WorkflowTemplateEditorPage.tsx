@@ -193,7 +193,7 @@ export function WorkflowTemplateEditorPage() {
   return (
     <PageFrame>
       <PageHeader title={title} subtitle={subtitle} />
-      <PageBody className="flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0">
+      <PageBody className="page-shell-scroll-no-gutter flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0 md:px-0">
         <WorkflowTemplateEditor
           initialValues={editingTemplate ? workflowDefinitionToFormValues(editingTemplate) : null}
           onCancel={handleBack}

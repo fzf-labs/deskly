@@ -100,6 +100,7 @@ const EDITOR_TOOLBAR_GROUP_CLASS =
 const EDITOR_RAIL_BUTTON_CLASS =
   'flex h-10 w-10 items-center justify-center rounded-[6px] border border-slate-200/80 bg-white/88 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-white hover:text-slate-900'
 const EDITOR_PANEL_HEADER_CLASS = 'border-b border-slate-200/70 px-4 py-4 backdrop-blur'
+const EDITOR_SELECT_TRIGGER_CLASS = 'rounded-[6px]'
 
 type WorkflowEditorNodeData = {
   title: string
@@ -846,10 +847,6 @@ export function WorkflowTemplateEditor({
     [selectedEdgeId, t.task.workflowNodeLabel, templateNodes]
   )
   const canDeleteSelection = Boolean(selectedNodeId || selectedEdgeId)
-  const modifierKeyLabel =
-    typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac')
-      ? 'Cmd'
-      : 'Ctrl'
   const editorLayoutStyle = useMemo(
     () =>
       ({
@@ -1185,18 +1182,10 @@ export function WorkflowTemplateEditor({
       <div className="border-b border-slate-200/80 bg-white px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex size-9 items-center justify-center rounded-[6px] border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                <GitBranchPlus className="size-4" />
-              </div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                工作流编辑器
-              </div>
-            </div>
             <h2 className="text-sm font-semibold">
               {templateName.trim() ||
                 (selectedNode ? selectedNode.name.trim() : '') ||
-                '工作流编辑器'}
+                '未命名工作流'}
             </h2>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <div
@@ -1209,9 +1198,8 @@ export function WorkflowTemplateEditor({
               >
                 {isDirty ? '未保存' : '已保存'}
               </div>
-              <div className={EDITOR_BADGE_CLASS}>{templateNodes.length} 个节点</div>
-              <div className={EDITOR_BADGE_CLASS}>{editorGraph.edges.length} 条连线</div>
-              <div className={EDITOR_BADGE_CLASS}>快捷键 {modifierKeyLabel}+S / L / Del</div>
+              <div className={EDITOR_BADGE_CLASS}>{templateNodes.length} 节点</div>
+              <div className={EDITOR_BADGE_CLASS}>{editorGraph.edges.length} 连线</div>
             </div>
           </div>
 
@@ -1285,7 +1273,7 @@ export function WorkflowTemplateEditor({
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <div className="min-h-0 flex-1 overflow-y-auto py-4 pl-0 pr-4">
                 <div className="space-y-4">
                   <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                     <div className="border-b border-slate-200/70 px-4 py-3">
@@ -1485,7 +1473,7 @@ export function WorkflowTemplateEditor({
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <div className="min-h-0 flex-1 overflow-y-auto py-4 pl-4 pr-0">
                 {selectedNode ? (
                   <div className="space-y-4">
                     <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
@@ -1560,6 +1548,7 @@ export function WorkflowTemplateEditor({
                           <div className="mt-1.5">
                             <Select
                               value={selectedNode.type}
+                              triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
                               onValueChange={(value) => {
                                 updateNode(selectedNode.id, (current) => ({
                                   ...current,
@@ -1627,6 +1616,7 @@ export function WorkflowTemplateEditor({
                             <div className="mt-1.5">
                               <Select
                                 value={selectedNode.cliToolId || ''}
+                                triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
                                 onValueChange={async (toolId) => {
                                   let defaultConfigId = ''
                                   if (toolId) {
@@ -1660,6 +1650,7 @@ export function WorkflowTemplateEditor({
                             <div className="mt-1.5">
                               <Select
                                 value={selectedNode.agentToolConfigId || ''}
+                                triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
                                 disabled={!selectedNode.cliToolId}
                                 onValueChange={(configId) => {
                                   updateNode(selectedNode.id, (current) => ({
@@ -1759,7 +1750,7 @@ export function WorkflowTemplateEditor({
                 )}
               </div>
 
-              <div className="border-t border-slate-200/70 px-4 py-3">
+              <div className="border-t border-slate-200/70 py-3 pl-4 pr-0">
                 {selectedEdgeSummary ? (
                   <div className={cn(EDITOR_SECTION_CLASS, 'px-3 py-3')}>
                     <div className="text-xs font-medium text-slate-500">连线</div>
