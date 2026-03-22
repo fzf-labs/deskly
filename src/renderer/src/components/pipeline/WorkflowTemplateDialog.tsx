@@ -11,6 +11,7 @@ import {
   type NodeProps,
   type ReactFlowInstance
 } from '@xyflow/react'
+import dagre from 'dagre'
 import {
   Bot,
   ChevronLeft,
@@ -18,7 +19,6 @@ import {
   FileText,
   GitBranchPlus,
   LayoutTemplate,
-  Network,
   Save,
   Sparkles,
   Settings2,
@@ -81,6 +81,9 @@ interface WorkflowTemplateEditorProps {
 
 const WORKFLOW_NODE_WIDTH = 232
 const WORKFLOW_NODE_HEIGHT = 92
+const WORKFLOW_LAYOUT_NODE_WIDTH = 260
+const WORKFLOW_LAYOUT_NODE_HEIGHT = 164
+const WORKFLOW_LAYOUT_NODE_SPACING_Y = WORKFLOW_LAYOUT_NODE_HEIGHT + 36
 const WORKFLOW_NODE_GAP_X = 280
 const WORKFLOW_NODE_GAP_Y = 148
 const EDGE_ID_SEPARATOR = '::'
@@ -93,9 +96,9 @@ const EDITOR_SECTION_CLASS =
 const EDITOR_BADGE_CLASS =
   'rounded-full border border-slate-200/80 bg-white/84 px-2.5 py-0.5 text-[11px] font-medium text-slate-600'
 const EDITOR_TOOLBAR_GROUP_CLASS =
-  'flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-white/88 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]'
+  'flex items-center gap-1 rounded-[2px] border border-slate-200/80 bg-white/88 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]'
 const EDITOR_RAIL_BUTTON_CLASS =
-  'flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/88 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-white hover:text-slate-900'
+  'flex h-10 w-10 items-center justify-center rounded-[2px] border border-slate-200/80 bg-white/88 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-white hover:text-slate-900'
 const EDITOR_PANEL_HEADER_CLASS = 'border-b border-slate-200/70 px-4 py-4 backdrop-blur'
 
 type WorkflowEditorNodeData = {
@@ -211,51 +214,190 @@ const buildAutoLayoutPositions = (nodes: TaskNodeTemplateDraft[]) => {
     return new Map<string, WorkflowDefinitionNodePosition>()
   }
 
-  const incomingCount = new Map<string, number>()
-  const outgoing = buildOutgoingDependencyMap(nodes)
-  const levels = new Map<string, number>()
   const nodesById = new Map(nodes.map((node) => [node.id, node]))
+  const outgoing = buildOutgoingDependencyMap(nodes)
+  const incomingById = new Map<string, string[]>()
 
   nodes.forEach((node) => {
-    incomingCount.set(
+    incomingById.set(
       node.id,
-      node.dependsOnIds.filter((dependencyId) => nodesById.has(dependencyId)).length
+      node.dependsOnIds.filter((dependencyId) => nodesById.has(dependencyId))
     )
   })
 
-  const queue = nodes
-    .filter((node) => (incomingCount.get(node.id) ?? 0) === 0)
-    .map((node) => node.id)
+  const graph = new dagre.graphlib.Graph()
+  graph.setDefaultEdgeLabel(() => ({}))
+  graph.setGraph({
+    rankdir: 'LR',
+    align: 'UL',
+    ranksep: 168,
+    nodesep: 92,
+    edgesep: 24,
+    marginx: 40,
+    marginy: 40
+  })
 
-  queue.forEach((nodeId) => levels.set(nodeId, 0))
+  const orderedNodes = [...nodes].sort((leftNode, rightNode) => {
+    const leftPosition = normalizeDraftPosition(
+      leftNode.position,
+      nodes.findIndex((node) => node.id === leftNode.id)
+    )
+    const rightPosition = normalizeDraftPosition(
+      rightNode.position,
+      nodes.findIndex((node) => node.id === rightNode.id)
+    )
 
-  while (queue.length > 0) {
-    const currentId = queue.shift()!
-    const currentLevel = levels.get(currentId) ?? 0
-
-    for (const nextId of outgoing.get(currentId) ?? []) {
-      const nextIncoming = (incomingCount.get(nextId) ?? 0) - 1
-      incomingCount.set(nextId, nextIncoming)
-      levels.set(nextId, Math.max(levels.get(nextId) ?? 0, currentLevel + 1))
-      if (nextIncoming === 0) {
-        queue.push(nextId)
-      }
+    if (leftPosition.y !== rightPosition.y) {
+      return leftPosition.y - rightPosition.y
     }
-  }
 
-  const fallbackLevel = Math.max(...levels.values(), 0)
-  const rowsByLevel = new Map<number, number>()
-  const positions = new Map<string, WorkflowDefinitionNodePosition>()
+    return leftPosition.x - rightPosition.x
+  })
 
-  nodes.forEach((node, index) => {
-    const level = levels.get(node.id) ?? fallbackLevel + index
-    const row = rowsByLevel.get(level) ?? 0
-    rowsByLevel.set(level, row + 1)
-    positions.set(node.id, {
-      x: level * WORKFLOW_NODE_GAP_X,
-      y: row * WORKFLOW_NODE_GAP_Y
+  orderedNodes.forEach((node) => {
+    graph.setNode(node.id, {
+      width: WORKFLOW_LAYOUT_NODE_WIDTH,
+      height: WORKFLOW_LAYOUT_NODE_HEIGHT
     })
   })
+
+  orderedNodes.forEach((node) => {
+    node.dependsOnIds
+      .filter((dependencyId) => nodesById.has(dependencyId))
+      .forEach((dependencyId) => {
+        graph.setEdge(dependencyId, node.id)
+      })
+  })
+
+  dagre.layout(graph)
+
+  const centerById = new Map<string, { x: number; y: number }>()
+  const columnGroups = new Map<number, string[]>()
+
+  orderedNodes.forEach((node) => {
+    const layoutNode = graph.node(node.id) as { x: number; y: number } | undefined
+
+    if (!layoutNode) {
+      return
+    }
+
+    const center = {
+      x: layoutNode.x,
+      y: layoutNode.y
+    }
+    centerById.set(node.id, center)
+
+    const columnKey = Math.round(layoutNode.x)
+    columnGroups.set(columnKey, [...(columnGroups.get(columnKey) ?? []), node.id])
+  })
+
+  const getNeighborAverageCenterY = (nodeIds: string[]) => {
+    const centers = nodeIds
+      .map((nodeId) => centerById.get(nodeId)?.y)
+      .filter((value): value is number => typeof value === 'number')
+
+    if (centers.length === 0) {
+      return null
+    }
+
+    return centers.reduce((sum, value) => sum + value, 0) / centers.length
+  }
+
+  const getIdealCenterY = (nodeId: string) => {
+    const currentCenter = centerById.get(nodeId)?.y ?? 0
+    const incomingAverage = getNeighborAverageCenterY(incomingById.get(nodeId) ?? [])
+    const outgoingAverage = getNeighborAverageCenterY(outgoing.get(nodeId) ?? [])
+
+    if (incomingAverage !== null && outgoingAverage !== null) {
+      return (incomingAverage + outgoingAverage) / 2
+    }
+
+    return incomingAverage ?? outgoingAverage ?? currentCenter
+  }
+
+  const redistributeColumn = (nodeIds: string[]) => {
+    if (nodeIds.length === 0) return
+
+    const orderedNodeIds = [...nodeIds].sort((leftId, rightId) => {
+      const leftIdeal = getIdealCenterY(leftId)
+      const rightIdeal = getIdealCenterY(rightId)
+
+      if (leftIdeal !== rightIdeal) {
+        return leftIdeal - rightIdeal
+      }
+
+      return (centerById.get(leftId)?.y ?? 0) - (centerById.get(rightId)?.y ?? 0)
+    })
+
+    if (orderedNodeIds.length === 1) {
+      const nodeId = orderedNodeIds[0]
+      const currentCenter = centerById.get(nodeId)
+
+      if (currentCenter) {
+        centerById.set(nodeId, {
+          x: currentCenter.x,
+          y: getIdealCenterY(nodeId)
+        })
+      }
+      return
+    }
+
+    const anchorCenter =
+      orderedNodeIds.reduce((sum, nodeId) => sum + getIdealCenterY(nodeId), 0) /
+      orderedNodeIds.length
+    const startY = anchorCenter - ((orderedNodeIds.length - 1) * WORKFLOW_LAYOUT_NODE_SPACING_Y) / 2
+
+    orderedNodeIds.forEach((nodeId, index) => {
+      const currentCenter = centerById.get(nodeId)
+      if (!currentCenter) return
+
+      centerById.set(nodeId, {
+        x: currentCenter.x,
+        y: startY + index * WORKFLOW_LAYOUT_NODE_SPACING_Y
+      })
+    })
+  }
+
+  const sortedColumnKeys = [...columnGroups.keys()].sort((left, right) => left - right)
+  const reversedColumnKeys = [...sortedColumnKeys].reverse()
+
+  for (let iteration = 0; iteration < 4; iteration += 1) {
+    sortedColumnKeys.forEach((columnKey) => {
+      redistributeColumn(columnGroups.get(columnKey) ?? [])
+    })
+
+    reversedColumnKeys.forEach((columnKey) => {
+      redistributeColumn(columnGroups.get(columnKey) ?? [])
+    })
+  }
+
+  const positions = new Map<string, WorkflowDefinitionNodePosition>()
+  let minY = 0
+
+  orderedNodes.forEach((node, index) => {
+    const center = centerById.get(node.id)
+
+    if (!center) {
+      positions.set(node.id, getDefaultNodePosition(index))
+      return
+    }
+
+    const y = Math.round(center.y - WORKFLOW_LAYOUT_NODE_HEIGHT / 2)
+    minY = Math.min(minY, y)
+    positions.set(node.id, {
+      x: Math.round(center.x - WORKFLOW_LAYOUT_NODE_WIDTH / 2),
+      y
+    })
+  })
+
+  if (minY < 0) {
+    positions.forEach((position, nodeId) => {
+      positions.set(nodeId, {
+        x: position.x,
+        y: position.y - minY
+      })
+    })
+  }
 
   return positions
 }
@@ -377,7 +519,7 @@ function EditorToolButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'h-9 rounded-xl px-3 text-xs',
+        'h-9 rounded-[2px] px-3 text-xs',
         variant === 'outline' &&
           'border-slate-200/80 bg-white/88 text-slate-700 hover:bg-white hover:text-slate-900',
         variant === 'ghost' && 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -669,15 +811,6 @@ export function WorkflowTemplateEditor({
     }
   }, [selectedEdgeId, templateNodes])
 
-  const nodeOptions = useMemo(
-    () =>
-      templateNodes.map((node, index) => ({
-        value: node.id,
-        label: node.name.trim() || `${t.task.workflowNodeLabel} ${index + 1}`
-      })),
-    [t.task.workflowNodeLabel, templateNodes]
-  )
-
   const selectedNode = useMemo(
     () => templateNodes.find((node) => node.id === selectedNodeId) ?? null,
     [selectedNodeId, templateNodes]
@@ -687,18 +820,6 @@ export function WorkflowTemplateEditor({
     () => templateNodes.findIndex((node) => node.id === selectedNodeId),
     [selectedNodeId, templateNodes]
   )
-  const outboundCountById = useMemo(() => {
-    const counts = new Map<string, number>()
-
-    templateNodes.forEach((node) => {
-      node.dependsOnIds.forEach((dependencyId) => {
-        counts.set(dependencyId, (counts.get(dependencyId) ?? 0) + 1)
-      })
-    })
-
-    return counts
-  }, [templateNodes])
-
   const selectedEdgeSummary = useMemo(() => {
     if (!selectedEdgeId) return null
 
@@ -1141,7 +1262,6 @@ export function WorkflowTemplateEditor({
               <div className="flex flex-col gap-2">
                 <EditorRailButton icon={FileText} title="工作流信息" />
                 <EditorRailButton icon={Sparkles} title="生成工作流" />
-                <EditorRailButton icon={Network} title="节点列表" />
               </div>
             </div>
           ) : (
@@ -1153,15 +1273,11 @@ export function WorkflowTemplateEditor({
                       <FileText className="size-3.5" />
                       <span>工作流</span>
                     </div>
-                    <div className="mt-1 text-sm font-semibold text-slate-900">模板与生成</div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      先设置模板信息并生成初稿，再继续微调 DAG。
-                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setLeftPanelCollapsed(true)}
-                    className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
+                    className="flex h-8 w-8 items-center justify-center rounded-[2px] text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
                     title="收起工作流面板"
                   >
                     <ChevronLeft className="size-4" />
@@ -1174,7 +1290,7 @@ export function WorkflowTemplateEditor({
                   <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                     <div className="border-b border-slate-200/70 px-4 py-3">
                       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        模板信息
+                        模板
                       </div>
                     </div>
                     <div className="space-y-4 px-4 py-4">
@@ -1207,11 +1323,8 @@ export function WorkflowTemplateEditor({
                     <div className="border-b border-slate-200/70 px-4 py-3">
                       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         <Sparkles className="size-3.5" />
-                        <span>{t.task.workflowGenerationPromptLabel || '根据目标生成'}</span>
+                        <span>{t.task.workflowGenerationPromptLabel || '生成'}</span>
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        根据你的目标先生成一版 DAG 草稿，再在画布中调整结构。
-                      </p>
                     </div>
                     <div className="px-4 py-4">
                       <textarea
@@ -1222,89 +1335,19 @@ export function WorkflowTemplateEditor({
                         }
                         className={cn(EDITOR_TEXTAREA_CLASS, 'mt-0 min-h-[132px]')}
                       />
-                      <div className="mt-3 flex items-center justify-between gap-3">
-                        <div className="text-xs text-slate-500">适合先快速起草，再手动微调。</div>
+                      <div className="mt-3 flex items-center justify-end gap-3">
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
                           onClick={() => void handleGenerate()}
                           disabled={isGenerating}
+                          className="rounded-[2px]"
                         >
                           {isGenerating
                             ? t.task.workflowGenerateLoading || '生成中...'
                             : t.task.workflowGenerateButton || '生成'}
                         </Button>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
-                    <div className="border-b border-slate-200/70 px-4 py-3">
-                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        <Network className="size-3.5" />
-                        <span>节点列表</span>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">
-                        可在这里或画布中选择节点进行编辑。
-                      </p>
-                    </div>
-                    <div className="px-3 py-3">
-                      <div className="space-y-2">
-                        {nodeOptions.map((option, index) => {
-                          const node = templateNodes[index]
-                          const inboundCount = node?.dependsOnIds.length ?? 0
-                          const outboundCount = outboundCountById.get(option.value) ?? 0
-
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              onClick={() => {
-                                setSelectedNodeId(option.value)
-                                setSelectedEdgeId(null)
-                              }}
-                              className={cn(
-                                'w-full rounded-2xl border px-3.5 py-3 text-left transition-all',
-                                selectedNodeId === option.value
-                                  ? 'border-sky-400/75 bg-sky-50/85 shadow-[0_10px_24px_rgba(59,130,246,0.08)]'
-                                  : 'border-slate-200/75 bg-white/78 hover:border-slate-300/80 hover:bg-white'
-                              )}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className={cn(
-                                        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
-                                        node?.type === 'agent'
-                                          ? 'bg-sky-50 text-sky-700'
-                                          : 'bg-emerald-50 text-emerald-700'
-                                      )}
-                                    >
-                                      {node?.type === 'agent' ? '智能体' : '命令'}
-                                    </span>
-                                    {node?.requiresApproval && (
-                                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                                        审批
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="mt-2 truncate text-sm font-medium text-slate-900">
-                                    {option.label}
-                                  </div>
-                                </div>
-                                <div className="text-[11px] font-medium text-slate-400">
-                                  {index + 1}
-                                </div>
-                              </div>
-                              <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
-                                <span className={EDITOR_BADGE_CLASS}>入 {inboundCount}</span>
-                                <span className={EDITOR_BADGE_CLASS}>出 {outboundCount}</span>
-                              </div>
-                            </button>
-                          )
-                        })}
                       </div>
                     </div>
                   </section>
@@ -1322,10 +1365,7 @@ export function WorkflowTemplateEditor({
                   画布
                 </div>
                 <div className="mt-1 text-sm font-semibold text-slate-900">
-                  {t.task.workflowCardTitle || '流程画布'}
-                </div>
-                <div className="mt-1 text-xs text-slate-500">
-                  拖动节点、从右向左连接节点，直接在画布中编辑 DAG。
+                  {t.task.workflowCardTitle || '流程图'}
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500">
@@ -1431,17 +1471,13 @@ export function WorkflowTemplateEditor({
                   <div>
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                       <Settings2 className="size-3.5" />
-                      <span>检查面板</span>
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-slate-900">节点配置</div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      编辑当前选中的节点，并查看依赖关系。
+                      <span>配置</span>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setRightPanelCollapsed(true)}
-                    className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
+                    className="flex h-8 w-8 items-center justify-center rounded-[2px] text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
                     title="收起检查面板"
                   >
                     <ChevronRight className="size-4" />
@@ -1470,6 +1506,7 @@ export function WorkflowTemplateEditor({
                             variant="ghost"
                             disabled={templateNodes.length === 1}
                             onClick={() => removeNode(selectedNode.id)}
+                            className="rounded-[2px]"
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -1494,7 +1531,7 @@ export function WorkflowTemplateEditor({
                     <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                       <div className="border-b border-slate-200/70 px-4 py-3">
                         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          基本配置
+                          基本
                         </div>
                       </div>
                       <div className="space-y-4 px-4 py-4">
@@ -1581,7 +1618,7 @@ export function WorkflowTemplateEditor({
                       <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                         <div className="border-b border-slate-200/70 px-4 py-3">
                           <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            运行配置
+                            运行
                           </div>
                         </div>
                         <div className="grid gap-4 px-4 py-4">
@@ -1652,11 +1689,8 @@ export function WorkflowTemplateEditor({
                     <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                       <div className="border-b border-slate-200/70 px-4 py-3">
                         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          依赖关系
+                          依赖
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">
-                          依赖关系请直接在画布中维护。选中连线后可查看或删除。
-                        </p>
                       </div>
                       <div className="px-4 py-4">
                         <div className="flex flex-wrap gap-2">
@@ -1694,7 +1728,7 @@ export function WorkflowTemplateEditor({
                     <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                       <div className="border-b border-slate-200/70 px-4 py-3">
                         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          执行控制
+                          执行
                         </div>
                       </div>
                       <label className="flex items-center gap-3 px-4 py-4 text-sm">
@@ -1728,13 +1762,13 @@ export function WorkflowTemplateEditor({
               <div className="border-t border-slate-200/70 px-4 py-3">
                 {selectedEdgeSummary ? (
                   <div className={cn(EDITOR_SECTION_CLASS, 'px-3 py-3')}>
-                    <div className="text-xs font-medium text-slate-500">当前连线</div>
+                    <div className="text-xs font-medium text-slate-500">连线</div>
                     <div className="mt-1 text-sm text-slate-900">
                       {selectedEdgeSummary.sourceLabel} {' 到 '} {selectedEdgeSummary.targetLabel}
                     </div>
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-500">选择一条连线即可查看或删除。</div>
+                  <div className="text-xs text-slate-500">选择连线后可查看或删除。</div>
                 )}
               </div>
             </>
