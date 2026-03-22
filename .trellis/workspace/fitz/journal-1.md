@@ -106,3 +106,51 @@ Completed the Codex-style workspace redesign, refined sidebar state/interaction,
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Workflow redesign implementation and verification
+
+**Date**: 2026-03-22
+**Task**: Workflow redesign implementation and verification
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Summary |
+|------|---------|
+| Workflow generation | Added natural-language workflow generation support and wired it through workflow IPC / preload / renderer adapters. |
+| Workflow editor | Upgraded the workflow template dialog to support DAG dependencies, command nodes, and pre-run manual editing after generation. |
+| Runtime alignment | Kept workflow execution frozen after start and aligned the archived PRD/task outcome with the implemented runtime model. |
+| Test stabilization | Updated TaskService and MsgStore tests so the full suite passes reliably with the current workflow bridge behavior. |
+
+**Validation**:
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+
+**Notes**:
+- Archived the completed `workflow-redesign` Trellis task before recording the session.
+- Recent implementation commits recorded: `5308f76`, `9efc278`.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5308f76` | (see git log) |
+| `9efc278` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
