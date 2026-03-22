@@ -2,15 +2,33 @@ import {
   Controls,
   Handle,
   MarkerType,
+  MiniMap,
   Position,
   ReactFlow,
   type Connection,
   type Edge,
   type Node,
-  type NodeProps
+  type NodeProps,
+  type ReactFlowInstance
 } from '@xyflow/react'
-import { Bot, GitBranchPlus, Sparkles, TerminalSquare, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  Bot,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  GitBranchPlus,
+  LayoutTemplate,
+  Network,
+  Save,
+  Sparkles,
+  Settings2,
+  TerminalSquare,
+  Trash2,
+  ScanSearch
+} from 'lucide-react'
+import type { CSSProperties } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useBeforeUnload, useBlocker } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -66,12 +84,28 @@ const WORKFLOW_NODE_HEIGHT = 92
 const WORKFLOW_NODE_GAP_X = 280
 const WORKFLOW_NODE_GAP_Y = 148
 const EDGE_ID_SEPARATOR = '::'
+const EDITOR_INPUT_CLASS =
+  'mt-1.5 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
+const EDITOR_TEXTAREA_CLASS =
+  'mt-1.5 w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
+const EDITOR_SECTION_CLASS =
+  'rounded-2xl border border-slate-200/80 bg-white/84 shadow-[0_12px_30px_rgba(15,23,42,0.05)] backdrop-blur'
+const EDITOR_BADGE_CLASS =
+  'rounded-full border border-slate-200/80 bg-white/84 px-2.5 py-0.5 text-[11px] font-medium text-slate-600'
+const EDITOR_TOOLBAR_GROUP_CLASS =
+  'flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-white/88 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]'
+const EDITOR_RAIL_BUTTON_CLASS =
+  'flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/88 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-white hover:text-slate-900'
+const EDITOR_PANEL_HEADER_CLASS = 'border-b border-slate-200/70 px-4 py-4 backdrop-blur'
 
 type WorkflowEditorNodeData = {
   title: string
   subtitle: string
   nodeType: 'agent' | 'command'
   indexLabel: string
+  inboundCount: number
+  outboundCount: number
+  requiresApproval: boolean
 }
 
 type WorkflowEditorNode = Node<WorkflowEditorNodeData, 'workflow-editor'>
@@ -128,6 +162,32 @@ const slugifyWorkflowKey = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
 
+const isEditableTarget = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  (target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.isContentEditable)
+
+const serializeDrafts = (values: WorkflowTemplateFormValues) =>
+  JSON.stringify({
+    name: values.name.trim(),
+    description: values.description?.trim() || '',
+    nodes: values.nodes.map((node, index) => ({
+      id: node.id,
+      key: node.key.trim() || `workflow-node-${index + 1}`,
+      type: node.type,
+      name: node.name.trim(),
+      prompt: node.prompt.trim(),
+      command: node.command.trim(),
+      cliToolId: node.cliToolId || '',
+      agentToolConfigId: node.agentToolConfigId || '',
+      requiresApproval: Boolean(node.requiresApproval),
+      dependsOnIds: [...new Set(node.dependsOnIds ?? [])].sort(),
+      position: normalizeDraftPosition(node.position, index)
+    }))
+  })
+
 const buildOutgoingDependencyMap = (nodes: TaskNodeTemplateDraft[]) => {
   const map = new Map<string, string[]>()
   nodes.forEach((node) => {
@@ -144,6 +204,60 @@ const buildOutgoingDependencyMap = (nodes: TaskNodeTemplateDraft[]) => {
   })
 
   return map
+}
+
+const buildAutoLayoutPositions = (nodes: TaskNodeTemplateDraft[]) => {
+  if (nodes.length === 0) {
+    return new Map<string, WorkflowDefinitionNodePosition>()
+  }
+
+  const incomingCount = new Map<string, number>()
+  const outgoing = buildOutgoingDependencyMap(nodes)
+  const levels = new Map<string, number>()
+  const nodesById = new Map(nodes.map((node) => [node.id, node]))
+
+  nodes.forEach((node) => {
+    incomingCount.set(
+      node.id,
+      node.dependsOnIds.filter((dependencyId) => nodesById.has(dependencyId)).length
+    )
+  })
+
+  const queue = nodes
+    .filter((node) => (incomingCount.get(node.id) ?? 0) === 0)
+    .map((node) => node.id)
+
+  queue.forEach((nodeId) => levels.set(nodeId, 0))
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!
+    const currentLevel = levels.get(currentId) ?? 0
+
+    for (const nextId of outgoing.get(currentId) ?? []) {
+      const nextIncoming = (incomingCount.get(nextId) ?? 0) - 1
+      incomingCount.set(nextId, nextIncoming)
+      levels.set(nextId, Math.max(levels.get(nextId) ?? 0, currentLevel + 1))
+      if (nextIncoming === 0) {
+        queue.push(nextId)
+      }
+    }
+  }
+
+  const fallbackLevel = Math.max(...levels.values(), 0)
+  const rowsByLevel = new Map<number, number>()
+  const positions = new Map<string, WorkflowDefinitionNodePosition>()
+
+  nodes.forEach((node, index) => {
+    const level = levels.get(node.id) ?? fallbackLevel + index
+    const row = rowsByLevel.get(level) ?? 0
+    rowsByLevel.set(level, row + 1)
+    positions.set(node.id, {
+      x: level * WORKFLOW_NODE_GAP_X,
+      y: row * WORKFLOW_NODE_GAP_Y
+    })
+  })
+
+  return positions
 }
 
 const hasPath = (
@@ -175,51 +289,126 @@ const wouldCreateCycle = (
   return hasPath(outgoing, nodeId, dependencyId)
 }
 
-function WorkflowEditorNodeCard({ data, selected }: NodeProps<WorkflowEditorNode>) {
+const WorkflowEditorNodeCard = memo(function WorkflowEditorNodeCard({
+  data,
+  selected,
+  dragging
+}: NodeProps<WorkflowEditorNode>) {
   const TypeIcon = data.nodeType === 'command' ? TerminalSquare : Bot
 
   return (
     <div
       className={cn(
-        'relative rounded-2xl border bg-background/96 px-3 py-3 shadow-sm transition-all',
-        'backdrop-blur-[1px]',
-        selected
-          ? 'border-primary ring-primary/20 ring-2 shadow-primary/10'
-          : 'border-border/70 hover:border-primary/35'
+        'relative overflow-hidden rounded-[24px] border px-4 py-4 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))]',
+        dragging
+          ? 'border-slate-300/90 shadow-[0_10px_24px_rgba(15,23,42,0.1)]'
+          : selected
+            ? 'border-sky-400/85 ring-2 ring-sky-500/20 shadow-sky-500/10'
+            : 'border-slate-200/80 shadow-[0_8px_20px_rgba(15,23,42,0.05)] hover:border-slate-300/90'
       )}
       style={{
         width: WORKFLOW_NODE_WIDTH,
-        minHeight: WORKFLOW_NODE_HEIGHT
+        minHeight: WORKFLOW_NODE_HEIGHT,
+        willChange: dragging ? 'transform' : undefined
       }}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className="!size-3 !border-2 !border-background !bg-slate-400"
+        className="!size-3.5 !border-2 !border-white !bg-slate-400"
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!size-3 !border-2 !border-background !bg-slate-400"
+        className="!size-3.5 !border-2 !border-white !bg-slate-400"
       />
 
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <div className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em]">
-            <TypeIcon className="size-3.5" />
-            <span>{data.nodeType === 'agent' ? 'Agent' : 'Command'}</span>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-slate-50 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+            <TypeIcon className="size-[18px]" />
           </div>
-          <div className="truncate text-sm font-semibold">{data.title}</div>
-          <p className="text-muted-foreground line-clamp-3 text-xs leading-5">
-            {data.subtitle || 'Configure this node from the panel on the right.'}
-          </p>
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              {data.nodeType === 'agent' ? '智能体节点' : '命令节点'}
+            </div>
+            <div className="mt-1 truncate text-sm font-semibold text-slate-900">{data.title}</div>
+          </div>
         </div>
 
-        <div className="border-border/60 bg-muted/45 rounded-full border px-2 py-0.5 text-[11px] font-medium">
-          {data.indexLabel}
-        </div>
+        <div className={EDITOR_BADGE_CLASS}>{data.indexLabel}</div>
+      </div>
+
+      <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-500">
+        {data.subtitle || '在右侧面板中配置该节点。'}
+      </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200/80 pt-3 text-[11px] text-slate-500">
+        <span className={EDITOR_BADGE_CLASS}>入 {data.inboundCount}</span>
+        <span className={EDITOR_BADGE_CLASS}>出 {data.outboundCount}</span>
+        {data.requiresApproval && <span className={EDITOR_BADGE_CLASS}>需要审批</span>}
       </div>
     </div>
+  )
+})
+
+interface EditorToolButtonProps {
+  icon: typeof Save
+  label: string
+  onClick?: () => void
+  disabled?: boolean
+  variant?: 'outline' | 'ghost' | 'default'
+  type?: 'button' | 'submit'
+}
+
+function EditorToolButton({
+  icon: Icon,
+  label,
+  onClick,
+  disabled = false,
+  variant = 'outline',
+  type = 'button'
+}: EditorToolButtonProps) {
+  return (
+    <Button
+      type={type}
+      size="sm"
+      variant={variant}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'h-9 rounded-xl px-3 text-xs',
+        variant === 'outline' &&
+          'border-slate-200/80 bg-white/88 text-slate-700 hover:bg-white hover:text-slate-900',
+        variant === 'ghost' && 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+      )}
+    >
+      <Icon className="mr-1.5 size-4" />
+      {label}
+    </Button>
+  )
+}
+
+interface EditorRailButtonProps {
+  icon: typeof Save
+  onClick?: () => void
+  title: string
+}
+
+function EditorRailButton({ icon: Icon, onClick, title }: EditorRailButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn(
+        EDITOR_RAIL_BUTTON_CLASS,
+        !onClick && 'cursor-default opacity-70 hover:bg-white/88 hover:text-slate-600'
+      )}
+      title={title}
+    >
+      <Icon className="size-4" />
+    </button>
   )
 }
 
@@ -233,6 +422,13 @@ const buildEditorGraph = (
   selectedEdgeId: string | null
 ): { nodes: WorkflowEditorNode[]; edges: Edge[] } => {
   const nodeIds = new Set(nodes.map((node) => node.id))
+  const outboundCountById = new Map<string, number>()
+
+  nodes.forEach((node) => {
+    node.dependsOnIds.forEach((dependencyId) => {
+      outboundCountById.set(dependencyId, (outboundCountById.get(dependencyId) ?? 0) + 1)
+    })
+  })
 
   return {
     nodes: nodes.map((node, index) => ({
@@ -243,10 +439,13 @@ const buildEditorGraph = (
         title: node.name.trim() || `${workflowNodeLabel} ${index + 1}`,
         subtitle:
           node.type === 'agent'
-            ? node.prompt.trim() || 'Add an agent prompt'
-            : node.command.trim() || 'Add a shell command',
+            ? node.prompt.trim() || '添加智能体提示词'
+            : node.command.trim() || '添加要执行的命令',
         nodeType: node.type,
-        indexLabel: `${index + 1}`
+        indexLabel: `${index + 1}`,
+        inboundCount: node.dependsOnIds.length,
+        outboundCount: outboundCountById.get(node.id) ?? 0,
+        requiresApproval: node.requiresApproval
       }
     })),
     edges: nodes.flatMap((node) =>
@@ -314,10 +513,12 @@ export function WorkflowTemplateEditor({
   onCancel
 }: WorkflowTemplateEditorProps) {
   const { t } = useLanguage()
+  const initialNodeRef = useRef<TaskNodeTemplateDraft>(createDefaultNode(0))
+  const formRef = useRef<HTMLFormElement | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [templateDescription, setTemplateDescription] = useState('')
   const [templateNodes, setTemplateNodes] = useState<TaskNodeTemplateDraft[]>([
-    createDefaultNode(0)
+    initialNodeRef.current
   ])
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
@@ -327,6 +528,16 @@ export function WorkflowTemplateEditor({
   const [cliConfigsByTool, setCliConfigsByTool] = useState<Record<string, AgentToolConfig[]>>({})
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false)
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
+  const [initialSnapshot, setInitialSnapshot] = useState(() =>
+    serializeDrafts({
+      name: '',
+      description: undefined,
+      nodes: [initialNodeRef.current]
+    })
+  )
 
   const loadCliConfigs = useCallback(
     async (toolId: string): Promise<AgentToolConfig[]> => {
@@ -396,6 +607,13 @@ export function WorkflowTemplateEditor({
       setTemplateDescription(initialValues.description || '')
       setTemplateNodes(nextNodes)
       setSelectedNodeId(nextNodes[0]?.id ?? null)
+      setInitialSnapshot(
+        serializeDrafts({
+          name: initialValues.name,
+          description: initialValues.description || undefined,
+          nodes: nextNodes
+        })
+      )
       return
     }
 
@@ -404,6 +622,13 @@ export function WorkflowTemplateEditor({
     setTemplateDescription('')
     setTemplateNodes([firstNode])
     setSelectedNodeId(firstNode.id)
+    setInitialSnapshot(
+      serializeDrafts({
+        name: '',
+        description: undefined,
+        nodes: [firstNode]
+      })
+    )
   }, [active, initialValues])
 
   useEffect(() => {
@@ -462,6 +687,17 @@ export function WorkflowTemplateEditor({
     () => templateNodes.findIndex((node) => node.id === selectedNodeId),
     [selectedNodeId, templateNodes]
   )
+  const outboundCountById = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    templateNodes.forEach((node) => {
+      node.dependsOnIds.forEach((dependencyId) => {
+        counts.set(dependencyId, (counts.get(dependencyId) ?? 0) + 1)
+      })
+    })
+
+    return counts
+  }, [templateNodes])
 
   const selectedEdgeSummary = useMemo(() => {
     if (!selectedEdgeId) return null
@@ -488,6 +724,57 @@ export function WorkflowTemplateEditor({
     () => buildEditorGraph(templateNodes, t.task.workflowNodeLabel, selectedEdgeId),
     [selectedEdgeId, t.task.workflowNodeLabel, templateNodes]
   )
+  const canDeleteSelection = Boolean(selectedNodeId || selectedEdgeId)
+  const modifierKeyLabel =
+    typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac')
+      ? 'Cmd'
+      : 'Ctrl'
+  const editorLayoutStyle = useMemo(
+    () =>
+      ({
+        '--workflow-editor-columns': `${leftPanelCollapsed ? '72px' : '320px'} minmax(0,1fr) ${
+          rightPanelCollapsed ? '72px' : '360px'
+        }`
+      }) as CSSProperties,
+    [leftPanelCollapsed, rightPanelCollapsed]
+  )
+
+  const currentSnapshot = useMemo(
+    () =>
+      serializeDrafts({
+        name: templateName,
+        description: templateDescription || undefined,
+        nodes: templateNodes
+      }),
+    [templateDescription, templateName, templateNodes]
+  )
+
+  const isDirty = currentSnapshot !== initialSnapshot
+  const blocker = useBlocker(isDirty)
+
+  useBeforeUnload(
+    useCallback(
+      (event) => {
+        if (!isDirty) return
+        event.preventDefault()
+        event.returnValue = ''
+      },
+      [isDirty]
+    )
+  )
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+
+    const shouldLeave = window.confirm('当前工作流还有未保存的修改，确定不保存直接离开吗？')
+
+    if (shouldLeave) {
+      blocker.proceed()
+      return
+    }
+
+    blocker.reset()
+  }, [blocker])
 
   const updateNode = useCallback(
     (nodeId: string, updater: (node: TaskNodeTemplateDraft) => TaskNodeTemplateDraft) => {
@@ -531,6 +818,38 @@ export function WorkflowTemplateEditor({
     setSelectedNodeId((current) => (current === nodeId ? null : current))
   }, [])
 
+  const fitCanvas = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      reactFlowInstance?.fitView({ padding: 0.18, maxZoom: 1.05, duration: 250 })
+    })
+  }, [reactFlowInstance])
+
+  const applyAutoLayout = useCallback(() => {
+    const nextPositions = buildAutoLayoutPositions(templateNodes)
+
+    setTemplateNodes((prev) =>
+      prev.map((node, index) => ({
+        ...node,
+        position: nextPositions.get(node.id) ?? normalizeDraftPosition(node.position, index)
+      }))
+    )
+    setError(null)
+    fitCanvas()
+  }, [fitCanvas, templateNodes])
+
+  const handleCancelRequest = useCallback(() => {
+    if (!isDirty) {
+      onCancel()
+      return
+    }
+
+    const shouldLeave = window.confirm('当前工作流还有未保存的修改，确定不保存直接离开吗？')
+
+    if (shouldLeave) {
+      onCancel()
+    }
+  }, [isDirty, onCancel])
+
   const handleConnect = useCallback(
     (connection: Connection) => {
       const sourceId = connection.source
@@ -541,7 +860,7 @@ export function WorkflowTemplateEditor({
       }
 
       if (sourceId === targetId) {
-        setError('A node cannot depend on itself.')
+        setError('节点不能依赖自身。')
         return
       }
 
@@ -558,7 +877,7 @@ export function WorkflowTemplateEditor({
       }
 
       if (wouldCreateCycle(templateNodes, targetId, sourceId)) {
-        setError('This connection would create a cycle in the DAG.')
+        setError('这条连线会在 DAG 中形成环。')
         return
       }
 
@@ -597,9 +916,20 @@ export function WorkflowTemplateEditor({
     setSelectedEdgeId(null)
   }, [selectedEdgeId])
 
+  const handleDeleteSelection = useCallback(() => {
+    if (selectedEdgeId) {
+      handleRemoveSelectedEdge()
+      return
+    }
+
+    if (selectedNodeId && templateNodes.length > 1) {
+      removeNode(selectedNodeId)
+    }
+  }, [handleRemoveSelectedEdge, removeNode, selectedEdgeId, selectedNodeId, templateNodes.length])
+
   const handleGenerate = async () => {
     if (!generationPrompt.trim()) {
-      setError(t.task.workflowGenerationPromptRequired || 'Please enter a workflow goal first.')
+      setError(t.task.workflowGenerationPromptRequired || '请先输入工作流目标。')
       return
     }
 
@@ -619,6 +949,7 @@ export function WorkflowTemplateEditor({
       setTemplateNodes(nextNodes)
       setSelectedNodeId(nextNodes[0]?.id ?? null)
       setSelectedEdgeId(null)
+      fitCanvas()
     } catch (err) {
       setError(String(err))
     } finally {
@@ -663,9 +994,7 @@ export function WorkflowTemplateEditor({
         (node.type === 'agent' && !node.prompt) || (node.type === 'command' && !node.command)
     )
     if (invalidNode) {
-      setError(
-        t.task.workflowNodeContentRequired || 'Each workflow node needs prompt or command content.'
-      )
+      setError(t.task.workflowNodeContentRequired || '每个工作流节点都需要填写提示词或命令内容。')
       return
     }
 
@@ -679,6 +1008,7 @@ export function WorkflowTemplateEditor({
         nodes
       }
       await onSubmit(payload)
+      setInitialSnapshot(serializeDrafts(payload))
     } catch (err) {
       setError(String(err))
     } finally {
@@ -686,103 +1016,341 @@ export function WorkflowTemplateEditor({
     }
   }
 
+  useEffect(() => {
+    if (!active) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) {
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        formRef.current?.requestSubmit()
+        return
+      }
+
+      if (
+        (event.key === 'Delete' || event.key === 'Backspace') &&
+        (selectedEdgeId || selectedNodeId)
+      ) {
+        event.preventDefault()
+        handleDeleteSelection()
+        return
+      }
+
+      if (!event.metaKey && !event.ctrlKey && event.key.toLowerCase() === 'l') {
+        event.preventDefault()
+        applyAutoLayout()
+        return
+      }
+
+      if (event.key === 'Escape') {
+        setSelectedEdgeId(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [active, applyAutoLayout, handleDeleteSelection, selectedEdgeId, selectedNodeId])
+
   return (
-    <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <div className="grid gap-4">
-          <div>
-            <label className="text-sm font-medium">{t.task.createTemplateNameLabel}</label>
-            <input
-              value={templateName}
-              onChange={(event) => setTemplateName(event.target.value)}
-              placeholder={t.task.createTemplateNamePlaceholder}
-              className={cn(
-                'mt-1.5 w-full rounded-md border bg-background px-3 py-2 text-sm',
-                'focus:outline-none focus:ring-2 focus:ring-primary'
-              )}
-            />
+    <form
+      ref={formRef}
+      data-workflow-template-editor="true"
+      onSubmit={handleSubmit}
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+    >
+      <div className="border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,245,249,0.92))] px-4 py-3 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex size-9 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+                <GitBranchPlus className="size-4" />
+              </div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                工作流编辑器
+              </div>
+            </div>
+            <h2 className="text-sm font-semibold">
+              {templateName.trim() ||
+                (selectedNode ? selectedNode.name.trim() : '') ||
+                '工作流编辑器'}
+            </h2>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <div
+                className={cn(
+                  'rounded-full border px-2.5 py-0.5 text-[11px] font-medium',
+                  isDirty
+                    ? 'border-amber-300/80 bg-amber-50 text-amber-700'
+                    : 'border-emerald-300/80 bg-emerald-50 text-emerald-700'
+                )}
+              >
+                {isDirty ? '未保存' : '已保存'}
+              </div>
+              <div className={EDITOR_BADGE_CLASS}>{templateNodes.length} 个节点</div>
+              <div className={EDITOR_BADGE_CLASS}>{editorGraph.edges.length} 条连线</div>
+              <div className={EDITOR_BADGE_CLASS}>快捷键 {modifierKeyLabel}+S / L / Del</div>
+            </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium">{t.task.createTemplateDescriptionLabel}</label>
-            <textarea
-              value={templateDescription}
-              onChange={(event) => setTemplateDescription(event.target.value)}
-              placeholder={t.task.createTemplateDescriptionPlaceholder}
-              className={cn(
-                'mt-1.5 min-h-[80px] w-full rounded-md border bg-background px-3 py-2 text-sm',
-                'focus:outline-none focus:ring-2 focus:ring-primary'
-              )}
-            />
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-            <Sparkles className="size-4" />
-            <span>{t.task.workflowGenerationPromptLabel || 'Generate from goal'}</span>
-          </div>
-          <textarea
-            value={generationPrompt}
-            onChange={(event) => setGenerationPrompt(event.target.value)}
-            placeholder={
-              t.task.workflowGenerationPromptPlaceholder ||
-              'Describe the workflow you want to generate.'
-            }
-            className={cn(
-              'min-h-[122px] w-full rounded-md border bg-background px-3 py-2 text-sm',
-              'focus:outline-none focus:ring-2 focus:ring-primary'
-            )}
-          />
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <p className="text-muted-foreground text-xs">
-              Generate a starting DAG, then drag nodes and connect them to refine the flow.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleGenerate()}
-              disabled={isGenerating}
-            >
-              {isGenerating
-                ? t.task.workflowGenerateLoading || 'Generating...'
-                : t.task.workflowGenerateButton || 'Generate'}
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className={EDITOR_TOOLBAR_GROUP_CLASS}>
+              <EditorToolButton icon={GitBranchPlus} label={t.task.addStage} onClick={addNode} />
+              <EditorToolButton icon={LayoutTemplate} label="自动布局" onClick={applyAutoLayout} />
+              <EditorToolButton icon={ScanSearch} label="适应画布" onClick={fitCanvas} />
+              <EditorToolButton
+                icon={Trash2}
+                label="删除"
+                variant="ghost"
+                disabled={!canDeleteSelection}
+                onClick={handleDeleteSelection}
+              />
+            </div>
+            <div className={EDITOR_TOOLBAR_GROUP_CLASS}>
+              <EditorToolButton
+                icon={ChevronLeft}
+                label={t.common.cancel}
+                variant="ghost"
+                onClick={handleCancelRequest}
+              />
+              <EditorToolButton
+                icon={Save}
+                label={saving ? t.task.createLoading : t.task.saveTemplate}
+                type="submit"
+                variant="default"
+                disabled={saving}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.45fr)_380px]">
-        <section className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-border/60 bg-muted/15">
-          <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <GitBranchPlus className="size-4" />
-                <span>{t.task.workflowCardTitle || 'Workflow DAG editor'}</span>
+      <div
+        className="grid min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_12%,#f1f5f9_100%)] transition-[grid-template-columns] duration-200 grid-cols-1 xl:[grid-template-columns:var(--workflow-editor-columns)]"
+        style={editorLayoutStyle}
+      >
+        <aside className="flex min-h-0 flex-col border-r border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9),rgba(241,245,249,0.78))]">
+          {leftPanelCollapsed ? (
+            <div className="flex h-full flex-col items-center gap-3 px-2 py-4">
+              <EditorRailButton
+                icon={ChevronRight}
+                onClick={() => setLeftPanelCollapsed(false)}
+                title="展开工作流面板"
+              />
+              <div className="flex flex-col gap-2">
+                <EditorRailButton icon={FileText} title="工作流信息" />
+                <EditorRailButton icon={Sparkles} title="生成工作流" />
+                <EditorRailButton icon={Network} title="节点列表" />
               </div>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Drag nodes to place them. Connect from the right handle into the left handle to
-                define dependencies.
-              </p>
             </div>
+          ) : (
+            <>
+              <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-white/45')}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      <FileText className="size-3.5" />
+                      <span>工作流</span>
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">模板与生成</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      先设置模板信息并生成初稿，再继续微调 DAG。
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLeftPanelCollapsed(true)}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
+                    title="收起工作流面板"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                </div>
+              </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={addNode}>
-                {t.task.addStage}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={!selectedEdgeSummary}
-                onClick={handleRemoveSelectedEdge}
-              >
-                Remove selected edge
-              </Button>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                <div className="space-y-4">
+                  <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
+                    <div className="border-b border-slate-200/70 px-4 py-3">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        模板信息
+                      </div>
+                    </div>
+                    <div className="space-y-4 px-4 py-4">
+                      <div>
+                        <label className="text-sm font-medium">
+                          {t.task.createTemplateNameLabel}
+                        </label>
+                        <input
+                          value={templateName}
+                          onChange={(event) => setTemplateName(event.target.value)}
+                          placeholder={t.task.createTemplateNamePlaceholder}
+                          className={EDITOR_INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">
+                          {t.task.createTemplateDescriptionLabel}
+                        </label>
+                        <textarea
+                          value={templateDescription}
+                          onChange={(event) => setTemplateDescription(event.target.value)}
+                          placeholder={t.task.createTemplateDescriptionPlaceholder}
+                          className={cn(EDITOR_TEXTAREA_CLASS, 'min-h-[112px]')}
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
+                    <div className="border-b border-slate-200/70 px-4 py-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        <Sparkles className="size-3.5" />
+                        <span>{t.task.workflowGenerationPromptLabel || '根据目标生成'}</span>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        根据你的目标先生成一版 DAG 草稿，再在画布中调整结构。
+                      </p>
+                    </div>
+                    <div className="px-4 py-4">
+                      <textarea
+                        value={generationPrompt}
+                        onChange={(event) => setGenerationPrompt(event.target.value)}
+                        placeholder={
+                          t.task.workflowGenerationPromptPlaceholder || '描述你想生成的工作流。'
+                        }
+                        className={cn(EDITOR_TEXTAREA_CLASS, 'mt-0 min-h-[132px]')}
+                      />
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <div className="text-xs text-slate-500">适合先快速起草，再手动微调。</div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void handleGenerate()}
+                          disabled={isGenerating}
+                        >
+                          {isGenerating
+                            ? t.task.workflowGenerateLoading || '生成中...'
+                            : t.task.workflowGenerateButton || '生成'}
+                        </Button>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
+                    <div className="border-b border-slate-200/70 px-4 py-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        <Network className="size-3.5" />
+                        <span>节点列表</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        可在这里或画布中选择节点进行编辑。
+                      </p>
+                    </div>
+                    <div className="px-3 py-3">
+                      <div className="space-y-2">
+                        {nodeOptions.map((option, index) => {
+                          const node = templateNodes[index]
+                          const inboundCount = node?.dependsOnIds.length ?? 0
+                          const outboundCount = outboundCountById.get(option.value) ?? 0
+
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                setSelectedNodeId(option.value)
+                                setSelectedEdgeId(null)
+                              }}
+                              className={cn(
+                                'w-full rounded-2xl border px-3.5 py-3 text-left transition-all',
+                                selectedNodeId === option.value
+                                  ? 'border-sky-400/75 bg-sky-50/85 shadow-[0_10px_24px_rgba(59,130,246,0.08)]'
+                                  : 'border-slate-200/75 bg-white/78 hover:border-slate-300/80 hover:bg-white'
+                              )}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={cn(
+                                        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                                        node?.type === 'agent'
+                                          ? 'bg-sky-50 text-sky-700'
+                                          : 'bg-emerald-50 text-emerald-700'
+                                      )}
+                                    >
+                                      {node?.type === 'agent' ? '智能体' : '命令'}
+                                    </span>
+                                    {node?.requiresApproval && (
+                                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                        审批
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="mt-2 truncate text-sm font-medium text-slate-900">
+                                    {option.label}
+                                  </div>
+                                </div>
+                                <div className="text-[11px] font-medium text-slate-400">
+                                  {index + 1}
+                                </div>
+                              </div>
+                              <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
+                                <span className={EDITOR_BADGE_CLASS}>入 {inboundCount}</span>
+                                <span className={EDITOR_BADGE_CLASS}>出 {outboundCount}</span>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </>
+          )}
+        </aside>
+
+        <section className="flex min-h-0 flex-col bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,252,0.76))]">
+          <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-white/58')}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  画布
+                </div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">
+                  {t.task.workflowCardTitle || '流程画布'}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  拖动节点、从右向左连接节点，直接在画布中编辑 DAG。
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500">
+                {selectedEdgeSummary ? (
+                  <div className="rounded-full border border-sky-200/80 bg-sky-50 px-3 py-1 text-sky-700">
+                    {selectedEdgeSummary.sourceLabel} {' -> '} {selectedEdgeSummary.targetLabel}
+                  </div>
+                ) : selectedNode ? (
+                  <>
+                    <div className={EDITOR_BADGE_CLASS}>
+                      {selectedNode.name.trim() ||
+                        `${t.task.workflowNodeLabel} ${selectedNodeIndex + 1}`}
+                    </div>
+                    <div className={EDITOR_BADGE_CLASS}>
+                      {selectedNode.type === 'agent' ? '智能体节点' : '命令节点'}
+                    </div>
+                  </>
+                ) : (
+                  <div className={EDITOR_BADGE_CLASS}>未选择内容</div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="relative min-h-0 flex-1 bg-background/90">
+          <div className="relative min-h-0 flex-1 bg-[radial-gradient(circle_at_top,rgba(186,230,253,0.22),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(241,245,249,0.82))]">
             <ReactFlow
               nodes={editorGraph.nodes}
               edges={editorGraph.edges}
@@ -791,6 +1359,7 @@ export function WorkflowTemplateEditor({
               fitViewOptions={{ padding: 0.18, maxZoom: 1.05 }}
               minZoom={0.35}
               maxZoom={1.4}
+              onlyRenderVisibleElements
               onConnect={handleConnect}
               onPaneClick={() => setSelectedEdgeId(null)}
               onNodeClick={(_, node) => {
@@ -816,8 +1385,18 @@ export function WorkflowTemplateEditor({
               nodesConnectable
               elementsSelectable
               zoomOnDoubleClick={false}
+              onInit={setReactFlowInstance}
               className="bg-transparent"
             >
+              <MiniMap
+                pannable
+                zoomable
+                position="bottom-right"
+                className="!border-slate-200/80 !bg-white/94 !shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+                nodeColor={(node) =>
+                  node.id === selectedNodeId ? 'rgba(59,130,246,0.9)' : 'rgba(100,116,139,0.72)'
+                }
+              />
               <Controls
                 position="top-right"
                 showInteractive={false}
@@ -825,304 +1404,349 @@ export function WorkflowTemplateEditor({
               />
             </ReactFlow>
           </div>
-
-          <div className="border-border/60 flex flex-wrap gap-2 border-t px-3 py-3">
-            {nodeOptions.map((option, index) => {
-              const node = templateNodes[index]
-              const inboundCount = node?.dependsOnIds.length ?? 0
-              const outboundCount = templateNodes.filter((item) =>
-                item.dependsOnIds.includes(option.value)
-              ).length
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    setSelectedNodeId(option.value)
-                    setSelectedEdgeId(null)
-                  }}
-                  className={cn(
-                    'rounded-full border px-3 py-1.5 text-left text-xs transition-colors',
-                    selectedNodeId === option.value
-                      ? 'border-primary bg-primary/8 text-primary'
-                      : 'border-border/70 bg-background hover:border-primary/35'
-                  )}
-                >
-                  <span className="block font-medium">{option.label}</span>
-                  <span className="text-muted-foreground block text-[11px]">
-                    in {inboundCount} / out {outboundCount}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
         </section>
 
-        <aside className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-border/60 bg-background/95">
-          <div className="border-border/60 border-b px-4 py-3">
-            <div className="text-sm font-medium">Node inspector</div>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Edit the selected node. Dependencies are managed from the graph canvas.
-            </p>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-            {selectedNode ? (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        {t.task.workflowNodeLabel} {selectedNodeIndex + 1}
-                      </div>
-                      <div className="truncate text-sm font-semibold">
-                        {selectedNode.name.trim() ||
-                          `${t.task.workflowNodeLabel} ${selectedNodeIndex + 1}`}
-                      </div>
+        <aside className="flex min-h-0 flex-col border-l border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(248,250,252,0.84))]">
+          {rightPanelCollapsed ? (
+            <div className="flex h-full flex-col items-center gap-3 px-2 py-4">
+              <EditorRailButton
+                icon={ChevronLeft}
+                onClick={() => setRightPanelCollapsed(false)}
+                title="展开检查面板"
+              />
+              <div className="flex flex-col gap-2">
+                <EditorRailButton icon={Settings2} title="检查面板" />
+                <EditorRailButton icon={Bot} title="节点详情" />
+                <EditorRailButton
+                  icon={Trash2}
+                  title="删除当前选择"
+                  onClick={handleDeleteSelection}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-white/52')}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      <Settings2 className="size-3.5" />
+                      <span>检查面板</span>
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      disabled={templateNodes.length === 1}
-                      onClick={() => removeNode(selectedNode.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">节点配置</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      编辑当前选中的节点，并查看依赖关系。
+                    </div>
                   </div>
-                  <div className="text-muted-foreground mt-2 text-xs">
-                    Position: {Math.round(selectedNode.position.x)},{' '}
-                    {Math.round(selectedNode.position.y)}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelCollapsed(true)}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-white/80 hover:text-slate-900"
+                    title="收起检查面板"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
                 </div>
+              </div>
 
-                <div>
-                  <label className="text-sm font-medium">{'Node name'}</label>
-                  <input
-                    value={selectedNode.name}
-                    onChange={(event) => {
-                      const value = event.target.value
-                      updateNode(selectedNode.id, (current) => ({
-                        ...current,
-                        name: value,
-                        key:
-                          current.key.startsWith('workflow-node-') && value.trim()
-                            ? slugifyWorkflowKey(value) || current.key
-                            : current.key
-                      }))
-                    }}
-                    placeholder={t.task.createStageNamePlaceholder}
-                    className="mt-1.5 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  />
-                </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                {selectedNode ? (
+                  <div className="space-y-4">
+                    <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
+                      <div className="border-b border-slate-200/70 px-4 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              {t.task.workflowNodeLabel} {selectedNodeIndex + 1}
+                            </div>
+                            <div className="mt-1 truncate text-sm font-semibold text-slate-900">
+                              {selectedNode.name.trim() ||
+                                `${t.task.workflowNodeLabel} ${selectedNodeIndex + 1}`}
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={templateNodes.length === 1}
+                            onClick={() => removeNode(selectedNode.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 px-4 py-4 text-[11px] text-slate-500">
+                        <span className={EDITOR_BADGE_CLASS}>
+                          {selectedNode.type === 'agent' ? '智能体节点' : '命令节点'}
+                        </span>
+                        <span className={EDITOR_BADGE_CLASS}>
+                          位置 {Math.round(selectedNode.position.x)},{' '}
+                          {Math.round(selectedNode.position.y)}
+                        </span>
+                        {selectedNode.requiresApproval && (
+                          <span className="rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-700">
+                            需要审批
+                          </span>
+                        )}
+                      </div>
+                    </section>
 
-                <div>
-                  <label className="text-sm font-medium">{'Node type'}</label>
-                  <div className="mt-1.5">
-                    <Select
-                      value={selectedNode.type}
-                      onValueChange={(value) => {
-                        updateNode(selectedNode.id, (current) => ({
-                          ...current,
-                          type: value as 'agent' | 'command',
-                          cliToolId: value === 'agent' ? current.cliToolId : '',
-                          agentToolConfigId: value === 'agent' ? current.agentToolConfigId : ''
-                        }))
-                      }}
-                      options={[
-                        {
-                          value: 'agent',
-                          label: t.task.workflowNodeTypeAgent || 'Agent'
-                        },
-                        {
-                          value: 'command',
-                          label: t.task.workflowNodeTypeCommand || 'Command'
-                        }
-                      ]}
-                    />
-                  </div>
-                </div>
+                    <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
+                      <div className="border-b border-slate-200/70 px-4 py-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          基本配置
+                        </div>
+                      </div>
+                      <div className="space-y-4 px-4 py-4">
+                        <div>
+                          <label className="text-sm font-medium">{'节点名称'}</label>
+                          <input
+                            value={selectedNode.name}
+                            onChange={(event) => {
+                              const value = event.target.value
+                              updateNode(selectedNode.id, (current) => ({
+                                ...current,
+                                name: value,
+                                key:
+                                  current.key.startsWith('workflow-node-') && value.trim()
+                                    ? slugifyWorkflowKey(value) || current.key
+                                    : current.key
+                              }))
+                            }}
+                            placeholder={t.task.createStageNamePlaceholder}
+                            className={EDITOR_INPUT_CLASS}
+                          />
+                        </div>
 
-                <div>
-                  <label className="text-sm font-medium">
-                    {selectedNode.type === 'agent'
-                      ? t.task.workflowNodePromptLabel || 'Prompt'
-                      : t.task.workflowNodeCommandLabel || 'Command'}
-                  </label>
-                  <textarea
-                    value={
-                      selectedNode.type === 'agent' ? selectedNode.prompt : selectedNode.command
-                    }
-                    onChange={(event) => {
-                      const value = event.target.value
-                      updateNode(selectedNode.id, (current) =>
-                        current.type === 'agent'
-                          ? { ...current, prompt: value }
-                          : { ...current, command: value }
-                      )
-                    }}
-                    placeholder={
-                      selectedNode.type === 'agent'
-                        ? t.task.createStagePromptPlaceholder
-                        : t.task.workflowNodeCommandPlaceholder || 'Command to run'
-                    }
-                    className="mt-1.5 min-h-[132px] w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  />
-                </div>
+                        <div>
+                          <label className="text-sm font-medium">{'节点类型'}</label>
+                          <div className="mt-1.5">
+                            <Select
+                              value={selectedNode.type}
+                              onValueChange={(value) => {
+                                updateNode(selectedNode.id, (current) => ({
+                                  ...current,
+                                  type: value as 'agent' | 'command',
+                                  cliToolId: value === 'agent' ? current.cliToolId : '',
+                                  agentToolConfigId:
+                                    value === 'agent' ? current.agentToolConfigId : ''
+                                }))
+                              }}
+                              options={[
+                                {
+                                  value: 'agent',
+                                  label: t.task.workflowNodeTypeAgent || '智能体'
+                                },
+                                {
+                                  value: 'command',
+                                  label: t.task.workflowNodeTypeCommand || '命令'
+                                }
+                              ]}
+                            />
+                          </div>
+                        </div>
 
-                {selectedNode.type === 'agent' && (
-                  <div className="grid gap-3">
-                    <div>
-                      <label className="text-sm font-medium">{t.task.createCliLabel}</label>
-                      <div className="mt-1.5">
-                        <Select
-                          value={selectedNode.cliToolId || ''}
-                          onValueChange={async (toolId) => {
-                            let defaultConfigId = ''
-                            if (toolId) {
-                              const configs =
-                                cliConfigsByTool[toolId] || (await loadCliConfigs(toolId))
-                              const defaultConfig = configs.find((config) => config.is_default)
-                              defaultConfigId = defaultConfig?.id || ''
+                        <div>
+                          <label className="text-sm font-medium">
+                            {selectedNode.type === 'agent'
+                              ? t.task.workflowNodePromptLabel || '提示词'
+                              : t.task.workflowNodeCommandLabel || '命令'}
+                          </label>
+                          <textarea
+                            value={
+                              selectedNode.type === 'agent'
+                                ? selectedNode.prompt
+                                : selectedNode.command
                             }
+                            onChange={(event) => {
+                              const value = event.target.value
+                              updateNode(selectedNode.id, (current) =>
+                                current.type === 'agent'
+                                  ? { ...current, prompt: value }
+                                  : { ...current, command: value }
+                              )
+                            }}
+                            placeholder={
+                              selectedNode.type === 'agent'
+                                ? t.task.createStagePromptPlaceholder
+                                : t.task.workflowNodeCommandPlaceholder || '要执行的命令'
+                            }
+                            className={cn(EDITOR_TEXTAREA_CLASS, 'min-h-[136px]')}
+                          />
+                        </div>
+                      </div>
+                    </section>
 
+                    {selectedNode.type === 'agent' && (
+                      <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
+                        <div className="border-b border-slate-200/70 px-4 py-3">
+                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            运行配置
+                          </div>
+                        </div>
+                        <div className="grid gap-4 px-4 py-4">
+                          <div>
+                            <label className="text-sm font-medium">{t.task.createCliLabel}</label>
+                            <div className="mt-1.5">
+                              <Select
+                                value={selectedNode.cliToolId || ''}
+                                onValueChange={async (toolId) => {
+                                  let defaultConfigId = ''
+                                  if (toolId) {
+                                    const configs =
+                                      cliConfigsByTool[toolId] || (await loadCliConfigs(toolId))
+                                    const defaultConfig = configs.find(
+                                      (config) => config.is_default
+                                    )
+                                    defaultConfigId = defaultConfig?.id || ''
+                                  }
+
+                                  updateNode(selectedNode.id, (current) => ({
+                                    ...current,
+                                    cliToolId: toolId,
+                                    agentToolConfigId: defaultConfigId
+                                  }))
+                                }}
+                                placeholder={t.task.createStageCliInherit}
+                                options={cliTools.map((tool) => ({
+                                  value: tool.id,
+                                  label: tool.displayName || tool.name || tool.id
+                                }))}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium">
+                              {t.task.createCliConfigLabel}
+                            </label>
+                            <div className="mt-1.5">
+                              <Select
+                                value={selectedNode.agentToolConfigId || ''}
+                                disabled={!selectedNode.cliToolId}
+                                onValueChange={(configId) => {
+                                  updateNode(selectedNode.id, (current) => ({
+                                    ...current,
+                                    agentToolConfigId: configId
+                                  }))
+                                }}
+                                placeholder={
+                                  !selectedNode.cliToolId
+                                    ? t.task.createCliConfigSelectTool
+                                    : t.task.createStageConfigInherit
+                                }
+                                options={(selectedNode.cliToolId
+                                  ? cliConfigsByTool[selectedNode.cliToolId] || []
+                                  : []
+                                ).map((config) => ({
+                                  value: config.id,
+                                  label: config.name
+                                }))}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                    )}
+
+                    <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
+                      <div className="border-b border-slate-200/70 px-4 py-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          依赖关系
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          依赖关系请直接在画布中维护。选中连线后可查看或删除。
+                        </p>
+                      </div>
+                      <div className="px-4 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          {selectedNode.dependsOnIds.length > 0 ? (
+                            selectedNode.dependsOnIds.map((dependencyId) => {
+                              const dependencyIndex = templateNodes.findIndex(
+                                (node) => node.id === dependencyId
+                              )
+                              const dependencyNode =
+                                dependencyIndex >= 0 ? templateNodes[dependencyIndex] : null
+                              if (!dependencyNode) return null
+
+                              return (
+                                <button
+                                  key={dependencyId}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedNodeId(selectedNode.id)
+                                    setSelectedEdgeId(buildEdgeId(dependencyId, selectedNode.id))
+                                  }}
+                                  className="rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs text-slate-700 transition-colors hover:border-sky-300/70 hover:text-slate-900"
+                                >
+                                  {dependencyNode.name.trim() ||
+                                    `${t.task.workflowNodeLabel} ${dependencyIndex + 1}`}
+                                </button>
+                              )
+                            })
+                          ) : (
+                            <div className="text-xs text-slate-500">该节点可直接开始执行。</div>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
+                      <div className="border-b border-slate-200/70 px-4 py-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          执行控制
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-3 px-4 py-4 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedNode.requiresApproval}
+                          onChange={(event) => {
+                            const checked = event.target.checked
                             updateNode(selectedNode.id, (current) => ({
                               ...current,
-                              cliToolId: toolId,
-                              agentToolConfigId: defaultConfigId
+                              requiresApproval: checked
                             }))
                           }}
-                          placeholder={t.task.createStageCliInherit}
-                          options={cliTools.map((tool) => ({
-                            value: tool.id,
-                            label: tool.displayName || tool.name || tool.id
-                          }))}
                         />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">{t.task.createCliConfigLabel}</label>
-                      <div className="mt-1.5">
-                        <Select
-                          value={selectedNode.agentToolConfigId || ''}
-                          disabled={!selectedNode.cliToolId}
-                          onValueChange={(configId) => {
-                            updateNode(selectedNode.id, (current) => ({
-                              ...current,
-                              agentToolConfigId: configId
-                            }))
-                          }}
-                          placeholder={
-                            !selectedNode.cliToolId
-                              ? t.task.createCliConfigSelectTool
-                              : t.task.createStageConfigInherit
-                          }
-                          options={(selectedNode.cliToolId
-                            ? cliConfigsByTool[selectedNode.cliToolId] || []
-                            : []
-                          ).map((config) => ({
-                            value: config.id,
-                            label: config.name
-                          }))}
-                        />
-                      </div>
-                    </div>
+                        <span>{t.task.createStageRequiresApproval}</span>
+                      </label>
+                    </section>
+                  </div>
+                ) : (
+                  <div
+                    className={cn(
+                      EDITOR_SECTION_CLASS,
+                      'flex h-full items-center justify-center px-6 py-10 text-sm text-slate-500'
+                    )}
+                  >
+                    从左侧列表或画布中选择节点进行编辑。
                   </div>
                 )}
+              </div>
 
-                <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
-                  <div className="text-sm font-medium">
-                    {t.task.workflowDependenciesLabel || 'Dependencies'}
+              <div className="border-t border-slate-200/70 px-4 py-3">
+                {selectedEdgeSummary ? (
+                  <div className={cn(EDITOR_SECTION_CLASS, 'px-3 py-3')}>
+                    <div className="text-xs font-medium text-slate-500">当前连线</div>
+                    <div className="mt-1 text-sm text-slate-900">
+                      {selectedEdgeSummary.sourceLabel} {' 到 '} {selectedEdgeSummary.targetLabel}
+                    </div>
                   </div>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    Create dependencies by dragging from one node into another. Click an edge in the
-                    graph to remove it.
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedNode.dependsOnIds.length > 0 ? (
-                      selectedNode.dependsOnIds.map((dependencyId) => {
-                        const dependencyIndex = templateNodes.findIndex(
-                          (node) => node.id === dependencyId
-                        )
-                        const dependencyNode =
-                          dependencyIndex >= 0 ? templateNodes[dependencyIndex] : null
-                        if (!dependencyNode) return null
-
-                        return (
-                          <button
-                            key={dependencyId}
-                            type="button"
-                            onClick={() => {
-                              setSelectedNodeId(selectedNode.id)
-                              setSelectedEdgeId(buildEdgeId(dependencyId, selectedNode.id))
-                            }}
-                            className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs hover:border-primary/35"
-                          >
-                            {dependencyNode.name.trim() ||
-                              `${t.task.workflowNodeLabel} ${dependencyIndex + 1}`}
-                          </button>
-                        )
-                      })
-                    ) : (
-                      <div className="text-muted-foreground text-xs">
-                        This node has no upstream dependency and can start immediately.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedNode.requiresApproval}
-                    onChange={(event) => {
-                      const checked = event.target.checked
-                      updateNode(selectedNode.id, (current) => ({
-                        ...current,
-                        requiresApproval: checked
-                      }))
-                    }}
-                  />
-                  <span>{t.task.createStageRequiresApproval}</span>
-                </label>
+                ) : (
+                  <div className="text-xs text-slate-500">选择一条连线即可查看或删除。</div>
+                )}
               </div>
-            ) : (
-              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                Select a node from the graph to edit it.
-              </div>
-            )}
-          </div>
-
-          <div className="border-border/60 border-t px-4 py-3">
-            {selectedEdgeSummary ? (
-              <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
-                <div className="text-xs font-medium">Selected edge</div>
-                <div className="mt-1 text-sm">
-                  {selectedEdgeSummary.sourceLabel} → {selectedEdgeSummary.targetLabel}
-                </div>
-              </div>
-            ) : (
-              <div className="text-muted-foreground text-xs">
-                Select an edge on the canvas if you want to remove that dependency.
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </aside>
       </div>
 
-      {error && <div className="text-sm text-red-500">{error}</div>}
-
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          {t.common.cancel}
-        </Button>
-        <Button type="submit" disabled={saving}>
-          {saving ? t.task.createLoading : t.task.saveTemplate}
-        </Button>
-      </div>
+      {error && (
+        <div className="border-t border-slate-200/80 bg-red-50/60 px-4 py-3 text-sm text-red-600">
+          {error}
+        </div>
+      )}
     </form>
   )
 }

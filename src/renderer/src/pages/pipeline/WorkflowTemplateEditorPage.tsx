@@ -9,13 +9,7 @@ import {
   workflowDefinitionToFormValues
 } from '@/components/pipeline'
 import { Button } from '@/components/ui/button'
-import {
-  EmptyStatePanel,
-  PageBody,
-  PageFrame,
-  PageHeader,
-  SurfaceCard
-} from '@/components/shared/page-shell'
+import { EmptyStatePanel, PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
 import { db, type WorkflowDefinition, type WorkflowDefinitionScope } from '@/data'
 import { useProjects } from '@/hooks/useProjects'
 import { useLanguage } from '@/providers/language-provider'
@@ -199,14 +193,12 @@ export function WorkflowTemplateEditorPage() {
   return (
     <PageFrame>
       <PageHeader title={title} subtitle={subtitle} />
-      <PageBody className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <SurfaceCard className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] p-5 md:p-6">
-          <WorkflowTemplateEditor
-            initialValues={editingTemplate ? workflowDefinitionToFormValues(editingTemplate) : null}
-            onCancel={handleBack}
-            onSubmit={handleSubmit}
-          />
-        </SurfaceCard>
+      <PageBody className="flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0">
+        <WorkflowTemplateEditor
+          initialValues={editingTemplate ? workflowDefinitionToFormValues(editingTemplate) : null}
+          onCancel={handleBack}
+          onSubmit={handleSubmit}
+        />
       </PageBody>
     </PageFrame>
   )
