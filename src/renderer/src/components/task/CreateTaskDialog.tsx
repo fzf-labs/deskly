@@ -10,7 +10,8 @@ import {
 } from '@/components/task/TaskCreateMenu'
 import { db } from '@/data'
 import type { AgentToolConfig } from '@/data'
-import { getSettings } from '@/data/settings'
+import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
+import { filterEnabledCliTools } from '@/lib/cli-tool-enablement'
 import { useLanguage } from '@/providers/language-provider'
 import type { MessageAttachment } from '@/hooks/useAgent'
 import { normalizeCliTools, type CLIToolInfo } from '@/lib/cli-tools'
@@ -65,16 +66,17 @@ export function CreateTaskDialog({
     const loadTools = async () => {
       try {
         const snapshot = await window.api?.cliTools?.getSnapshot?.()
-        const tools = normalizeCliTools(snapshot)
+        const settings = getSettings()
+        const tools = filterEnabledCliTools(normalizeCliTools(snapshot), settings)
         setCliTools(tools)
 
-        const settings = getSettings()
-        if (settings.defaultCliToolId) {
+        const defaultCliToolId = getEnabledDefaultCliToolId(settings)
+        if (defaultCliToolId) {
           const hasDefault = tools.some(
-            (tool) => tool.id === settings.defaultCliToolId
+            (tool) => tool.id === defaultCliToolId
           )
           if (hasDefault) {
-            setSelectedCliToolId(settings.defaultCliToolId)
+            setSelectedCliToolId(defaultCliToolId)
           }
         }
 
@@ -86,7 +88,7 @@ export function CreateTaskDialog({
     }
 
     const unsubscribe = window.api?.cliTools?.onUpdated?.((tools) => {
-      setCliTools(normalizeCliTools(tools))
+      setCliTools(filterEnabledCliTools(normalizeCliTools(tools), getSettings()))
     })
 
     const loadDefinitions = async () => {
@@ -153,6 +155,13 @@ export function CreateTaskDialog({
   }, [open, projectId, projectPath, isGitProject])
 
   useEffect(() => {
+    if (!open || !selectedCliToolId) return
+    if (cliTools.some((tool) => tool.id === selectedCliToolId)) return
+    setSelectedCliToolId('')
+    setSelectedCliConfigId('')
+  }, [cliTools, open, selectedCliToolId])
+
+  useEffect(() => {
     if (!open) return
     if (!selectedCliToolId) {
       setCliConfigs([])
@@ -209,7 +218,7 @@ export function CreateTaskDialog({
     }
 
     const settings = getSettings()
-    const resolvedCliToolId = selectedCliToolId || settings.defaultCliToolId || ''
+    const resolvedCliToolId = selectedCliToolId || getEnabledDefaultCliToolId(settings) || ''
     const resolvedCliConfigId =
       selectedCliConfigId || cliConfigs.find((config) => config.is_default)?.id || ''
 

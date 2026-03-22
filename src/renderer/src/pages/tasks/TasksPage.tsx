@@ -4,6 +4,7 @@ import { Bot, Sparkles } from 'lucide-react'
 
 import type { MessageAttachment } from '@/hooks/useAgent'
 import { ChatInput } from '@/components/shared/ChatInput'
+import { Select } from '@/components/ui/select'
 import {
   TaskCreateMenu,
   type TaskMode,
@@ -11,14 +12,15 @@ import {
   type TaskMenuWorkflowTemplate
 } from '@/components/task/TaskCreateMenu'
 import { db, type AgentToolConfig } from '@/data'
-import { getSettings } from '@/data/settings'
+import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
 import { useProjects } from '@/hooks/useProjects'
+import { filterEnabledCliTools } from '@/lib/cli-tool-enablement'
 import { normalizeCliTools } from '@/lib/cli-tools'
 import { useLanguage } from '@/providers/language-provider'
 
 export function TasksPage() {
   const navigate = useNavigate()
-  const { currentProject } = useProjects()
+  const { currentProject, currentProjectId, projects, setCurrentProjectId } = useProjects()
   const { t } = useLanguage()
 
   const [cliTools, setCliTools] = useState<TaskMenuCliToolInfo[]>([])
@@ -30,22 +32,35 @@ export function TasksPage() {
   const [workflowDefinitions, setWorkflowDefinitions] = useState<TaskMenuWorkflowTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [taskMode, setTaskMode] = useState<TaskMode>('conversation')
+  const workspaceOptionValue = '__deskly_workspace__'
 
   const isGitProject = currentProject?.projectType === 'git'
+  const selectedProjectValue = currentProjectId ?? workspaceOptionValue
+  const projectOptions = [
+    { value: workspaceOptionValue, label: 'Deskly workspace' },
+    ...projects.map((project) => ({
+      value: project.id,
+      label: project.name
+    }))
+  ]
 
   useEffect(() => {
     let active = true
     const loadCliTools = async () => {
       try {
         const detected = await window.api?.cliTools?.getSnapshot?.()
-        const tools = normalizeCliTools(detected) as TaskMenuCliToolInfo[]
+        const settings = getSettings()
+        const tools = filterEnabledCliTools(
+          normalizeCliTools(detected) as TaskMenuCliToolInfo[],
+          settings
+        )
         if (!active) return
         setCliTools(tools)
 
-        const settings = getSettings()
-        if (settings.defaultCliToolId) {
-          const hasDefault = tools.some((tool) => tool.id === settings.defaultCliToolId)
-          if (hasDefault) setSelectedCliToolId(settings.defaultCliToolId)
+        const defaultCliToolId = getEnabledDefaultCliToolId(settings)
+        if (defaultCliToolId) {
+          const hasDefault = tools.some((tool) => tool.id === defaultCliToolId)
+          if (hasDefault) setSelectedCliToolId(defaultCliToolId)
         }
 
         void window.api?.cliTools?.refresh?.({ level: 'fast' })
@@ -58,7 +73,9 @@ export function TasksPage() {
 
     const unsubscribe = window.api?.cliTools?.onUpdated?.((tools) => {
       if (!active) return
-      setCliTools(normalizeCliTools(tools) as TaskMenuCliToolInfo[])
+      setCliTools(
+        filterEnabledCliTools(normalizeCliTools(tools) as TaskMenuCliToolInfo[], getSettings())
+      )
     })
 
     void loadCliTools()
@@ -67,6 +84,13 @@ export function TasksPage() {
       unsubscribe?.()
     }
   }, [])
+
+  useEffect(() => {
+    if (!selectedCliToolId) return
+    if (cliTools.some((tool) => tool.id === selectedCliToolId)) return
+    setSelectedCliToolId('')
+    setSelectedCliConfigId('')
+  }, [cliTools, selectedCliToolId])
 
   useEffect(() => {
     if (!selectedCliToolId) {
@@ -207,7 +231,7 @@ export function TasksPage() {
       if (!text.trim() && (!attachments || attachments.length === 0)) return
 
       const settings = getSettings()
-      const resolvedCliToolId = selectedCliToolId || settings.defaultCliToolId || ''
+      const resolvedCliToolId = selectedCliToolId || getEnabledDefaultCliToolId(settings) || ''
       const resolvedCliConfigId =
         selectedCliConfigId || cliConfigs.find((config) => config.is_default)?.id || ''
       if (taskMode === 'conversation' && (!resolvedCliToolId || !resolvedCliConfigId)) {
@@ -275,9 +299,18 @@ export function TasksPage() {
       <div className="relative flex flex-1 flex-col overflow-auto px-6 py-10">
         <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center">
           <div className="mb-10 flex flex-col items-center gap-5 text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/92 px-4 py-2 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/70 bg-background/92 px-4 py-2 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
               <Bot className="size-3.5" />
-              <span>{currentProject?.name || 'Deskly workspace'}</span>
+              <Select
+                value={selectedProjectValue}
+                onValueChange={(value) =>
+                  setCurrentProjectId(value === workspaceOptionValue ? null : value)
+                }
+                options={projectOptions}
+                ariaLabel="Select current project"
+                triggerClassName="h-auto w-auto min-w-0 max-w-[min(28rem,calc(100vw-5rem))] border-0 bg-transparent px-0 py-0 text-xs font-medium text-muted-foreground shadow-none focus-visible:border-transparent focus-visible:ring-0"
+                contentClassName="min-w-[220px]"
+              />
             </div>
             <div className="flex size-16 items-center justify-center rounded-[22px] border border-white/80 bg-white/88 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur">
               <Sparkles className="size-7" />

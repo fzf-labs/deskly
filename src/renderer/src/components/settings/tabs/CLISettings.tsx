@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { newUlid } from '@/lib/ids';
+import { Switch } from '../components/Switch';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { db } from '@/data';
 import type { AgentToolConfig } from '@/data';
+import { isCliToolEnabledInSettings } from '@/data/settings';
 import type { SettingsTabProps } from '../types';
 import {
   normalizeCliTools,
@@ -216,6 +218,24 @@ export function CLISettings({
     setDefaultCliToolId(value);
     onSettingsChange({ ...settings, defaultCliToolId: value });
   };
+
+  const handleToolEnabledChange = useCallback((toolId: string, enabled: boolean) => {
+    const nextSettings = {
+      ...settings,
+      enabledCliTools: {
+        ...settings.enabledCliTools,
+        [toolId]: enabled,
+      },
+      defaultCliToolId:
+        !enabled && settings.defaultCliToolId === toolId ? '' : settings.defaultCliToolId,
+    };
+
+    if (!enabled && defaultCliToolId === toolId) {
+      setDefaultCliToolId('');
+    }
+
+    onSettingsChange(nextSettings);
+  }, [defaultCliToolId, onSettingsChange, settings]);
 
   const loadConfigs = useCallback(async (toolId?: string) => {
     if (!toolId) {
@@ -612,7 +632,10 @@ export function CLISettings({
             onValueChange={handleDefaultChange}
             placeholder={t.settings?.cliDefaultPlaceholder || 'Select default CLI'}
             options={tools
-              .filter((tool) => isCliToolInstalled(tool))
+              .filter(
+                (tool) =>
+                  isCliToolInstalled(tool) && isCliToolEnabledInSettings(tool.id, settings)
+              )
               .map((tool) => ({
                 value: tool.id,
                 label: tool.displayName,
@@ -691,16 +714,25 @@ export function CLISettings({
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-medium">{tool.displayName}</span>
-                      <span
-                        className={cn(
-                          'inline-flex size-2 rounded-full',
-                          isCliToolInstalled(tool)
-                            ? 'bg-emerald-500'
-                            : tool.installState === 'checking' || tool.installState === 'unknown'
-                              ? 'bg-amber-400'
-                              : 'bg-rose-500'
-                        )}
-                      />
+                      <div
+                        className="flex items-center gap-2"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <span
+                          className={cn(
+                            'inline-flex size-2 rounded-full',
+                            isCliToolInstalled(tool)
+                              ? 'bg-emerald-500'
+                              : tool.installState === 'checking' || tool.installState === 'unknown'
+                                ? 'bg-amber-400'
+                                : 'bg-rose-500'
+                          )}
+                        />
+                        <Switch
+                          checked={isCliToolEnabledInSettings(tool.id, settings)}
+                          onChange={(enabled) => handleToolEnabledChange(tool.id, enabled)}
+                        />
+                      </div>
                     </div>
                     <div className="text-muted-foreground mt-1 text-xs font-mono">
                       {tool.name}
@@ -757,6 +789,22 @@ export function CLISettings({
                       <p className="text-foreground font-mono break-all">
                         {activeTool.installPath || '—'}
                       </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground">
+                        {t.settings?.cliEnabledLabel || 'Enabled'}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={isCliToolEnabledInSettings(activeTool.id, settings)}
+                          onChange={(enabled) => handleToolEnabledChange(activeTool.id, enabled)}
+                        />
+                        <span className="text-foreground font-medium">
+                          {isCliToolEnabledInSettings(activeTool.id, settings)
+                            ? t.settings?.cliConfigOptionEnabled || 'Enabled'
+                            : t.settings?.cliConfigOptionDisabled || 'Disabled'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

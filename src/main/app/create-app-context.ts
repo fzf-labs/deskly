@@ -22,14 +22,23 @@ import { AppContext, AppServices } from './AppContext'
 export const createAppContext = (): AppContext => {
   const appPaths = getAppPaths()
 
+  const settingsService = new SettingsService()
   const databaseService = new DatabaseService()
   const projectService = new ProjectService(databaseService)
   const gitService = new GitService()
   const cliProcessService = new CLIProcessService()
   const cliToolDetectorService = new CLIToolDetectorService()
   const cliToolConfigService = new CLIToolConfigService()
-  const cliSessionService = new CliSessionService(cliToolConfigService, databaseService)
-  databaseService.setWorkflowGenerationRuntime(cliSessionService, cliToolDetectorService)
+  const cliSessionService = new CliSessionService(
+    cliToolConfigService,
+    databaseService,
+    settingsService
+  )
+  databaseService.setWorkflowGenerationRuntime(
+    cliSessionService,
+    cliToolDetectorService,
+    settingsService
+  )
   const workflowSchedulerService = new WorkflowSchedulerService(databaseService, cliSessionService)
   databaseService.setWorkflowSchedulerService(workflowSchedulerService)
   const terminalService = new TerminalService()
@@ -38,8 +47,7 @@ export const createAppContext = (): AppContext => {
   const previewConfigService = new PreviewConfigService()
   const previewService = new PreviewService()
   const notificationService = new NotificationService()
-  const settingsService = new SettingsService()
-  const taskService = new TaskService(databaseService, gitService)
+  const taskService = new TaskService(databaseService, gitService, settingsService)
   const automationRunnerService = new AutomationRunnerService(
     databaseService,
     taskService,

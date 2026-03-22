@@ -1,4 +1,8 @@
 // Settings type definitions
+import type {
+  EnabledCliTools,
+  SupportedCliToolId
+} from '../../../../shared/cli-tool-enablement';
 
 export interface AIProvider {
   id: string;
@@ -110,6 +114,7 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system';
   language: string;
   editor: EditorSettings;
+  enabledCliTools: EnabledCliTools;
   defaultCliToolId: string;
   gitWorktreeBranchPrefix: string;
   gitWorktreeDir: string;
@@ -117,3 +122,5 @@ export interface Settings {
   claudeCodePath: string;
   codexCliPath: string;
 }
+
+export type { EnabledCliTools, SupportedCliToolId };

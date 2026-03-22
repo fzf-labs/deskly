@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_PORT } from '@/config';
 import { db, type Task } from '@/data';
-import { getSettings } from '@/data/settings';
+import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings';
 import {
   addBackgroundTask,
   getBackgroundTask,
@@ -633,7 +633,7 @@ export function useAgent(): UseAgentReturn {
           const nodeRuntime = await getCurrentTaskNodeRuntime(taskIdValue)
           cliToolId = nodeRuntime?.cliToolId ?? null
         }
-        if (!cliToolId) cliToolId = getSettings().defaultCliToolId
+        if (!cliToolId) cliToolId = getEnabledDefaultCliToolId(getSettings())
         return getProjectMcpConfigPath(project.path, cliToolId || undefined);
       } catch (error) {
         console.warn('[useAgent] Failed to resolve project MCP config path:', error);
@@ -719,10 +719,11 @@ export function useAgent(): UseAgentReturn {
       try {
         if (!existingTask) {
           const settings = getSettings();
+          const defaultCliToolId = getEnabledDefaultCliToolId(settings);
           let agentToolConfigId: string | null = null;
-          if (settings.defaultCliToolId) {
+          if (defaultCliToolId) {
             try {
-              const configs = await db.listAgentToolConfigs(settings.defaultCliToolId);
+              const configs = await db.listAgentToolConfigs(defaultCliToolId);
               const list = Array.isArray(configs) ? (configs as Array<{ id: string; is_default?: number }>) : [];
               const defaultConfig = list.find((cfg) => cfg.is_default);
               agentToolConfigId = defaultConfig?.id ?? null;
@@ -737,7 +738,7 @@ export function useAgent(): UseAgentReturn {
           });
           await db.updateCurrentTaskNodeRuntime(currentTaskId, {
             session_id: sessId,
-            cli_tool_id: settings.defaultCliToolId || null,
+            cli_tool_id: defaultCliToolId || null,
             agent_tool_config_id: agentToolConfigId,
           });
           console.log(

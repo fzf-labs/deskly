@@ -373,6 +373,13 @@ interface AppAPI {
 }
 
 interface AppSettings {
+  enabledCliTools: {
+    'claude-code': boolean
+    codex: boolean
+    'cursor-agent': boolean
+    'gemini-cli': boolean
+    opencode: boolean
+  }
   theme: 'light' | 'dark' | 'system'
   language: string
   notifications: {

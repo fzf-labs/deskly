@@ -8,8 +8,10 @@ import { OpencodeAdapter } from './adapters/OpencodeAdapter'
 import { MsgStoreService } from '../MsgStoreService'
 import { CLIToolConfigService } from '../CLIToolConfigService'
 import { DatabaseService } from '../DatabaseService'
+import { SettingsService } from '../SettingsService'
 import { LogMsg } from '../../types/log'
 import { normalizeCliToolConfig } from '../../../shared/cli-config-spec'
+import { isCliToolEnabled } from '../../../shared/cli-tool-enablement'
 import { newUlid } from '../../utils/ids'
 
 interface SessionRecord {
@@ -47,11 +49,17 @@ export class CliSessionService extends EventEmitter {
   private adapters: Map<string, CliAdapter> = new Map()
   private configService: CLIToolConfigService
   private databaseService: DatabaseService
+  private settingsService: SettingsService
 
-  constructor(configService: CLIToolConfigService, databaseService: DatabaseService) {
+  constructor(
+    configService: CLIToolConfigService,
+    databaseService: DatabaseService,
+    settingsService: SettingsService
+  ) {
     super()
     this.configService = configService
     this.databaseService = databaseService
+    this.settingsService = settingsService
 
     this.registerAdapter(new ClaudeCodeAdapter(configService))
     this.registerAdapter(new CursorAgentAdapter())
@@ -75,6 +83,12 @@ export class CliSessionService extends EventEmitter {
     return normalizeCliToolConfig(toolId, config)
   }
 
+  private assertToolEnabled(toolId: string): void {
+    if (!isCliToolEnabled(toolId, this.settingsService.getSettings().enabledCliTools)) {
+      throw new Error('CLI tool is disabled in Settings -> Agent CLI')
+    }
+  }
+
   async startSession(
     sessionId: string,
     toolId: string,
@@ -90,6 +104,8 @@ export class CliSessionService extends EventEmitter {
     if (this.sessions.has(sessionId)) {
       throw new Error(`Session ${sessionId} already exists`)
     }
+
+    this.assertToolEnabled(toolId)
 
     const adapter = this.adapters.get(toolId)
     if (!adapter) {
@@ -428,6 +444,8 @@ export class CliSessionService extends EventEmitter {
   }
 
   async runOneShotSession(options: CliOneShotRunOptions): Promise<CliOneShotRunResult> {
+    this.assertToolEnabled(options.toolId)
+
     const adapter = this.adapters.get(options.toolId)
     if (!adapter) {
       throw new Error(`Unsupported CLI tool: ${options.toolId}`)

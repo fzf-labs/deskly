@@ -1,7 +1,13 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { getAppPaths } from '../app/AppPaths'
+import {
+  createDefaultEnabledCliTools,
+  normalizeEnabledCliTools,
+  type EnabledCliTools
+} from '../../shared/cli-tool-enablement'
 
 export interface AppSettings {
+  enabledCliTools: EnabledCliTools
   theme: 'light' | 'dark' | 'system'
   language: string
   notifications: {
@@ -11,6 +17,7 @@ export interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
+  enabledCliTools: createDefaultEnabledCliTools(),
   theme: 'system',
   language: 'zh-CN',
   notifications: {
@@ -36,7 +43,11 @@ export class SettingsService {
         const loaded = JSON.parse(data)
         const { accentColor: _accentColor, backgroundStyle: _backgroundStyle, ...rest } =
           loaded as Record<string, unknown>
-        return { ...DEFAULT_SETTINGS, ...rest }
+        return {
+          ...DEFAULT_SETTINGS,
+          ...rest,
+          enabledCliTools: normalizeEnabledCliTools(rest.enabledCliTools)
+        }
       }
     } catch (error) {
       console.error('[SettingsService] Failed to load settings:', error)
@@ -53,11 +64,20 @@ export class SettingsService {
   }
 
   getSettings(): AppSettings {
-    return { ...this.settings }
+    return {
+      ...this.settings,
+      enabledCliTools: normalizeEnabledCliTools(this.settings.enabledCliTools)
+    }
   }
 
   updateSettings(updates: Partial<AppSettings>): AppSettings {
-    this.settings = { ...this.settings, ...updates }
+    this.settings = {
+      ...this.settings,
+      ...updates,
+      enabledCliTools: normalizeEnabledCliTools(
+        updates.enabledCliTools ?? this.settings.enabledCliTools
+      )
+    }
     this.saveSettings()
     return this.getSettings()
   }

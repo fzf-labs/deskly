@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { getSettings } from '@/data/settings';
+import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings';
 import type { MessageAttachment } from '@/hooks/useAgent';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/providers/language-provider';
@@ -53,11 +53,19 @@ export function TaskInput() {
 
     try {
       const settings = getSettings();
+      const defaultCliToolId = getEnabledDefaultCliToolId(settings);
+      if (!defaultCliToolId) {
+        window.alert(
+          t.settings?.cliDefaultRequired ||
+            'Please enable and choose a default CLI in Settings -> Agent CLI'
+        );
+        return;
+      }
       const result = await window.api.task.create({
         title: prompt,
         prompt,
         taskMode: 'conversation',
-        cliToolId: settings.defaultCliToolId || undefined,
+        cliToolId: defaultCliToolId,
       });
       if (result.success && result.data) {
         navigate(`/task/${result.data.id}`, {

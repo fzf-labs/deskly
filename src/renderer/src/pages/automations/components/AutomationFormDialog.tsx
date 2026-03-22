@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { useProjects } from '@/hooks/useProjects';
 import type { AgentToolConfig } from '@/data';
+import { filterEnabledCliTools } from '@/lib/cli-tool-enablement';
 import type { Automation, AutomationTriggerType } from '@/types/automation';
 import { normalizeCliTools, type CLIToolInfo } from '@/lib/cli-tools';
 
@@ -77,7 +78,7 @@ export function AutomationFormDialog({
       try {
         const result = await window.api.cliTools.getSnapshot();
         if (!active) return;
-        const list = normalizeCliTools(result);
+        const list = filterEnabledCliTools(normalizeCliTools(result));
         setCliTools(list);
         void window.api.cliTools.refresh({ level: 'fast' });
       } catch {
@@ -88,7 +89,7 @@ export function AutomationFormDialog({
 
     const unsubscribe = window.api.cliTools.onUpdated((tools) => {
       if (!active) return;
-      setCliTools(normalizeCliTools(tools));
+      setCliTools(filterEnabledCliTools(normalizeCliTools(tools)));
     });
 
     void loadTools();
@@ -97,6 +98,13 @@ export function AutomationFormDialog({
       unsubscribe?.();
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!cliToolId) return;
+    if (cliTools.some((tool) => tool.id === cliToolId)) return;
+    setCliToolId('');
+    setCliConfigId('');
+  }, [cliToolId, cliTools]);
 
   useEffect(() => {
     if (!open) return;

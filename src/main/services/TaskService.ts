@@ -4,8 +4,10 @@ import { realpath, rm } from 'fs/promises'
 import { homedir } from 'os'
 import { DatabaseService } from './DatabaseService'
 import { GitService } from './GitService'
+import { SettingsService } from './SettingsService'
 import { newUlid } from '../utils/ids'
 import { getAppPaths } from '../app/AppPaths'
+import { isCliToolEnabled } from '../../shared/cli-tool-enablement'
 import type { CreateTaskOptions, TaskWithWorktree } from '../types/domain/task'
 import type { TaskStatus } from '../types/task'
 import type { WorkflowTemplate } from '../types/workflow'
@@ -19,10 +21,12 @@ export class TaskService {
 
   private db: DatabaseService
   private git: GitService
+  private settingsService: SettingsService
 
-  constructor(db: DatabaseService, git: GitService) {
+  constructor(db: DatabaseService, git: GitService, settingsService: SettingsService) {
     this.db = db
     this.git = git
+    this.settingsService = settingsService
   }
 
   private resolveWorktreeRoot(pathInput?: string): string {
@@ -130,6 +134,14 @@ export class TaskService {
 
     if (options.taskMode === 'conversation' && !options.cliToolId) {
       throw new Error('CLI tool is required for conversation tasks')
+    }
+
+    if (
+      options.taskMode === 'conversation' &&
+      options.cliToolId &&
+      !isCliToolEnabled(options.cliToolId, this.settingsService.getSettings().enabledCliTools)
+    ) {
+      throw new Error('CLI tool is disabled in Settings -> Agent CLI')
     }
 
     if (

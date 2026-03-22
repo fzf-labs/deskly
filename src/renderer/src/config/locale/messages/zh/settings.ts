@@ -108,6 +108,7 @@ export default {
   cliDetectError: '检测 CLI 工具失败，请重试。',
   cliEmpty: '未发现 CLI 工具。',
   cliTool: '工具',
+  cliEnabledLabel: '启用状态',
   cliStatus: '状态',
   cliVersion: '版本',
   cliInstallPath: '安装路径',
@@ -148,6 +149,7 @@ export default {
   cliConfigHintEnvPerLine: '每行一个 KEY=VALUE',
   cliConfigShowSecret: '显示值',
   cliConfigHideSecret: '隐藏值',
+  cliDefaultRequired: '请先在 设置 -> Agent CLI 启用并选择默认 CLI',
 
   // Git
   gitDescription: '查看 Git 是否可用，并配置 worktree 分支命名前缀。',

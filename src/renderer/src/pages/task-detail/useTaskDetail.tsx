@@ -19,7 +19,8 @@ import type { NavigateFunction } from 'react-router-dom'
 import { Clock, GitBranch } from 'lucide-react'
 
 import { db, type Task, type WorkflowRun, type WorkflowRunNode } from '@/data'
-import { getSettings } from '@/data/settings'
+import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
+import { filterEnabledCliTools, isCliToolEnabled } from '@/lib/cli-tool-enablement'
 import { normalizeCliTools } from '@/lib/cli-tools'
 import { newUuid } from '@/lib/ids'
 import type { AgentMessage, MessageAttachment } from '@/hooks/useAgent'
@@ -276,6 +277,7 @@ export function useTaskDetail({
           const sessionId = initialSessionId || null
           try {
             const settings = getSettings()
+            const defaultCliToolId = getEnabledDefaultCliToolId(settings)
             const createdTask = await db.createTask({
               id: taskId,
               title: initialPrompt,
@@ -284,7 +286,7 @@ export function useTaskDetail({
             setTask(createdTask)
             await db.updateCurrentTaskNodeRuntime(taskId, {
               session_id: sessionId ?? null,
-              cli_tool_id: settings.defaultCliToolId || null
+              cli_tool_id: defaultCliToolId || null
             })
             await loadCurrentNodeRuntime()
           } catch (error) {
@@ -324,7 +326,9 @@ export function useTaskDetail({
     const loadCliTools = async () => {
       try {
         const result = await window.api?.cliTools?.getSnapshot?.()
-        if (active) setCliTools(normalizeCliTools(result) as CLIToolInfo[])
+        if (active) {
+          setCliTools(filterEnabledCliTools(normalizeCliTools(result) as CLIToolInfo[]))
+        }
         void window.api?.cliTools?.refresh?.({ level: 'fast' })
       } catch {
         if (active) setCliTools([])
@@ -332,7 +336,7 @@ export function useTaskDetail({
     }
     const unsubscribe = window.api?.cliTools?.onUpdated?.((tools) => {
       if (!active) return
-      setCliTools(normalizeCliTools(tools) as CLIToolInfo[])
+      setCliTools(filterEnabledCliTools(normalizeCliTools(tools) as CLIToolInfo[]))
     })
     void loadCliTools()
     return () => {
@@ -353,10 +357,19 @@ export function useTaskDetail({
     Array<{ id: string; name: string; is_default?: number }>
   >([])
 
+  useEffect(() => {
+    if (!isEditOpen) return
+    if (!editCliToolId || isCliToolEnabled(editCliToolId)) return
+    setEditCliToolId('')
+    setEditCliConfigId('')
+  }, [editCliToolId, isEditOpen])
+
   const handleOpenEdit = useCallback(() => {
     if (!task || task.status !== 'todo') return
     setEditPrompt(task.prompt || '')
-    setEditCliToolId(currentNodeRuntime.cliToolId || '')
+    setEditCliToolId(
+      isCliToolEnabled(currentNodeRuntime.cliToolId) ? currentNodeRuntime.cliToolId || '' : ''
+    )
     setEditCliConfigId(currentNodeRuntime.agentToolConfigId || '')
     setIsEditOpen(true)
   }, [currentNodeRuntime.agentToolConfigId, currentNodeRuntime.cliToolId, task])

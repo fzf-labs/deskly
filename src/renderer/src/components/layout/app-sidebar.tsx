@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { isProjectRequiredRoute } from '@/lib/project-routing'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
 
@@ -67,7 +68,6 @@ export function WorkspaceSidebarContent() {
   const { leftOpen } = useSidebar()
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
-  const [selectedProjectGroupId, setSelectedProjectGroupId] = useState<string | null>(null)
   const [sortMode, setSortMode] = useState<WorkspaceSidebarSortMode>(getInitialSidebarSortMode)
   const hasMountedRef = useRef(false)
   const activeTaskId = useActiveTaskId()
@@ -78,10 +78,10 @@ export function WorkspaceSidebarContent() {
   const isComposerRoute = isWorkspaceRoute && activeTaskId === null
 
   useEffect(() => {
-    if (isComposerRoute && selectedProjectGroupId === null && currentProjectId !== null) {
-      setCurrentProjectId(null)
+    if (!currentProjectId && isProjectRequiredRoute(location.pathname, location.search)) {
+      navigate('/tasks', { replace: true })
     }
-  }, [currentProjectId, isComposerRoute, selectedProjectGroupId, setCurrentProjectId])
+  }, [currentProjectId, location.pathname, location.search, navigate])
 
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_SORT_MODE_KEY, sortMode)
@@ -107,25 +107,20 @@ export function WorkspaceSidebarContent() {
   }, [location.pathname, refresh])
 
   const handleOpenWorkspace = () => {
-    setSelectedProjectGroupId(null)
-    setCurrentProjectId(null)
     navigate('/tasks')
   }
 
   const handleSelectProject = (projectId: string | null) => {
-    setSelectedProjectGroupId(projectId)
     setCurrentProjectId(projectId)
     navigate('/tasks')
   }
 
   const handleSetCurrentProject = (projectId: string) => {
-    setSelectedProjectGroupId(projectId)
     setCurrentProjectId(projectId)
     navigate('/tasks')
   }
 
   const handleSelectTask = (taskId: string, projectId: string | null) => {
-    setSelectedProjectGroupId(projectId)
     if (projectId) {
       setCurrentProjectId(projectId)
     }
@@ -142,7 +137,7 @@ export function WorkspaceSidebarContent() {
       label: t.nav.newThread,
       icon: PenSquare,
       onClick: handleOpenWorkspace,
-      isActive: isComposerRoute && selectedProjectGroupId === null
+      isActive: isComposerRoute
     }
   ]
 
@@ -200,6 +195,7 @@ export function WorkspaceSidebarContent() {
   }
 
   const sidebarVisible = leftOpen
+  const visibleUtilityItems = currentProjectId ? utilityItems : []
 
   return (
     <TooltipProvider delayDuration={120}>
@@ -262,7 +258,7 @@ export function WorkspaceSidebarContent() {
             emptyLabel={t.nav.noTasksYet}
             startConversationLabel={t.nav.startConversation}
             activeTaskId={activeTaskId}
-            activeProjectGroupId={isComposerRoute ? selectedProjectGroupId : null}
+            activeProjectGroupId={isComposerRoute ? currentProjectId : null}
             projectGroups={projectGroups}
             expandedGroups={expandedGroups}
             onSelectProject={handleSelectProject}
@@ -270,7 +266,9 @@ export function WorkspaceSidebarContent() {
             onToggleGroup={toggleGroup}
           />
 
-          <WorkspaceSidebarUtilityNav leftOpen items={utilityItems} />
+          {visibleUtilityItems.length > 0 ? (
+            <WorkspaceSidebarUtilityNav leftOpen items={visibleUtilityItems} />
+          ) : null}
           <div className="px-3 pb-3 pt-4">
             <div className="border-sidebar-border/70 border-t pt-3">
               <WorkspaceSidebarUtilityNav

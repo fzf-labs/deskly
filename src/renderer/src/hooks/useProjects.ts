@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { normalizeCurrentProjectId } from '@/lib/project-routing';
 
 export interface Project {
   id: string;
@@ -81,6 +82,15 @@ export function useProjects() {
     // Notify other components about the change
     window.dispatchEvent(new CustomEvent(CURRENT_PROJECT_CHANGED_EVENT, { detail: id }));
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const normalizedId = normalizeCurrentProjectId(currentProjectId, projects);
+    if (normalizedId !== currentProjectId) {
+      setCurrentProjectId(normalizedId);
+    }
+  }, [currentProjectId, loading, projects, setCurrentProjectId]);
 
   const addProject = useCallback(async (input: CreateProjectInput): Promise<Project> => {
     const result = await window.api.projects.add({

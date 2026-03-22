@@ -10,11 +10,17 @@ import {
 import type {
   Settings,
   AIProvider,
+  EnabledCliTools,
   SandboxProviderSetting,
   AgentRuntimeSetting,
   SoundChoice,
   SoundPresetId,
 } from './types';
+import {
+  createDefaultEnabledCliTools,
+  isCliToolEnabled,
+  normalizeEnabledCliTools,
+} from '../../../../shared/cli-tool-enablement';
 import {
   DEFAULT_TASK_COMPLETE_SOUND,
   DEFAULT_TASK_NODE_COMPLETE_SOUND,
@@ -154,6 +160,7 @@ export const defaultSettings: Settings = {
     editorType: 'vscode',
     customCommand: '',
   },
+  enabledCliTools: createDefaultEnabledCliTools(),
   defaultCliToolId: '',
   gitWorktreeBranchPrefix: 'WT-',
   gitWorktreeDir: '~/.deskly/worktrees',
@@ -217,6 +224,7 @@ const loadGeneralSettingsFromMain = async (): Promise<Partial<Settings>> => {
   try {
     const appSettings = await window.api.settings.get();
     return {
+      enabledCliTools: normalizeEnabledCliTools(appSettings.enabledCliTools),
       theme: appSettings.theme,
       language: appSettings.language,
     };
@@ -262,6 +270,11 @@ const normalizeLoadedSettings = (value: unknown): Settings => {
 
   if (!loadedSettings.gitWorktreeDir?.trim()) {
     loadedSettings.gitWorktreeDir = defaultSettings.gitWorktreeDir;
+  }
+
+  loadedSettings.enabledCliTools = normalizeEnabledCliTools(loadedSettings.enabledCliTools);
+  if (!isCliToolEnabled(loadedSettings.defaultCliToolId, loadedSettings.enabledCliTools)) {
+    loadedSettings.defaultCliToolId = '';
   }
 
   if (typeof loadedSettings.taskCompleteNotificationsEnabled !== 'boolean') {
@@ -323,10 +336,10 @@ export async function getSettingsAsync(): Promise<Settings> {
     loadGeneralSettingsFromMain(),
   ]);
 
-  settingsCache = {
+  settingsCache = normalizeLoadedSettings({
     ...(storedSettings ?? defaultSettings),
     ...generalSettings,
-  };
+  });
 
   return settingsCache;
 }
@@ -339,13 +352,23 @@ export function getSettings(): Settings {
 }
 
 export function saveSettings(settings: Settings): void {
-  settingsCache = settings;
+  const enabledCliTools = normalizeEnabledCliTools(settings.enabledCliTools);
+  const normalizedSettings: Settings = {
+    ...settings,
+    enabledCliTools,
+    defaultCliToolId: isCliToolEnabled(settings.defaultCliToolId, enabledCliTools)
+      ? settings.defaultCliToolId
+      : '',
+  };
+
+  settingsCache = normalizedSettings;
 
   const isElectron = typeof window !== 'undefined' && 'api' in window;
   if (isElectron && window.api.settings) {
     window.api.settings.update({
-      theme: settings.theme,
-      language: settings.language,
+      enabledCliTools: normalizedSettings.enabledCliTools,
+      theme: normalizedSettings.theme,
+      language: normalizedSettings.language,
     }).catch((error) => {
       console.error('[Settings] Failed to sync to main process:', error);
     });
@@ -353,21 +376,21 @@ export function saveSettings(settings: Settings): void {
 
   if (isElectron && window.api.notification) {
     const notificationsEnabled =
-      settings.taskCompleteNotificationsEnabled ||
-      settings.taskNodeCompleteNotificationsEnabled;
+      normalizedSettings.taskCompleteNotificationsEnabled ||
+      normalizedSettings.taskNodeCompleteNotificationsEnabled;
     console.info('[NotifyDebug][renderer] Sync notification enabled state', {
-      taskCompleteNotificationsEnabled: settings.taskCompleteNotificationsEnabled,
-      taskNodeCompleteNotificationsEnabled: settings.taskNodeCompleteNotificationsEnabled,
+      taskCompleteNotificationsEnabled: normalizedSettings.taskCompleteNotificationsEnabled,
+      taskNodeCompleteNotificationsEnabled: normalizedSettings.taskNodeCompleteNotificationsEnabled,
       notificationsEnabled,
     });
     window.api.notification.setEnabled(notificationsEnabled).catch((error) => {
       console.error('[Settings] Failed to sync notification state:', error);
     });
     const soundEnabled =
-      settings.taskCompleteSoundEnabled || settings.taskNodeCompleteSoundEnabled;
+      normalizedSettings.taskCompleteSoundEnabled || normalizedSettings.taskNodeCompleteSoundEnabled;
     console.info('[NotifyDebug][renderer] Sync notification sound enabled state', {
-      taskCompleteSoundEnabled: settings.taskCompleteSoundEnabled,
-      taskNodeCompleteSoundEnabled: settings.taskNodeCompleteSoundEnabled,
+      taskCompleteSoundEnabled: normalizedSettings.taskCompleteSoundEnabled,
+      taskNodeCompleteSoundEnabled: normalizedSettings.taskNodeCompleteSoundEnabled,
       soundEnabled,
     });
     window.api.notification.setSoundEnabled(soundEnabled).catch((error) => {
@@ -378,7 +401,8 @@ export function saveSettings(settings: Settings): void {
   try {
     const sanitized = {
       ...settings,
-      profile: { ...settings.profile },
+      ...normalizedSettings,
+      profile: { ...normalizedSettings.profile },
     } as Settings & { mcpEnabled?: boolean };
     if ('mcpEnabled' in sanitized) delete sanitized.mcpEnabled;
     delete (sanitized.profile as { avatar?: string }).avatar;
@@ -462,6 +486,21 @@ export function getDefaultSandboxProvider(): SandboxProviderSetting | undefined 
 export function getDefaultAgentRuntime(): AgentRuntimeSetting | undefined {
   const settings = getSettings();
   return settings.agentRuntimes.find((r) => r.id === settings.defaultAgentRuntime);
+}
+
+export function isCliToolEnabledInSettings(
+  toolId: string | null | undefined,
+  settings: Pick<Settings, 'enabledCliTools'> = getSettings()
+): boolean {
+  return isCliToolEnabled(toolId, settings.enabledCliTools as EnabledCliTools);
+}
+
+export function getEnabledDefaultCliToolId(
+  settings: Pick<Settings, 'defaultCliToolId' | 'enabledCliTools'> = getSettings()
+): string {
+  return isCliToolEnabled(settings.defaultCliToolId, settings.enabledCliTools as EnabledCliTools)
+    ? settings.defaultCliToolId
+    : '';
 }
 
 // ============ Sync with Backend ============

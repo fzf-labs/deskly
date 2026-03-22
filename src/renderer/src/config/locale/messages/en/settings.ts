@@ -118,6 +118,7 @@ export default {
   cliDetectError: 'Unable to detect CLI tools. Please try again.',
   cliEmpty: 'No CLI tools found.',
   cliTool: 'Tool',
+  cliEnabledLabel: 'Enabled',
   cliStatus: 'Status',
   cliVersion: 'Version',
   cliInstallPath: 'Install Path',
@@ -158,6 +159,7 @@ export default {
   cliConfigHintEnvPerLine: 'KEY=VALUE per line',
   cliConfigShowSecret: 'Show value',
   cliConfigHideSecret: 'Hide value',
+  cliDefaultRequired: 'Please enable and choose a default CLI in Settings -> Agent CLI',
 
   // Git
   gitDescription: 'Check Git installation status and configure worktree branch naming.',

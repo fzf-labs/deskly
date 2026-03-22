@@ -5,9 +5,11 @@ import {
   getWorkflowGenerationSchemaString
 } from './workflow-generation-prompt'
 import type { CLIToolDetectorService } from './CLIToolDetectorService'
+import type { SettingsService } from './SettingsService'
 import type { WorkflowDefinitionService } from './WorkflowDefinitionService'
 import type { CliSessionService } from './cli/CliSessionService'
 import { newUlid } from '../utils/ids'
+import { isCliToolEnabled } from '../../shared/cli-tool-enablement'
 import type {
   GenerateWorkflowDefinitionInput,
   GeneratedWorkflowDefinitionResult,
@@ -478,15 +480,18 @@ export class WorkflowDefinitionGenerationService {
   private cliSessionService: CliSessionService | null = null
   private cliToolDetectorService: CLIToolDetectorService | null = null
   private workflowDefinitionService: WorkflowDefinitionService | null = null
+  private settingsService: SettingsService | null = null
 
   setCliRuntime(
     cliSessionService: CliSessionService,
     cliToolDetectorService: CLIToolDetectorService,
-    workflowDefinitionService: WorkflowDefinitionService
+    workflowDefinitionService: WorkflowDefinitionService,
+    settingsService: SettingsService
   ): void {
     this.cliSessionService = cliSessionService
     this.cliToolDetectorService = cliToolDetectorService
     this.workflowDefinitionService = workflowDefinitionService
+    this.settingsService = settingsService
   }
 
   async generateDefinition(
@@ -529,6 +534,9 @@ export class WorkflowDefinitionGenerationService {
     }
 
     const toolIds = await this.resolveGenerationTools(input)
+    if (toolIds.length === 0) {
+      throw new Error('CLI tool is disabled in Settings -> Agent CLI')
+    }
     let lastError: Error | null = null
 
     for (const toolId of toolIds) {
@@ -605,17 +613,29 @@ export class WorkflowDefinitionGenerationService {
   private async resolveGenerationTools(
     input: WorkflowGenerationRuntimeInput
   ): Promise<SupportedWorkflowGenerationTool[]> {
+    const enabledCliTools = this.settingsService?.getSettings().enabledCliTools
+
     if (isSupportedWorkflowGenerationTool(input.toolId)) {
+      if (enabledCliTools && !isCliToolEnabled(input.toolId, enabledCliTools)) {
+        throw new Error('CLI tool is disabled in Settings -> Agent CLI')
+      }
       return [input.toolId]
     }
 
     if (!this.cliToolDetectorService) {
-      return [...WORKFLOW_GENERATION_CANDIDATE_TOOLS]
+      return enabledCliTools
+        ? WORKFLOW_GENERATION_CANDIDATE_TOOLS.filter((toolId) =>
+            isCliToolEnabled(toolId, enabledCliTools)
+          )
+        : [...WORKFLOW_GENERATION_CANDIDATE_TOOLS]
     }
 
     const rankedTools: ToolAvailabilityRank[] = []
 
     for (const toolId of WORKFLOW_GENERATION_CANDIDATE_TOOLS) {
+      if (enabledCliTools && !isCliToolEnabled(toolId, enabledCliTools)) {
+        continue
+      }
       const detected = await this.cliToolDetectorService.detectTool(toolId, { level: 'fast' })
       rankedTools.push({
         toolId,

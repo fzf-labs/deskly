@@ -11,9 +11,11 @@ export type {
   UserProfile,
   EditorType,
   EditorSettings,
+  EnabledCliTools,
   Settings,
   SoundChoice,
   SoundPresetId,
+  SupportedCliToolId,
 } from './types';
 
 // General - core functions, theme
@@ -23,9 +25,11 @@ export {
   defaultAgentRuntimes,
   defaultProviders,
   defaultSettings,
+  getEnabledDefaultCliToolId,
   // Core functions
   getSettings,
   getSettingsAsync,
+  isCliToolEnabledInSettings,
   saveSettings,
   saveSettingItem,
   initializeSettings,

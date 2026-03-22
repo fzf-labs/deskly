@@ -40,6 +40,7 @@ import {
   type WorkflowDefinitionNodePosition
 } from '@/data'
 import { newUuid } from '@/lib/ids'
+import { filterEnabledCliTools } from '@/lib/cli-tool-enablement'
 import { normalizeCliTools, type CLIToolInfo } from '@/lib/cli-tools'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
@@ -751,6 +752,13 @@ export function WorkflowTemplateEditor({
 
   const generationCliTools = useMemo(() => cliTools.filter(isWorkflowGenerationCliTool), [cliTools])
 
+  useEffect(() => {
+    if (!generationToolId) return
+    if (generationCliTools.some((tool) => tool.id === generationToolId)) return
+    setGenerationToolId('')
+    setGenerationAgentToolConfigId('')
+  }, [generationCliTools, generationToolId])
+
   const resolveDefaultCliConfigId = useCallback(
     async (toolId: string): Promise<string> => {
       if (!toolId) return ''
@@ -767,7 +775,7 @@ export function WorkflowTemplateEditor({
     const loadTools = async () => {
       try {
         const detected = await window.api?.cliTools?.getSnapshot?.()
-        if (isMounted) setCliTools(normalizeCliTools(detected))
+        if (isMounted) setCliTools(filterEnabledCliTools(normalizeCliTools(detected)))
         void window.api?.cliTools?.refresh?.({ level: 'fast' })
       } catch {
         if (isMounted) setCliTools([])
@@ -776,7 +784,7 @@ export function WorkflowTemplateEditor({
 
     const unsubscribe = window.api?.cliTools?.onUpdated?.((tools) => {
       if (!isMounted) return
-      setCliTools(normalizeCliTools(tools))
+      setCliTools(filterEnabledCliTools(normalizeCliTools(tools)))
     })
 
     void loadTools()

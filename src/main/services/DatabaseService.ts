@@ -19,6 +19,7 @@ import { WorkflowRunService } from './WorkflowRunService'
 import type { WorkflowSchedulerService } from './WorkflowSchedulerService'
 import type { CliSessionService } from './cli/CliSessionService'
 import type { CLIToolDetectorService } from './CLIToolDetectorService'
+import type { SettingsService } from './SettingsService'
 import { getWorkflowCurrentNodeId, getWorkflowNodeOrderMap } from './workflow-graph'
 import type { CreateProjectInput, Project, UpdateProjectInput } from '../types/project'
 import type {
@@ -131,12 +132,14 @@ export class DatabaseService {
 
   setWorkflowGenerationRuntime(
     cliSessionService: CliSessionService,
-    cliToolDetectorService: CLIToolDetectorService
+    cliToolDetectorService: CLIToolDetectorService,
+    settingsService: SettingsService
   ): void {
     this.workflowDefinitionGenerationService.setCliRuntime(
       cliSessionService,
       cliToolDetectorService,
-      this.workflowDefinitionService
+      this.workflowDefinitionService,
+      settingsService
     )
   }
 
