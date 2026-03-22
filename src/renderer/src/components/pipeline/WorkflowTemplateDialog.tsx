@@ -114,6 +114,9 @@ type WorkflowEditorNodeData = {
 
 type WorkflowEditorNode = Node<WorkflowEditorNodeData, 'workflow-editor'>
 
+const isWorkflowGenerationCliTool = (tool: CLIToolInfo) =>
+  tool.id === 'claude-code' || tool.id === 'codex'
+
 const getDefaultNodePosition = (index: number): WorkflowDefinitionNodePosition => ({
   x: (index % 3) * WORKFLOW_NODE_GAP_X,
   y: Math.floor(index / 3) * WORKFLOW_NODE_GAP_Y
@@ -709,6 +712,8 @@ export function WorkflowTemplateEditor({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
   const [generationPrompt, setGenerationPrompt] = useState('')
+  const [generationToolId, setGenerationToolId] = useState('')
+  const [generationAgentToolConfigId, setGenerationAgentToolConfigId] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [cliTools, setCliTools] = useState<CLIToolInfo[]>([])
   const [cliConfigsByTool, setCliConfigsByTool] = useState<Record<string, AgentToolConfig[]>>({})
@@ -744,6 +749,17 @@ export function WorkflowTemplateEditor({
     [cliConfigsByTool]
   )
 
+  const generationCliTools = useMemo(() => cliTools.filter(isWorkflowGenerationCliTool), [cliTools])
+
+  const resolveDefaultCliConfigId = useCallback(
+    async (toolId: string): Promise<string> => {
+      if (!toolId) return ''
+      const configs = cliConfigsByTool[toolId] || (await loadCliConfigs(toolId))
+      return configs.find((config) => config.is_default)?.id || ''
+    },
+    [cliConfigsByTool, loadCliConfigs]
+  )
+
   useEffect(() => {
     if (!active) return
     let isMounted = true
@@ -776,6 +792,8 @@ export function WorkflowTemplateEditor({
 
     setError(null)
     setGenerationPrompt('')
+    setGenerationToolId('')
+    setGenerationAgentToolConfigId('')
     setSelectedEdgeId(null)
 
     if (initialValues) {
@@ -1116,7 +1134,9 @@ export function WorkflowTemplateEditor({
       const generated = await db.generateWorkflowDefinition({
         prompt: generationPrompt.trim(),
         name: templateName.trim() || undefined,
-        mode: 'ai'
+        mode: 'ai',
+        toolId: generationToolId || undefined,
+        agentToolConfigId: generationAgentToolConfigId || undefined
       })
       applyGeneratedDraft(generated)
     } catch (err) {
@@ -1395,6 +1415,78 @@ export function WorkflowTemplateEditor({
                         }
                         className={cn(EDITOR_TEXTAREA_CLASS, 'mt-0 min-h-[132px]')}
                       />
+                      <div className="mt-3 grid gap-3">
+                        <div>
+                          <label className="text-sm font-medium">
+                            {t.task.workflowGenerationCliLabel || t.task.createCliLabel}
+                          </label>
+                          <div className="mt-1.5">
+                            <Select
+                              value={generationToolId}
+                              triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
+                              disabled={isGenerating}
+                              onValueChange={async (toolId) => {
+                                setGenerationToolId(toolId)
+                                if (!toolId) {
+                                  setGenerationAgentToolConfigId('')
+                                  return
+                                }
+
+                                const defaultConfigId = await resolveDefaultCliConfigId(toolId)
+                                setGenerationAgentToolConfigId(defaultConfigId)
+                              }}
+                              placeholder={t.task.workflowGenerationCliAuto || '自动选择可用 CLI'}
+                              options={[
+                                {
+                                  value: '',
+                                  label: t.task.workflowGenerationCliAuto || '自动选择可用 CLI'
+                                },
+                                ...generationCliTools.map((tool) => ({
+                                  value: tool.id,
+                                  label: tool.displayName || tool.name || tool.id
+                                }))
+                              ]}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium">
+                            {t.task.workflowGenerationCliConfigLabel || t.task.createCliConfigLabel}
+                          </label>
+                          <div className="mt-1.5">
+                            <Select
+                              value={generationAgentToolConfigId}
+                              triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
+                              disabled={!generationToolId || isGenerating}
+                              onValueChange={(configId) => {
+                                setGenerationAgentToolConfigId(configId)
+                              }}
+                              placeholder={
+                                !generationToolId
+                                  ? t.task.createCliConfigSelectTool
+                                  : t.task.workflowGenerationCliConfigDefault ||
+                                    '使用所选 CLI 的默认配置'
+                              }
+                              options={[
+                                {
+                                  value: '',
+                                  label:
+                                    t.task.workflowGenerationCliConfigDefault ||
+                                    '使用所选 CLI 的默认配置'
+                                },
+                                ...((generationToolId
+                                  ? cliConfigsByTool[generationToolId] || []
+                                  : []
+                                ).map((config) => ({
+                                  value: config.id,
+                                  label: config.name
+                                })) ?? [])
+                              ]}
+                            />
+                          </div>
+                        </div>
+                      </div>
                       <div className="mt-3 flex items-center justify-end gap-3">
                         <Button
                           type="button"

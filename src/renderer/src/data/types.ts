@@ -177,6 +177,8 @@ export interface GenerateWorkflowDefinitionInput {
   prompt: string
   name?: string | null
   mode?: 'ai' | 'rules'
+  toolId?: string | null
+  agentToolConfigId?: string | null
 }
 
 export interface GeneratedWorkflowDefinitionResult {

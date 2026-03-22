@@ -31,7 +31,9 @@ export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): 
       v.shape({
         prompt: v.string(),
         name: v.optional(v.nullable(v.string({ allowEmpty: true }))),
-        mode: v.optional(v.enum(['ai', 'rules'] as const))
+        mode: v.optional(v.enum(['ai', 'rules'] as const)),
+        toolId: v.optional(v.nullable(v.string({ allowEmpty: true }))),
+        agentToolConfigId: v.optional(v.nullable(v.string({ allowEmpty: true })))
       })
     ],
     async (_, input) =>

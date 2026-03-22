@@ -100,6 +100,10 @@ export default {
   workflowGenerateButton: 'Generate workflow',
   workflowGenerateLoading: 'Generating...',
   workflowGenerationPromptLabel: 'Generate from goal',
+  workflowGenerationCliLabel: 'Generation CLI',
+  workflowGenerationCliConfigLabel: 'Generation config',
+  workflowGenerationCliAuto: 'Auto-select an available CLI',
+  workflowGenerationCliConfigDefault: 'Use the selected CLI default config',
   workflowGenerationPromptPlaceholder: 'Describe the workflow you want to generate.',
   workflowGenerationPromptRequired: 'Please enter a workflow goal first.',
   workflowGenerationCliUnavailable:

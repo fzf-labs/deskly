@@ -100,6 +100,10 @@ export default {
   workflowGenerateButton: '生成工作流',
   workflowGenerateLoading: '生成中...',
   workflowGenerationPromptLabel: '根据目标生成',
+  workflowGenerationCliLabel: '生成 CLI',
+  workflowGenerationCliConfigLabel: '生成配置',
+  workflowGenerationCliAuto: '自动选择可用 CLI',
+  workflowGenerationCliConfigDefault: '使用所选 CLI 的默认配置',
   workflowGenerationPromptPlaceholder:
     '描述你想生成的 workflow，比如先分析需求，再实现，再验证结果。',
   workflowGenerationPromptRequired: '请先填写用于生成 workflow 的目标描述。',

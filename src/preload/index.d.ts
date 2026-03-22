@@ -316,6 +316,8 @@ interface WorkflowAPI {
     prompt: string
     name?: string | null
     mode?: 'ai' | 'rules'
+    toolId?: string | null
+    agentToolConfigId?: string | null
   }) => Promise<unknown>
   createDefinition: (input: unknown) => Promise<unknown>
   updateDefinition: (input: unknown) => Promise<unknown>

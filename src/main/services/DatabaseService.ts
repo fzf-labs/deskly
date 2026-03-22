@@ -639,7 +639,26 @@ export class DatabaseService {
   async generateWorkflowDefinition(
     input: GenerateWorkflowDefinitionInput
   ): Promise<GeneratedWorkflowDefinitionResult> {
-    return await this.workflowDefinitionGenerationService.generateDefinition(input)
+    let resolvedToolConfig: Record<string, unknown> | null = null
+
+    if (input.toolId && input.agentToolConfigId) {
+      const configRecord = this.getAgentToolConfig(input.agentToolConfigId)
+      if (configRecord?.tool_id === input.toolId && configRecord.config_json) {
+        try {
+          const parsed = JSON.parse(configRecord.config_json)
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            resolvedToolConfig = parsed as Record<string, unknown>
+          }
+        } catch (error) {
+          console.error('[DatabaseService] Failed to parse workflow generation tool config:', error)
+        }
+      }
+    }
+
+    return await this.workflowDefinitionGenerationService.generateDefinition({
+      ...input,
+      resolvedToolConfig
+    })
   }
 
   updateWorkflowDefinition(input: UpdateWorkflowDefinitionInput): WorkflowDefinition {

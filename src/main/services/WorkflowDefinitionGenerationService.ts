@@ -25,6 +25,14 @@ type DraftWorkflowStep = {
 
 type RecordLike = Record<string, unknown>
 type SupportedWorkflowGenerationTool = 'claude-code' | 'codex'
+type ToolAvailabilityRank = {
+  toolId: SupportedWorkflowGenerationTool
+  installed: boolean
+  configState: 'unknown' | 'valid' | 'missing'
+}
+type WorkflowGenerationRuntimeInput = GenerateWorkflowDefinitionInput & {
+  resolvedToolConfig?: Record<string, unknown> | null
+}
 
 const DEFAULT_AGENT_STEPS: DraftWorkflowStep[] = [
   {
@@ -60,6 +68,10 @@ const WORKFLOW_GENERATION_CANDIDATE_TOOLS: SupportedWorkflowGenerationTool[] = [
   'claude-code',
   'codex'
 ]
+
+const isSupportedWorkflowGenerationTool = (
+  value: string | null | undefined
+): value is SupportedWorkflowGenerationTool => value === 'claude-code' || value === 'codex'
 
 const splitPromptIntoSteps = (prompt: string): string[] => {
   const normalized = prompt
@@ -478,7 +490,7 @@ export class WorkflowDefinitionGenerationService {
   }
 
   async generateDefinition(
-    input: GenerateWorkflowDefinitionInput
+    input: WorkflowGenerationRuntimeInput
   ): Promise<GeneratedWorkflowDefinitionResult> {
     const prompt = input.prompt.trim()
     if (!prompt) {
@@ -495,7 +507,7 @@ export class WorkflowDefinitionGenerationService {
   }
 
   private generateRuleDefinition(
-    input: GenerateWorkflowDefinitionInput
+    input: WorkflowGenerationRuntimeInput
   ): GeneratedWorkflowDefinitionResult {
     const steps = buildDraftSteps(input)
 
@@ -507,7 +519,7 @@ export class WorkflowDefinitionGenerationService {
   }
 
   private async generateAiDefinition(
-    input: GenerateWorkflowDefinitionInput
+    input: WorkflowGenerationRuntimeInput
   ): Promise<GeneratedWorkflowDefinitionResult> {
     const cliSessionService = this.cliSessionService
     const workflowDefinitionService = this.workflowDefinitionService
@@ -516,8 +528,40 @@ export class WorkflowDefinitionGenerationService {
       throw new Error('WORKFLOW_AI_GENERATION_RUNTIME_UNAVAILABLE')
     }
 
-    const toolId = await this.resolveGenerationTool()
-    const toolConfig = this.buildToolConfig(toolId)
+    const toolIds = await this.resolveGenerationTools(input)
+    let lastError: Error | null = null
+
+    for (const toolId of toolIds) {
+      try {
+        const generated = await this.generateAiDefinitionWithTool(toolId, input)
+        return generated
+      } catch (error) {
+        lastError =
+          error instanceof Error
+            ? error
+            : new Error(String(error || 'WORKFLOW_AI_GENERATION_FAILED'))
+      }
+    }
+
+    if (lastError) {
+      throw lastError
+    }
+
+    throw new Error('WORKFLOW_AI_GENERATION_FAILED')
+  }
+
+  private async generateAiDefinitionWithTool(
+    toolId: SupportedWorkflowGenerationTool,
+    input: WorkflowGenerationRuntimeInput
+  ): Promise<GeneratedWorkflowDefinitionResult> {
+    const cliSessionService = this.cliSessionService
+    const workflowDefinitionService = this.workflowDefinitionService
+
+    if (!cliSessionService || !workflowDefinitionService) {
+      throw new Error('WORKFLOW_AI_GENERATION_RUNTIME_UNAVAILABLE')
+    }
+
+    const toolConfig = this.buildToolConfig(toolId, input)
     const result = await cliSessionService.runOneShotSession({
       toolId,
       workdir: os.homedir(),
@@ -558,26 +602,58 @@ export class WorkflowDefinitionGenerationService {
     throw new Error('WORKFLOW_AI_GENERATION_PARSE_FAILED')
   }
 
-  private async resolveGenerationTool(): Promise<SupportedWorkflowGenerationTool> {
-    if (!this.cliToolDetectorService) {
-      return 'claude-code'
+  private async resolveGenerationTools(
+    input: WorkflowGenerationRuntimeInput
+  ): Promise<SupportedWorkflowGenerationTool[]> {
+    if (isSupportedWorkflowGenerationTool(input.toolId)) {
+      return [input.toolId]
     }
+
+    if (!this.cliToolDetectorService) {
+      return [...WORKFLOW_GENERATION_CANDIDATE_TOOLS]
+    }
+
+    const rankedTools: ToolAvailabilityRank[] = []
 
     for (const toolId of WORKFLOW_GENERATION_CANDIDATE_TOOLS) {
       const detected = await this.cliToolDetectorService.detectTool(toolId, { level: 'fast' })
-      if (detected?.installed) {
-        return toolId
-      }
+      rankedTools.push({
+        toolId,
+        installed: Boolean(detected?.installed),
+        configState: detected?.configState ?? 'unknown'
+      })
+    }
+
+    const available = rankedTools
+      .filter((tool) => tool.installed)
+      .sort((left, right) => {
+        const rank = (value: ToolAvailabilityRank['configState']) => {
+          if (value === 'valid') return 2
+          if (value === 'unknown') return 1
+          return 0
+        }
+
+        return rank(right.configState) - rank(left.configState)
+      })
+      .map((tool) => tool.toolId)
+
+    if (available.length > 0) {
+      return available
     }
 
     throw new Error('WORKFLOW_AI_CLI_UNAVAILABLE')
   }
 
-  private buildToolConfig(toolId: SupportedWorkflowGenerationTool): Record<string, unknown> {
+  private buildToolConfig(
+    toolId: SupportedWorkflowGenerationTool,
+    input: WorkflowGenerationRuntimeInput
+  ): Record<string, unknown> {
     const schema = getWorkflowGenerationSchemaString()
+    const selectedConfig = input.resolvedToolConfig ?? {}
 
     if (toolId === 'claude-code') {
       return {
+        ...selectedConfig,
         system_prompt: WORKFLOW_GENERATION_SYSTEM_PROMPT,
         json_schema: schema,
         permission_mode: 'plan'
@@ -585,6 +661,7 @@ export class WorkflowDefinitionGenerationService {
     }
 
     return {
+      ...selectedConfig,
       output_schema: schema,
       skip_git_repo_check: true,
       sandbox: 'read-only',
