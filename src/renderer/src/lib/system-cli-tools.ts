@@ -1,4 +1,5 @@
 import type {
+  LocalizedText,
   SystemCliToolInfo,
   SystemCliToolInstallState
 } from '../../../shared/system-cli-tools'
@@ -32,3 +33,29 @@ export const normalizeSystemCliTools = (value: unknown): SystemCliToolInfo[] => 
 
 export const isSystemCliToolInstalled = (tool: SystemCliToolInfo): boolean =>
   tool.installState === 'installed'
+
+export const getLocalizedSystemCliText = (
+  value: LocalizedText,
+  language: string
+): string => (language.startsWith('zh') ? value.zh : value.en)
+
+export const getSystemCliSearchText = (tool: SystemCliToolInfo): string =>
+  [
+    tool.id,
+    tool.displayName,
+    tool.category,
+    tool.summary.zh,
+    tool.summary.en,
+    tool.detailIntro.zh,
+    tool.detailIntro.en,
+    ...tool.useCases.flatMap((item) => [item.zh, item.en]),
+    ...tool.guideSteps.flatMap((item) => [item.zh, item.en]),
+    ...tool.examplePrompts.flatMap((item) => [
+      item.label.zh,
+      item.label.en,
+      item.prompt.zh,
+      item.prompt.en
+    ])
+  ]
+    .join(' ')
+    .toLowerCase()

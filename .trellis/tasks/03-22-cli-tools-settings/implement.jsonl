@@ -5,3 +5,6 @@
 {"file": ".trellis/spec/frontend/type-safety.md", "reason": "IPC boundaries for CLI Tools detection need strict typed normalization"}
 {"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Renderer settings tab UI and reusable components must follow repo component patterns"}
 {"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "CLI Tools spans main IPC preload and renderer so contracts must be explicit"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "CLI Tools tab is evolving quickly so shared dialog/filter helpers should avoid repeated card logic"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Renderer changes must keep loading/error handling and pass lint/typecheck"}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "Async settings tab loading and subscriptions should follow existing hook/effect patterns"}

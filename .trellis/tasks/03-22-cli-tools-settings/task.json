@@ -1,9 +1,9 @@
 {
   "id": "cli-tools-settings",
   "name": "cli-tools-settings",
-  "title": "brainstorm: cli tools settings tab",
-  "description": "",
-  "status": "planning",
+  "title": "cli tools settings tab",
+  "description": "Add a dedicated CLI Tools settings tab for system tools while keeping Agent CLI as a separate runtime configuration domain.",
+  "status": "in_progress",
   "dev_type": "fullstack",
   "scope": null,
   "package": null,
@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 1,
   "next_action": [
     {
       "phase": 1,
