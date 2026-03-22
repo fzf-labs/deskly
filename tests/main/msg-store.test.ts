@@ -105,8 +105,10 @@ describe('MsgStoreService', () => {
       store.push({ type: 'stdout', content: 'x'.repeat(80) } as any)
     }
 
-    await waitFor(() => existsSync(logFilePath), 1000)
-    await waitFor(() => existsSync(`${logFilePath}.1`), 1000)
+    await waitFor(
+      () => existsSync(logFilePath) && existsSync(`${logFilePath}.1`),
+      1000
+    )
 
     expect(existsSync(logFilePath)).toBe(true)
     expect(existsSync(`${logFilePath}.1`)).toBe(true)
