@@ -256,7 +256,7 @@ export function TasksPage() {
         const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'WT-'
         const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
 
-        const result = await window.api.task.create({
+        const createdTask = await window.api.task.create({
           title,
           prompt,
           taskMode,
@@ -271,9 +271,7 @@ export function TasksPage() {
           workflowDefinitionId: taskMode === 'workflow' ? selectedTemplateId : undefined
         })
 
-        if (result.success && result.data) {
-          navigate(`/task/${result.data.id}`, { state: { prompt, attachments } })
-        }
+        navigate(`/task/${createdTask.id}`, { state: { prompt, attachments } })
       } catch (error) {
         console.error('[TasksPage] Failed to create task:', error)
       }

@@ -259,7 +259,7 @@ export function CreateTaskDialog({
       const cliToolId = taskMode === 'conversation' ? resolvedCliToolId : undefined
       const agentToolConfigId = taskMode === 'conversation' ? resolvedCliConfigId : undefined
 
-      const result = await window.api.task.create({
+      const createdTask = await window.api.task.create({
         title: trimmedTitle,
         prompt: trimmedPrompt,
         taskMode,
@@ -274,13 +274,9 @@ export function CreateTaskDialog({
         workflowDefinitionId: taskMode === 'workflow' ? selectedTemplateId : undefined
       })
 
-      if (result.success && result.data) {
-        onTaskCreated?.(result.data)
-        resetForm()
-        onOpenChange(false)
-      } else {
-        setError(result.error || t.task.createTaskFailed)
-      }
+      onTaskCreated?.(createdTask)
+      resetForm()
+      onOpenChange(false)
     } catch (err) {
       setError(String(err))
     } finally {

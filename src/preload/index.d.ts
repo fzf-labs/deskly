@@ -444,7 +444,7 @@ interface TaskAPI {
     agentToolConfigId?: string
     workflowTemplateId?: string
     workflowDefinitionId?: string
-  }) => Promise<{ success: boolean; data?: TaskWithWorktree; error?: string }>
+  }) => Promise<TaskWithWorktree>
   get: (id: string) => Promise<TaskWithWorktree | null>
   getAll: () => Promise<TaskWithWorktree[]>
   getByProject: (projectId: string) => Promise<TaskWithWorktree[]>

@@ -147,15 +147,7 @@ export class DatabaseService {
   createTask(input: CreateTaskInput): Task {
     const task = this.taskRepo.createTask(input)
 
-    const existingNodes = this.taskNodeRepo.getTaskNodes(task.id)
-    if (existingNodes.length === 0 && task.task_mode === 'conversation') {
-      this.taskNodeRepo.createConversationNode({
-        task_id: task.id,
-        prompt: task.prompt
-      })
-
-      this.taskExecutionService.syncTaskStatus(task.id)
-    }
+    this.ensureConversationTaskNode(task.id)
 
     return this.taskRepo.getTask(task.id)!
   }
@@ -300,6 +292,7 @@ export class DatabaseService {
       return updated ? this.getTaskNode(updated.id) : null
     }
 
+    this.ensureConversationTaskNode(taskId)
     const updated = this.taskNodeRepo.updateTaskNodeRuntime(taskId, updates)
     if (updated) {
       this.taskExecutionService.syncTaskStatus(updated.task_id)
@@ -374,6 +367,7 @@ export class DatabaseService {
   }
 
   startTaskExecution(taskId: string): TaskNode | null {
+    this.ensureConversationTaskNode(taskId)
     const updated = this.taskExecutionService.startTaskExecution(taskId)
     if (updated) this.notifyTaskNodeStatusChange(updated)
     return updated
@@ -836,6 +830,26 @@ export class DatabaseService {
 
   markStaleRunningAutomationRunsFailed(errorMessage = 'interrupted_by_app_restart'): number {
     return this.automationRepo.markStaleRunningRunsFailed(errorMessage)
+  }
+
+  private ensureConversationTaskNode(taskId: string): TaskNode | null {
+    const task = this.taskRepo.getTask(taskId)
+    if (!task || task.task_mode !== 'conversation') {
+      return null
+    }
+
+    const existingNode =
+      this.taskNodeRepo.getCurrentTaskNode(taskId) ?? this.taskNodeRepo.getTaskNodes(taskId)[0]
+    if (existingNode) {
+      return existingNode
+    }
+
+    const createdNode = this.taskNodeRepo.createConversationNode({
+      task_id: task.id,
+      prompt: task.prompt
+    })
+    this.taskExecutionService.syncTaskStatus(task.id)
+    return createdNode
   }
 
   private mapWorkflowRunNodesToTaskNodes(run: WorkflowRun, nodes: WorkflowRunNode[]): TaskNode[] {

@@ -61,18 +61,16 @@ export function TaskInput() {
         );
         return;
       }
-      const result = await window.api.task.create({
+      const createdTask = await window.api.task.create({
         title: prompt,
         prompt,
         taskMode: 'conversation',
         cliToolId: defaultCliToolId,
       });
-      if (result.success && result.data) {
-        navigate(`/task/${result.data.id}`, {
-          state: { prompt, attachments },
-        });
-        return;
-      }
+      navigate(`/task/${createdTask.id}`, {
+        state: { prompt, attachments },
+      });
+      return;
     } catch (error) {
       console.error('[TaskInput] Failed to initialize task:', error);
     }

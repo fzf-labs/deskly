@@ -23,17 +23,15 @@ export function HomePage() {
         )
         return
       }
-      const result = await window.api.task.create({
+      const createdTask = await window.api.task.create({
         title: prompt,
         prompt,
         taskMode: 'conversation',
         cliToolId: defaultCliToolId
       })
-      if (result.success && result.data) {
-        navigate(`/task/${result.data.id}`, {
-          state: { prompt, attachments }
-        })
-      }
+      navigate(`/task/${createdTask.id}`, {
+        state: { prompt, attachments }
+      })
     } catch (error) {
       console.error('[Home] Failed to create task:', error)
     }

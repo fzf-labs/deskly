@@ -240,6 +240,31 @@ export function useAgent(): UseAgentReturn {
     }
   }, [])
 
+  const resolveDefaultConversationRuntime = useCallback(async (): Promise<{
+    cliToolId: string | null
+    agentToolConfigId: string | null
+  }> => {
+    const settings = getSettings();
+    const cliToolId = getEnabledDefaultCliToolId(settings) || null;
+    if (!cliToolId) {
+      return { cliToolId: null, agentToolConfigId: null };
+    }
+
+    try {
+      const configs = await db.listAgentToolConfigs(cliToolId);
+      const list = Array.isArray(configs)
+        ? (configs as Array<{ id: string; is_default?: number | boolean }>)
+        : [];
+      const defaultConfig = list.find((config) => Boolean(config.is_default));
+      return {
+        cliToolId,
+        agentToolConfigId: defaultConfig?.id ?? null,
+      };
+    } catch {
+      return { cliToolId, agentToolConfigId: null };
+    }
+  }, []);
+
   // Load existing task from database
   // This function handles task switching (moving running task to background)
   // and loading task metadata. Message loading and background restoration is done by loadMessages.
@@ -717,29 +742,13 @@ export function useAgent(): UseAgentReturn {
 
       // Save task to database - check if task exists first
       try {
+        const { cliToolId: defaultCliToolId, agentToolConfigId } =
+          await resolveDefaultConversationRuntime();
         if (!existingTask) {
-          const settings = getSettings();
-          const defaultCliToolId = getEnabledDefaultCliToolId(settings);
-          let agentToolConfigId: string | null = null;
-          if (defaultCliToolId) {
-            try {
-              const configs = await db.listAgentToolConfigs(defaultCliToolId);
-              const list = Array.isArray(configs) ? (configs as Array<{ id: string; is_default?: number }>) : [];
-              const defaultConfig = list.find((cfg) => cfg.is_default);
-              agentToolConfigId = defaultConfig?.id ?? null;
-            } catch {
-              agentToolConfigId = null;
-            }
-          }
           await db.createTask({
             id: currentTaskId,
             title: prompt,
             prompt,
-          });
-          await db.updateCurrentTaskNodeRuntime(currentTaskId, {
-            session_id: sessId,
-            cli_tool_id: defaultCliToolId || null,
-            agent_tool_config_id: agentToolConfigId,
           });
           console.log(
             '[useAgent] Created new task:',
@@ -750,6 +759,12 @@ export function useAgent(): UseAgentReturn {
         } else {
           console.log('[useAgent] Task already exists:', currentTaskId);
         }
+
+        await db.updateCurrentTaskNodeRuntime(currentTaskId, {
+          session_id: sessId,
+          cli_tool_id: defaultCliToolId,
+          agent_tool_config_id: agentToolConfigId,
+        });
       } catch (error) {
         console.error('Failed to create task:', error);
       }
@@ -974,6 +989,7 @@ export function useAgent(): UseAgentReturn {
       initialPrompt,
       isRunning,
       processStream,
+      resolveDefaultConversationRuntime,
       resolveProjectMcpConfigPath,
       resolveTaskWorkDir,
       startTaskNodeExecutionForTask,

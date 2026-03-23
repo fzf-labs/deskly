@@ -173,14 +173,16 @@ export function useTaskDetail({
   }, [taskId])
 
   const loadCurrentNodeRuntime = useCallback(async () => {
+    const emptyRuntime: CurrentNodeRuntime = {
+      taskNodeId: null,
+      sessionId: null,
+      cliToolId: null,
+      agentToolConfigId: null
+    }
+
     if (!taskId) {
-      setCurrentNodeRuntime({
-        taskNodeId: null,
-        sessionId: null,
-        cliToolId: null,
-        agentToolConfigId: null
-      })
-      return
+      setCurrentNodeRuntime(emptyRuntime)
+      return emptyRuntime
     }
 
     try {
@@ -207,21 +209,64 @@ export function useTaskDetail({
         node = sortedNodes[sortedNodes.length - 1] ?? null
       }
 
-      setCurrentNodeRuntime({
+      const nextRuntime: CurrentNodeRuntime = {
         taskNodeId: node?.id ?? null,
         sessionId: node?.session_id ?? null,
         cliToolId: node?.cli_tool_id ?? null,
         agentToolConfigId: node?.agent_tool_config_id ?? null
-      })
+      }
+      setCurrentNodeRuntime(nextRuntime)
+      return nextRuntime
     } catch {
-      setCurrentNodeRuntime({
-        taskNodeId: null,
-        sessionId: null,
-        cliToolId: null,
-        agentToolConfigId: null
-      })
+      setCurrentNodeRuntime(emptyRuntime)
+      return emptyRuntime
     }
   }, [taskId])
+
+  const ensureConversationRuntime = useCallback(
+    async (
+      taskRecord?: Task | null,
+      preferredSessionId?: string | null
+    ): Promise<CurrentNodeRuntime> => {
+      const latestRuntime = await loadCurrentNodeRuntime()
+      const currentTask = taskRecord ?? task
+
+      if (!taskId || currentTask?.task_mode !== 'conversation') {
+        return latestRuntime
+      }
+
+      if (latestRuntime.cliToolId) {
+        return latestRuntime
+      }
+
+      const settings = getSettings()
+      const defaultCliToolId = getEnabledDefaultCliToolId(settings)
+      if (!defaultCliToolId) {
+        return latestRuntime
+      }
+
+      let defaultConfigId: string | null = latestRuntime.agentToolConfigId
+      try {
+        const configs = (await db.listAgentToolConfigs(defaultCliToolId)) as Array<{
+          id: string
+          is_default?: number | boolean
+        }>
+        const defaultConfig = configs.find((config) => Boolean(config.is_default))
+        defaultConfigId = defaultConfig?.id ?? defaultConfigId
+      } catch {
+        defaultConfigId = latestRuntime.agentToolConfigId
+      }
+
+      await db.updateCurrentTaskNodeRuntime(taskId, {
+        session_id: preferredSessionId !== undefined ? preferredSessionId : latestRuntime.sessionId,
+        cli_tool_id: defaultCliToolId,
+        agent_tool_config_id: defaultConfigId
+      })
+
+      return await loadCurrentNodeRuntime()
+    },
+    [loadCurrentNodeRuntime, task, taskId]
+  )
 
   const refreshTask = useCallback(async () => {
     if (!taskId) return
@@ -265,7 +310,7 @@ export function useTaskDetail({
           } else {
             setWorkflowRunNodes([])
           }
-          await loadCurrentNodeRuntime()
+          await ensureConversationRuntime(existingTask)
           await loadMessages(taskId)
           setHasStarted(true)
           setIsLoading(false)
@@ -288,7 +333,7 @@ export function useTaskDetail({
               session_id: sessionId ?? null,
               cli_tool_id: defaultCliToolId || null
             })
-            await loadCurrentNodeRuntime()
+            await ensureConversationRuntime(createdTask, sessionId ?? null)
           } catch (error) {
             console.error('[TaskDetail] Failed to initialize task:', error)
             const newTask = await loadTask(taskId)
@@ -305,6 +350,7 @@ export function useTaskDetail({
     void initialize()
   }, [
     taskId,
+    ensureConversationRuntime,
     loadCurrentNodeRuntime,
     loadMessages,
     loadTask,
@@ -1821,8 +1867,14 @@ export function useTaskDetail({
   const handleReply = useCallback(
     async (text: string, messageAttachments?: MessageAttachment[]) => {
       if ((text.trim() || (messageAttachments && messageAttachments.length > 0)) && taskId) {
-        if (!useCliSession && isRunning) return
-        if (useCliSession) {
+        let latestRuntime = await loadCurrentNodeRuntime()
+        if (task?.task_mode === 'conversation' && !latestRuntime.cliToolId) {
+          latestRuntime = await ensureConversationRuntime(task)
+        }
+        const shouldUseCliSession = Boolean(latestRuntime.cliToolId)
+
+        if (!shouldUseCliSession && isRunning) return
+        if (shouldUseCliSession) {
           if (task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'done') return
 
           const content = text.trim()
@@ -1890,7 +1942,9 @@ export function useTaskDetail({
       appendCliSystemLog,
       appendCliUserLog,
       continueConversation,
+      ensureConversationRuntime,
       isRunning,
+      loadCurrentNodeRuntime,
       loadMessages,
       pipelineStatus,
       pipelineTemplate,
@@ -1901,10 +1955,8 @@ export function useTaskDetail({
       setTask,
       startNextPipelineStage,
       t.common.errors.serverNotRunning,
-      task?.status,
-      task?.task_mode,
+      task,
       taskId,
-      useCliSession,
       workingDir
     ]
   )
@@ -1923,8 +1975,13 @@ export function useTaskDetail({
 
     markStartedOnce()
 
+    let latestRuntime = currentNodeRuntime
     try {
       await db.startTaskExecution(taskId)
+      latestRuntime = await loadCurrentNodeRuntime()
+      if (task?.task_mode === 'conversation' && !latestRuntime.cliToolId) {
+        latestRuntime = await ensureConversationRuntime(task)
+      }
       const refreshedTask = await db.getTask(taskId)
       if (refreshedTask) setTask(refreshedTask)
       const workflowRun = await db.getWorkflowRunByTask(taskId)
@@ -1950,7 +2007,9 @@ export function useTaskDetail({
       return
     }
 
-    if (useCliSession) {
+    const shouldUseCliSession = Boolean(latestRuntime.cliToolId)
+
+    if (shouldUseCliSession) {
       try {
         if (!cliSessionRef.current) throw new Error('CLI session not initialized')
         const prompt = buildCliPrompt(await resolveCurrentNodePrompt())
@@ -1965,8 +2024,8 @@ export function useTaskDetail({
       return
     }
 
-    const sessionInfo = currentNodeRuntime.sessionId
-      ? { sessionId: currentNodeRuntime.sessionId }
+    const sessionInfo = latestRuntime.sessionId
+      ? { sessionId: latestRuntime.sessionId }
       : undefined
     const pendingAttachments = initialAttachmentsRef.current
     initialAttachmentsRef.current = undefined
@@ -1982,7 +2041,8 @@ export function useTaskDetail({
     appendCliUserLog,
     backendWorkflowRun,
     buildCliPrompt,
-    currentNodeRuntime.sessionId,
+    currentNodeRuntime,
+    ensureConversationRuntime,
     initialPrompt,
     initialAttachmentsRef,
     isRunning,
@@ -2000,10 +2060,8 @@ export function useTaskDetail({
     setBackendWorkflowRun,
     startPipelineStage,
     t.common.errors.serverNotRunning,
-    task?.prompt,
-    task?.task_mode,
+    task,
     taskId,
-    useCliSession,
     workingDir
   ])
 
