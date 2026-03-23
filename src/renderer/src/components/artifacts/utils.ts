@@ -1,5 +1,3 @@
-import { API_BASE_URL } from '@/config';
-
 import type { Artifact } from './types';
 
 // Max file size for preview (50MB)
@@ -230,11 +228,10 @@ export function inlineAssets(html: string, allArtifacts: Artifact[]): string {
 export async function openFileExternal(path: string): Promise<void> {
   if (!path) return;
   try {
-    await fetch(`${API_BASE_URL}/files/open`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path }),
-    });
+    if (!window.api?.shell?.openPath) {
+      throw new Error('Shell IPC is unavailable');
+    }
+    await window.api.shell.openPath(path);
   } catch (err) {
     console.error('[Preview] Failed to open file:', err);
   }

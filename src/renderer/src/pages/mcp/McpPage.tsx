@@ -6,7 +6,6 @@ import { Loader2, RefreshCw, X } from 'lucide-react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useProjects } from '@/hooks/useProjects'
 import { useLanguage } from '@/providers/language-provider'
-import { API_BASE_URL } from '@/config'
 import { resolvePath } from '@/lib/skills'
 import {
   buildMcpServersFromConfig,
@@ -94,31 +93,16 @@ export function McpPage() {
       }
     }
 
-    if (window.api?.fs?.exists && window.api?.fs?.readTextFile) {
-      try {
-        const exists = await window.api.fs.exists(resolvedPath)
-        if (!exists) return { exists: false, servers: {} }
-        const content = await window.api.fs.readTextFile(resolvedPath)
-        return { exists: true, servers: parseContent(content) }
-      } catch (error) {
-        console.warn('[Project MCP] Failed to read config file:', error)
-        return { exists: false, servers: {} }
-      }
-    }
-
     try {
-      const response = await fetch(`${API_BASE_URL}/files/read`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: resolvedPath, expandHome: true })
-      })
-      const data = await response.json()
-      if (!data.success || !data.content) {
+      if (!window.api?.fs?.exists || !window.api?.fs?.readTextFile) {
         return { exists: false, servers: {} }
       }
-      return { exists: true, servers: parseContent(data.content) }
+      const exists = await window.api.fs.exists(resolvedPath)
+      if (!exists) return { exists: false, servers: {} }
+      const content = await window.api.fs.readTextFile(resolvedPath)
+      return { exists: true, servers: parseContent(content) }
     } catch (error) {
-      console.warn('[Project MCP] Failed to read config via API:', error)
+      console.warn('[Project MCP] Failed to read config file:', error)
     }
 
     return { exists: false, servers: {} }

@@ -42,6 +42,3 @@ export const categoryIcons: Record<
   data: Database,
   about: Info,
 };
-
-// Re-export API config
-export { API_PORT, API_BASE_URL } from '@/config';

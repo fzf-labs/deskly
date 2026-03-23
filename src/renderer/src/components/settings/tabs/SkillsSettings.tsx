@@ -8,18 +8,13 @@ import {
   resolvePath,
 } from '@/lib/skills';
 import {
-  ArrowLeftRight,
   FolderOpen,
-  Github,
-  Layers,
   Loader2,
   MoreHorizontal,
   RefreshCw,
   Trash2,
-  X,
 } from 'lucide-react';
 
-import { API_BASE_URL } from '../constants';
 import type { SettingsTabProps, SkillInfo } from '../types';
 
 // Skill card component
@@ -110,9 +105,6 @@ export function SkillsSettings({
   const [cliSkillGroups, setCliSkillGroups] = useState<CliSkillGroup[]>([]);
   const [mainTab, setMainTab] = useState<MainTab>('installed');
   const [loading, setLoading] = useState(true);
-  const [showGitHubImport, setShowGitHubImport] = useState(false);
-  const [githubUrl, setGithubUrl] = useState('');
-  const [importing, setImporting] = useState(false);
   const [homeDir, setHomeDir] = useState<string | null>(null);
   const { t } = useLanguage();
   const defaultAppSkillsPath = '~/.deskly/skills';
@@ -499,105 +491,6 @@ export function SkillsSettings({
                 {t.common.delete}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Import from GitHub Dialog */}
-      {showGitHubImport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/50"
-            onClick={() => {
-              setShowGitHubImport(false);
-              setGithubUrl('');
-            }}
-          />
-          <div className="bg-background border-border relative z-10 w-[420px] rounded-xl border p-6 shadow-lg">
-            <button
-              onClick={() => {
-                setShowGitHubImport(false);
-                setGithubUrl('');
-              }}
-              className="text-muted-foreground hover:text-foreground absolute top-4 right-4"
-            >
-              <X className="size-5" />
-            </button>
-
-            {/* Icons */}
-            <div className="mb-4 flex items-center justify-center gap-3">
-              <div className="bg-muted flex size-12 items-center justify-center rounded-xl">
-                <Github className="size-6" />
-              </div>
-              <ArrowLeftRight className="text-muted-foreground size-5" />
-              <div className="bg-muted flex size-12 items-center justify-center rounded-xl">
-                <Layers className="size-6" />
-              </div>
-            </div>
-
-            <h3 className="text-foreground mb-2 text-center text-lg font-semibold">
-              {t.settings.skillsImportGitHub}
-            </h3>
-            <p className="text-muted-foreground mb-6 text-center text-sm">
-              {t.settings.skillsImportGitHubDialogDesc}
-            </p>
-
-            <div className="mb-4">
-              <label className="text-foreground mb-2 block text-sm font-medium">
-                URL
-              </label>
-              <input
-                type="text"
-                value={githubUrl}
-                onChange={(e) => setGithubUrl(e.target.value)}
-                placeholder="https://github.com/username/repo"
-                className="border-input bg-muted text-foreground placeholder:text-muted-foreground focus:ring-ring h-11 w-full rounded-lg border px-3 text-sm focus:ring-2 focus:outline-none"
-              />
-            </div>
-
-            <button
-              onClick={async () => {
-                if (!githubUrl) return;
-                setImporting(true);
-                try {
-                  const response = await fetch(
-                    `${API_BASE_URL}/files/import-skill`,
-                    {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        url: githubUrl,
-                        targetDir: appSkillsPath,
-                      }),
-                    }
-                  );
-                  const data = await response.json();
-                  if (data.success) {
-                    setShowGitHubImport(false);
-                    setGithubUrl('');
-                    // Reload skills
-                    loadSkillsFromPath(appSkillsPath);
-                  } else {
-                    console.error('[Skills] Import failed:', data.error);
-                  }
-                } catch (err) {
-                  console.error('[Skills] Import error:', err);
-                } finally {
-                  setImporting(false);
-                }
-              }}
-              disabled={!githubUrl || importing}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {importing ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  {t.settings.skillsImporting}
-                </>
-              ) : (
-                t.settings.skillsImport
-              )}
-            </button>
           </div>
         </div>
       )}

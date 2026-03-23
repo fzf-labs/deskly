@@ -5,22 +5,6 @@
  */
 
 // =============================================================================
-// API Configuration
-// =============================================================================
-
-/**
- * API port configuration
- * - Development: 2026 (run `pnpm dev:api` separately)
- * - Production: 2620 (bundled sidecar)
- */
-export const API_PORT = import.meta.env.PROD ? 2620 : 2026;
-
-/**
- * API base URL
- */
-export const API_BASE_URL = `http://localhost:${API_PORT}`;
-
-// =============================================================================
 // App Configuration
 // =============================================================================
 

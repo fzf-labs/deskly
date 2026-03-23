@@ -84,25 +84,12 @@ interface UseTaskDetailInput {
   taskId?: string
   initialPrompt: string
   initialSessionId?: string
-  initialAttachmentsRef: React.MutableRefObject<MessageAttachment[] | undefined>
   navigate: NavigateFunction
   activeTaskId: string | null
   messages: AgentMessage[]
   setMessages: React.Dispatch<React.SetStateAction<AgentMessage[]>>
   isRunning: boolean
   stopAgent: () => Promise<void>
-  runAgent: (
-    prompt: string,
-    taskId?: string,
-    sessionInfo?: { sessionId: string },
-    attachments?: MessageAttachment[],
-    workingDir?: string
-  ) => Promise<string>
-  continueConversation: (
-    prompt: string,
-    attachments?: MessageAttachment[],
-    workingDir?: string
-  ) => Promise<void>
   loadTask: (taskId: string) => Promise<Task | null>
   loadMessages: (taskId: string) => Promise<void>
   sessionFolder: string | null
@@ -117,15 +104,12 @@ export function useTaskDetail({
   taskId,
   initialPrompt,
   initialSessionId,
-  initialAttachmentsRef,
   navigate,
   activeTaskId,
   messages,
   setMessages,
   isRunning,
   stopAgent,
-  runAgent,
-  continueConversation,
   loadTask,
   loadMessages,
   sessionFolder,
@@ -1123,31 +1107,24 @@ export function useTaskDetail({
         return
       }
 
-      const sessionInfo = currentNodeRuntime.sessionId
-        ? { sessionId: currentNodeRuntime.sessionId }
-        : undefined
-      if (messages.length === 0) {
-        await runAgent(prompt, taskId, sessionInfo, undefined, workingDir || undefined)
-      } else {
-        await continueConversation(prompt, undefined, workingDir || undefined)
-      }
+      setPipelineStatus('failed')
+      await appendPipelineNotice(
+        t.common.errors.serverNotRunning || 'CLI session is not running.'
+      )
     },
     [
       appendCliUserLog,
       appendPipelineNotice,
       buildCliPrompt,
-      continueConversation,
-      currentNodeRuntime.sessionId,
       messages.length,
       pipelineTemplate,
       resolveTaskNodePrompt,
-      runAgent,
       runCliPrompt,
       taskId,
       t.task.pipelineApprovalNotePrefix,
       t.task.pipelineCompleted,
-      useCliSession,
-      workingDir
+      t.common.errors.serverNotRunning,
+      useCliSession
     ]
   )
 
@@ -1920,14 +1897,19 @@ export function useTaskDetail({
           await startNextPipelineStage(approvalNote)
           return
         }
-        await continueConversation(text.trim(), messageAttachments, workingDir || undefined)
+        setMessages((prev) => [
+          ...prev,
+          {
+            type: 'error',
+            message: t.common.errors.serverNotRunning || 'CLI session is not running.'
+          }
+        ])
       }
     },
     [
       activeTaskId,
       appendCliSystemLog,
       appendCliUserLog,
-      continueConversation,
       ensureConversationRuntime,
       isRunning,
       loadCurrentNodeRuntime,
@@ -1943,8 +1925,7 @@ export function useTaskDetail({
       t.common.errors.serverNotRunning,
       task,
       taskId,
-      useCliSessionPanel,
-      workingDir
+      useCliSessionPanel
     ]
   )
 
@@ -2011,18 +1992,13 @@ export function useTaskDetail({
       return
     }
 
-    const sessionInfo = latestRuntime.sessionId
-      ? { sessionId: latestRuntime.sessionId }
-      : undefined
-    const pendingAttachments = initialAttachmentsRef.current
-    initialAttachmentsRef.current = undefined
-    await runAgent(
-      task?.prompt || initialPrompt,
-      taskId,
-      sessionInfo,
-      pendingAttachments,
-      workingDir || undefined
-    )
+    setMessages((prev) => [
+      ...prev,
+      {
+        type: 'error',
+        message: t.common.errors.serverNotRunning || 'CLI session is not running.'
+      }
+    ])
   }, [
     appendCliSystemLog,
     appendCliUserLog,
@@ -2030,8 +2006,6 @@ export function useTaskDetail({
     buildCliPrompt,
     currentNodeRuntime,
     ensureConversationRuntime,
-    initialPrompt,
-    initialAttachmentsRef,
     isRunning,
     loadCurrentNodeRuntime,
     loadWorkflowStatus,
@@ -2039,17 +2013,16 @@ export function useTaskDetail({
     pipelineStatus,
     pipelineTemplate,
     resolveCurrentNodePrompt,
-    runAgent,
     runCliPrompt,
     selectedWorkflowNode?.id,
     selectedWorkflowNodeIsFailed,
+    setMessages,
     setTask,
     setBackendWorkflowRun,
     startPipelineStage,
     t.common.errors.serverNotRunning,
     task,
     taskId,
-    workingDir
   ])
 
   const handleApproveCliTask = useCallback(async () => {

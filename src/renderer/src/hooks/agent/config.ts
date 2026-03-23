@@ -1,6 +1,5 @@
 // Agent configuration helpers
 
-import { API_BASE_URL } from '@/config';
 import { translations, type Language } from '@/config/locale';
 import { getCurrentProjectId } from '@/data/projects';
 import { getSettings } from '@/data/settings';
@@ -8,8 +7,6 @@ import {
   DEFAULT_PROJECT_SKILLS_SETTINGS,
   resolveProjectSkillDirectories,
 } from '@/lib/skills';
-
-export const AGENT_SERVER_URL = API_BASE_URL;
 
 // Helper to get current language translations
 export function getErrorMessages() {
@@ -104,7 +101,7 @@ export function getModelConfig():
 
 // Helper to get sandbox configuration from settings
 export function getSandboxConfig():
-  | { enabled: boolean; provider?: string; apiEndpoint?: string }
+  | { enabled: boolean; provider?: string }
   | undefined {
   try {
     const settings = getSettings();
@@ -129,7 +126,6 @@ export function getSandboxConfig():
     const config = {
       enabled: true,
       provider: settings.defaultSandboxProvider,
-      apiEndpoint: AGENT_SERVER_URL,
     };
 
     console.log('[useAgent] ✅ Sandbox ENABLED, returning config:', config);

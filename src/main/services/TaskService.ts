@@ -1,6 +1,6 @@
 import * as path from 'path'
 import { mkdirSync } from 'fs'
-import { realpath, rm } from 'fs/promises'
+import { access, lstat, realpath, rm, symlink } from 'fs/promises'
 import { homedir } from 'os'
 import { DatabaseService } from './DatabaseService'
 import { GitService } from './GitService'
@@ -14,6 +14,7 @@ import { buildConversationWorkflowDefinition } from './workflow-definition-utils
 
 const TASK_STATUS_VALUES = ['todo', 'in_progress', 'in_review', 'done', 'failed'] as const
 type TaskStatusValue = (typeof TASK_STATUS_VALUES)[number]
+const WORKTREE_SHARED_DIRECTORY_NAMES = ['node_modules'] as const
 
 export class TaskService {
   private static readonly DEFAULT_WORKTREE_PREFIX = 'WT-'
@@ -35,6 +36,45 @@ export class TaskService {
     const trimmed = pathInput.trim()
     const resolved = trimmed.replace(/^~(?=\/|\\|$)/, homedir())
     return resolved || fallback
+  }
+
+  private async pathExists(targetPath: string): Promise<boolean> {
+    try {
+      await access(targetPath)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private async bootstrapWorktreeDependencies(
+    projectPath: string,
+    worktreePath: string
+  ): Promise<void> {
+    for (const directoryName of WORKTREE_SHARED_DIRECTORY_NAMES) {
+      const sourcePath = path.join(projectPath, directoryName)
+      const targetPath = path.join(worktreePath, directoryName)
+
+      if (!(await this.pathExists(sourcePath)) || (await this.pathExists(targetPath))) {
+        continue
+      }
+
+      try {
+        const sourceStats = await lstat(sourcePath)
+        if (!sourceStats.isDirectory() && !sourceStats.isSymbolicLink()) {
+          continue
+        }
+
+        await symlink(sourcePath, targetPath, process.platform === 'win32' ? 'junction' : 'dir')
+      } catch (error) {
+        console.warn('[TaskService] Failed to bootstrap worktree dependency directory:', {
+          projectPath,
+          worktreePath,
+          directoryName,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
+    }
   }
 
   async createTask(options: CreateTaskOptions): Promise<TaskWithWorktree> {
@@ -69,6 +109,7 @@ export class TaskService {
           true,
           baseBranch
         )
+        await this.bootstrapWorktreeDependencies(options.projectPath, worktreePath)
       } catch (error) {
         console.error('Failed to create worktree:', error)
         throw error

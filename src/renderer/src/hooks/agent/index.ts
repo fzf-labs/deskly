@@ -5,7 +5,6 @@ export * from './types';
 
 // Config
 export {
-  AGENT_SERVER_URL,
   getErrorMessages,
   getModelConfig,
   getSandboxConfig,
@@ -14,7 +13,7 @@ export {
 } from './config';
 
 // Error handling
-export { formatFetchError, fetchWithRetry } from './errorHandling';
+export { formatFetchError } from './errorHandling';
 
 // Message handling
 export { buildConversationHistory } from './messageHandling';

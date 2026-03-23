@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
-import { useAgent, type MessageAttachment } from '@/hooks/useAgent'
+import { useAgent } from '@/hooks/useAgent'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
 import { useAppShell, useSidebar } from '@/components/layout'
@@ -24,7 +24,6 @@ export function TaskDetailContainer() {
   const state = location.state as LocationState | null
   const initialPrompt = state?.prompt || ''
   const initialSessionId = state?.sessionId
-  const initialAttachments = state?.attachments
 
   const {
     taskId: activeTaskId,
@@ -32,8 +31,6 @@ export function TaskDetailContainer() {
     setMessages,
     isRunning,
     stopAgent,
-    runAgent,
-    continueConversation,
     loadTask,
     loadMessages,
     phase,
@@ -44,26 +41,18 @@ export function TaskDetailContainer() {
   const { toggleLeft } = useSidebar()
 
   const containerRef = useRef<HTMLDivElement>(null)
-  const initialAttachmentsRef = useRef<MessageAttachment[] | undefined>(initialAttachments)
-
-  useEffect(() => {
-    initialAttachmentsRef.current = initialAttachments
-  }, [initialAttachments])
 
   // Single consolidated hook for all task detail logic
   const detail = useTaskDetail({
     taskId,
     initialPrompt,
     initialSessionId,
-    initialAttachmentsRef,
     navigate,
     activeTaskId,
     messages,
     setMessages,
     isRunning,
     stopAgent,
-    runAgent,
-    continueConversation,
     loadTask,
     loadMessages,
     sessionFolder,

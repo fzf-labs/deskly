@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { API_BASE_URL } from '@/config';
 import { getSettings } from '@/data/settings';
 import { cn } from '@/lib/utils';
 import { fs } from '@/lib/electron-api';
@@ -252,15 +251,10 @@ export function ArtifactPreview({
 
     if (artifact.path) {
       try {
-        const response = await fetch(`${API_BASE_URL}/files/open`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: artifact.path }),
-        });
-        const result = await response.json();
-        if (!result.success) {
-          console.error('[ArtifactPreview] Failed to open file:', result.error);
+        if (!window.api?.shell?.openPath) {
+          throw new Error('Shell IPC is unavailable');
         }
+        await window.api.shell.openPath(artifact.path);
         return;
       } catch (err) {
         console.error('[ArtifactPreview] Failed to open file:', err);
@@ -760,15 +754,10 @@ function PreviewContent({
   const handleOpenExternal = async () => {
     if (!artifact.path) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/files/open`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: artifact.path }),
-      });
-      const data = await response.json();
-      if (!data.success) {
-        console.error('[Preview] Failed to open file:', data.error);
+      if (!window.api?.shell?.openPath) {
+        throw new Error('Shell IPC is unavailable');
       }
+      await window.api.shell.openPath(artifact.path);
     } catch (err) {
       console.error('[Preview] Error opening file:', err);
     }

@@ -1,6 +1,4 @@
 // General settings - language, theme, AI providers, sandbox, agent runtime
-
-import { API_BASE_URL } from '@/config';
 import {
   getDataRootDir,
   getMcpConfigPath,
@@ -507,35 +505,14 @@ export function getEnabledDefaultCliToolId(
 
 export async function syncSettingsWithBackend(): Promise<void> {
   const settings = getSettings();
-  const aiProvider = getDefaultAIProvider();
-  const agentConfig: Record<string, unknown> = {
-    ...getDefaultAgentRuntime()?.config,
-  };
-
-  if (settings.defaultProvider !== 'default' && aiProvider) {
-    if (aiProvider.apiKey) agentConfig.apiKey = aiProvider.apiKey;
-    if (aiProvider.baseUrl) agentConfig.baseUrl = aiProvider.baseUrl;
-    if (settings.defaultModel) agentConfig.model = settings.defaultModel;
-  }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/providers/settings/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sandboxProvider: settings.defaultSandboxProvider,
-        sandboxConfig: getDefaultSandboxProvider()?.config,
-        agentProvider: settings.defaultAgentRuntime,
-        agentConfig,
-        defaultProvider: settings.defaultProvider,
-        defaultModel: settings.defaultModel,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('[Settings] Failed to sync with backend:', response.statusText);
+    if (!window.api?.settings?.update) {
+      console.warn('[Settings] Could not sync with main process: settings IPC unavailable');
+      return;
     }
+    await window.api.settings.update(settings as unknown as Record<string, unknown>);
   } catch (error) {
-    console.warn('[Settings] Could not sync with backend:', error);
+    console.warn('[Settings] Could not sync with main process:', error);
   }
 }

@@ -1,4 +1,3 @@
-import { API_BASE_URL } from '@/config';
 import type { SkillFile, SkillInfo } from '@/components/settings/types';
 
 export const CLI_SKILL_DIRECTORIES: Record<string, string> = {
@@ -82,69 +81,33 @@ export async function readDirectoryEntries(
   if (!directoryPath) return [];
   try {
     const resolvedPath = await resolvePath(directoryPath);
-    if (window.api?.fs?.exists) {
-      const exists = await window.api.fs.exists(resolvedPath);
-      if (!exists) return [];
-    }
-    if (window.api?.fs?.readDir) {
-      return (await window.api.fs.readDir(resolvedPath, {
-        maxDepth: 3,
-      })) as SkillFile[];
-    }
+    if (!window.api?.fs?.exists || !window.api?.fs?.readDir) return [];
+
+    const exists = await window.api.fs.exists(resolvedPath);
+    if (!exists) return [];
+
+    return (await window.api.fs.readDir(resolvedPath, {
+      maxDepth: 3,
+    })) as SkillFile[];
   } catch (err) {
     console.error('[Skills] Failed to read directory:', err);
     return [];
   }
-
-  try {
-    const resolvedPath = await resolvePath(directoryPath);
-    const filesResponse = await fetch(`${API_BASE_URL}/files/readdir`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: resolvedPath, maxDepth: 3 }),
-    });
-    const filesData = await filesResponse.json();
-    if (filesData.success && filesData.files) {
-      return filesData.files as SkillFile[];
-    }
-  } catch (err) {
-    console.error('[Skills] Failed to read directory via API:', err);
-  }
-
-  return [];
 }
 
 export async function readSkillMarkdown(skillMdPath: string): Promise<string> {
   try {
     const resolvedPath = await resolvePath(skillMdPath);
-    if (window.api?.fs?.exists) {
-      const exists = await window.api.fs.exists(resolvedPath);
-      if (!exists) return '';
-    }
-    if (window.api?.fs?.readTextFile) {
-      return await window.api.fs.readTextFile(resolvedPath);
-    }
+    if (!window.api?.fs?.exists || !window.api?.fs?.readTextFile) return '';
+
+    const exists = await window.api.fs.exists(resolvedPath);
+    if (!exists) return '';
+
+    return await window.api.fs.readTextFile(resolvedPath);
   } catch (err) {
     console.error('[Skills] Failed to read skill file:', err);
     return '';
   }
-
-  try {
-    const resolvedPath = await resolvePath(skillMdPath);
-    const mdResponse = await fetch(`${API_BASE_URL}/files/read`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: resolvedPath }),
-    });
-    const mdData = await mdResponse.json();
-    if (mdData.success && mdData.content) {
-      return mdData.content as string;
-    }
-  } catch (err) {
-    console.error('[Skills] Failed to read skill file via API:', err);
-  }
-
-  return '';
 }
 
 export async function loadSkillsFromDirectory(
@@ -212,27 +175,16 @@ export async function openFolderInSystem(folderPath: string) {
       resolvedPath = resolvedPath.replace(/^~(?=\/|\\)/, homeDir);
     }
 
-    if (window.api?.fs?.exists && window.api?.fs?.mkdir) {
-      const exists = await window.api.fs.exists(resolvedPath);
-      if (!exists) {
-        await window.api.fs.mkdir(resolvedPath);
-      }
+    if (!window.api?.fs?.exists || !window.api?.fs?.mkdir || !window.api?.shell?.openPath) {
+      throw new Error('Filesystem IPC is unavailable');
     }
 
-    if (window.api?.shell?.openPath) {
-      await window.api.shell.openPath(resolvedPath);
-      return;
+    const exists = await window.api.fs.exists(resolvedPath);
+    if (!exists) {
+      await window.api.fs.mkdir(resolvedPath);
     }
 
-    const response = await fetch(`${API_BASE_URL}/files/open`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: resolvedPath, expandHome: true }),
-    });
-    const data = await response.json();
-    if (!data.success) {
-      console.error('[Skills] Failed to open folder:', data.error);
-    }
+    await window.api.shell.openPath(resolvedPath);
   } catch (err) {
     console.error('[Skills] Error opening folder:', err);
   }

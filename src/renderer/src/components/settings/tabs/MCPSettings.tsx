@@ -25,7 +25,6 @@ import {
   X,
 } from 'lucide-react';
 
-import { API_BASE_URL } from '../constants';
 import type {
   MCPConfig,
   MCPServerStdio,
@@ -495,12 +494,7 @@ export function MCPSettings({ settings }: SettingsTabProps) {
   const fetchAllConfigs = useCallback(async (): Promise<MCPConfigSource[]> => {
     const fsApi = window.api?.fs;
     if (!fsApi?.readTextFile || !fsApi?.exists) {
-      const response = await fetch(`${API_BASE_URL}/mcp/all-configs`);
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to load config');
-      }
-      return result.configs as MCPConfigSource[];
+      throw new Error('Filesystem IPC is unavailable');
     }
 
     const configs: MCPConfigSource[] = [];
@@ -765,38 +759,23 @@ export function MCPSettings({ settings }: SettingsTabProps) {
       serverList.filter((server) => !server.source || server.source === 'Deskly')
     );
 
-    let fileSaved = false;
-    if (window.api?.fs?.writeTextFile) {
-      try {
-        const targetPath = await resolvePath(await getSaveConfigPath());
-        if (targetPath) {
-          await ensureParentDir(targetPath);
-          await window.api.fs.writeTextFile(
-            targetPath,
-            JSON.stringify(config, null, 2)
-          );
-          fileSaved = true;
-        }
-      } catch (err) {
-        console.error('[MCP] Failed to save MCP config to file:', err);
-      }
+    if (!window.api?.fs?.writeTextFile) {
+      console.error('[MCP] Failed to save MCP config: filesystem IPC unavailable');
+      return;
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/mcp/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      });
-
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to save config');
+      const targetPath = await resolvePath(await getSaveConfigPath());
+      if (!targetPath) {
+        throw new Error('Missing MCP config path');
       }
+      await ensureParentDir(targetPath);
+      await window.api.fs.writeTextFile(
+        targetPath,
+        JSON.stringify(config, null, 2)
+      );
     } catch (err) {
-      if (!fileSaved) {
-        console.error('[MCP] Failed to save MCP config via API:', err);
-      }
+      console.error('[MCP] Failed to save MCP config to file:', err);
     }
   };
 
@@ -849,26 +828,18 @@ export function MCPSettings({ settings }: SettingsTabProps) {
     try {
       const resolvedPath = await resolvePath(folderPath);
       await ensureDirectoryExists(resolvedPath);
-      if (window.api?.shell?.openPath) {
-        try {
-          await window.api.shell.openPath(resolvedPath);
-          return;
-        } catch (error) {
-          if (window.api?.shell?.showItemInFolder) {
-            await window.api.shell.showItemInFolder(resolvedPath);
-            return;
-          }
-          throw error;
-        }
+      if (!window.api?.shell?.openPath) {
+        throw new Error('Shell IPC is unavailable');
       }
-      const response = await fetch(`${API_BASE_URL}/files/open`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: resolvedPath, expandHome: true }),
-      });
-      const data = await response.json();
-      if (!data.success) {
-        console.error('[MCP] Failed to open folder:', data.error);
+      try {
+        await window.api.shell.openPath(resolvedPath);
+        return;
+      } catch (error) {
+        if (window.api?.shell?.showItemInFolder) {
+          await window.api.shell.showItemInFolder(resolvedPath);
+          return;
+        }
+        throw error;
       }
     } catch (err) {
       console.error('[MCP] Error opening folder:', err);
