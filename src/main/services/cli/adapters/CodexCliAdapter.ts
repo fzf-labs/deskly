@@ -4,7 +4,7 @@ import * as path from 'path'
 
 import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliAdapter } from './ProcessCliAdapter'
-import { parseJsonLine, successSignal } from './completion'
+import { failureSignal, parseJsonLine, successSignal } from './completion'
 import {
   asBoolean,
   asString,
@@ -17,13 +17,15 @@ import { ProcessCommandSpec } from '../ProcessCliSession'
 
 type RecordLike = Record<string, unknown>
 
-function detectCodexCompletion(line: string) {
+export function detectCodexCompletion(line: string) {
   const msg = parseJsonLine(line)
   if (!msg) return null
 
   const event = (msg.event || msg.method || msg.type) as string | undefined
   if (event) {
     const lowered = event.toLowerCase()
+    if (lowered.includes('failed') || lowered.includes('error')) return failureSignal(event)
+    if (lowered.includes('completed')) return successSignal(event)
     if (lowered.includes('finished')) return successSignal(event)
   }
 
@@ -192,20 +194,11 @@ export class CodexCliAdapter implements CliAdapter {
   private attachThreadTracking(handle: CliSessionHandle, sessionId: string): void {
     let buffer = this.stdoutBuffers.get(sessionId) ?? ''
 
-    const onOutput = (data: { sessionId: string; type: 'stdout' | 'stderr'; content: string }) => {
-      if (data.sessionId !== sessionId) return
-      if (data.type === 'stderr') {
-        this.log('stderr', {
-          sessionId,
-          bytes: data.content.length,
-          preview: data.content.slice(0, 200)
-        })
-        return
-      }
-      buffer += data.content
+    const processStdout = (content: string) => {
+      buffer += content
       this.log('stdout', {
         sessionId,
-        bytes: data.content.length
+        bytes: content.length
       })
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? ''
@@ -223,9 +216,24 @@ export class CodexCliAdapter implements CliAdapter {
       this.stdoutBuffers.set(sessionId, buffer)
     }
 
+    const onOutput = (data: { sessionId: string; type: 'stdout' | 'stderr'; content: string }) => {
+      if (data.sessionId !== sessionId) return
+      if (data.type !== 'stderr') return
+      this.log('stderr', {
+        sessionId,
+        bytes: data.content.length,
+        preview: data.content.slice(0, 200)
+      })
+    }
+
+    const stopHistoryStream = handle.msgStore.stdoutLinesStream((line) => {
+      processStdout(line)
+    })
+
     const cleanup = () => {
       this.stdoutBuffers.delete(sessionId)
       void this.cleanupMaterializedSchema(sessionId)
+      stopHistoryStream()
       handle.off('output', onOutput)
       handle.off('close', onClose)
       handle.off('error', onError)

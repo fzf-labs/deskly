@@ -13,6 +13,7 @@ import { LogMsg } from '../../types/log'
 import { normalizeCliToolConfig } from '../../../shared/agent-cli-config-spec'
 import { isCliToolEnabled } from '../../../shared/agent-cli-tool-enablement'
 import { newUlid } from '../../utils/ids'
+import { CliSessionClosePayload, CliSessionErrorPayload } from './types'
 
 interface SessionRecord {
   handle: CliSessionHandle
@@ -284,62 +285,68 @@ export class CliSessionService extends EventEmitter {
       this.pendingMsgStores.delete(sessionId)
     }
 
-    handle.on(
-      'status',
-      (data: { sessionId: string; status: CliSessionStatus; forced?: boolean }) => {
-        this.emit('status', data)
-      }
-    )
+    const onStatus = (data: { sessionId: string; status: CliSessionStatus; forced?: boolean }) => {
+      this.emit('status', data)
+    }
 
-    handle.on(
-      'output',
-      (data: { sessionId: string; type: 'stdout' | 'stderr'; content: string }) => {
-        this.emit('output', data)
-      }
-    )
+    const onOutput = (data: { sessionId: string; type: 'stdout' | 'stderr'; content: string }) => {
+      this.emit('output', data)
+    }
 
-    handle.on(
-      'close',
-      (data: { sessionId: string; code: number | null; forcedStatus?: CliSessionStatus }) => {
-        const sessionRecord = this.sessions.get(data.sessionId)
-        const durationSeconds = sessionRecord
-          ? (Date.now() - sessionRecord.startTime.getTime()) / 1000
-          : undefined
-
-        if (sessionRecord?.taskNodeId) {
-          if (data.code === 0) {
-            this.databaseService.completeTaskNode(sessionRecord.taskNodeId, {
-              sessionId: data.sessionId,
-              duration: durationSeconds
-            })
-          } else if (typeof data.code === 'number') {
-            this.databaseService.markTaskNodeErrorReview(
-              sessionRecord.taskNodeId,
-              `CLI exited with code ${data.code}`
-            )
-          }
-        }
-
-        this.emit('close', {
-          ...data,
-          taskId: sessionRecord?.taskId,
-          taskNodeId: sessionRecord?.taskNodeId
-        })
-        this.sessions.delete(data.sessionId)
-      }
-    )
-
-    handle.on('error', (data: { sessionId: string; error: string }) => {
+    const onClose = (data: CliSessionClosePayload) => {
       const sessionRecord = this.sessions.get(data.sessionId)
+      const durationSeconds = sessionRecord
+        ? (Date.now() - sessionRecord.startTime.getTime()) / 1000
+        : undefined
+
       if (sessionRecord?.taskNodeId) {
-        this.databaseService.markTaskNodeErrorReview(sessionRecord.taskNodeId, data.error)
+        if (data.code === 0) {
+          this.databaseService.completeTaskNode(sessionRecord.taskNodeId, {
+            sessionId: data.sessionId,
+            duration: durationSeconds
+          })
+        } else if (typeof data.code === 'number') {
+          this.databaseService.markTaskNodeErrorReview(
+            sessionRecord.taskNodeId,
+            `CLI exited with code ${data.code}`
+          )
+        }
       }
-      this.emit('error', {
+
+      this.emit('close', {
         ...data,
         taskId: sessionRecord?.taskId,
         taskNodeId: sessionRecord?.taskNodeId
       })
-    })
+      this.sessions.delete(data.sessionId)
+    }
+
+    const onError = (data: CliSessionErrorPayload) => {
+      const sessionRecord = this.sessions.get(data.sessionId)
+      const errorMessage = data.error instanceof Error ? data.error.message : data.error
+      if (sessionRecord?.taskNodeId) {
+        this.databaseService.markTaskNodeErrorReview(sessionRecord.taskNodeId, errorMessage)
+      }
+      this.emit('error', {
+        ...data,
+        error: errorMessage,
+        taskId: sessionRecord?.taskId,
+        taskNodeId: sessionRecord?.taskNodeId
+      })
+    }
+
+    handle.on('status', onStatus)
+    handle.on('output', onOutput)
+    handle.on('close', onClose)
+    handle.on('error', onError)
+
+    if (handle.status !== 'running') {
+      if (handle.lastErrorPayload && this.sessions.has(sessionId)) {
+        onError(handle.lastErrorPayload)
+      } else if (handle.lastClosePayload && this.sessions.has(sessionId)) {
+        onClose(handle.lastClosePayload)
+      }
+    }
   }
 
   stopSession(sessionId: string): void {

@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest'
 import { afterEach, vi } from 'vitest'
 
 import { ClaudeCodeAdapter } from '../../src/main/services/cli/adapters/ClaudeCodeAdapter'
-import { CodexCliAdapter } from '../../src/main/services/cli/adapters/CodexCliAdapter'
+import {
+  CodexCliAdapter,
+  detectCodexCompletion
+} from '../../src/main/services/cli/adapters/CodexCliAdapter'
 import { CursorAgentAdapter } from '../../src/main/services/cli/adapters/CursorAgentAdapter'
 import { GeminiCliAdapter } from '../../src/main/services/cli/adapters/GeminiCliAdapter'
 import { OpencodeAdapter } from '../../src/main/services/cli/adapters/OpencodeAdapter'
@@ -31,7 +34,9 @@ class MockCliSessionHandle extends EventEmitter {
   sessionId = 'session-1'
   toolId = 'codex'
   status = 'running' as const
-  msgStore = {} as never
+  msgStore = {
+    stdoutLinesStream: () => () => undefined
+  } as never
 
   stop() {}
 }
@@ -176,6 +181,13 @@ describe('CLI adapter argv builders', () => {
         '-'
       ])
     )
+  })
+
+  it('detects codex completed events as successful completion', () => {
+    expect(detectCodexCompletion('{"type":"turn.completed"}')).toEqual({
+      status: 'success',
+      reason: 'turn.completed'
+    })
   })
 
   it('materializes inline codex output schema JSON into a temp file', async () => {

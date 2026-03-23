@@ -1856,7 +1856,8 @@ export function useTaskDetail({
         if (task?.task_mode === 'conversation' && !latestRuntime.cliToolId) {
           latestRuntime = await ensureConversationRuntime(task)
         }
-        const shouldUseCliSession = Boolean(latestRuntime.cliToolId)
+        const shouldUseCliSession =
+          task?.task_mode === 'workflow' ? useCliSessionPanel : Boolean(latestRuntime.cliToolId)
 
         if (!shouldUseCliSession && isRunning) return
         if (shouldUseCliSession) {
@@ -1942,6 +1943,7 @@ export function useTaskDetail({
       t.common.errors.serverNotRunning,
       task,
       taskId,
+      useCliSessionPanel,
       workingDir
     ]
   )

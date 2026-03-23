@@ -97,7 +97,7 @@ export function TaskComposer({
               composer.cliConfigs.find((config) => config.is_default)?.id ||
               null
             }
-            disabled={composer.loading || composer.taskMode !== 'conversation'}
+            disabled={composer.loading}
             onApply={(optimizedPrompt) => {
               composer.setPrompt(optimizedPrompt)
               composer.setError(null)

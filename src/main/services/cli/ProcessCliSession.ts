@@ -1,7 +1,13 @@
 import { ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
 import { MsgStoreService } from '../MsgStoreService'
-import { CliCompletionSignal, CliSessionHandle, CliSessionStatus } from './types'
+import {
+  CliCompletionSignal,
+  CliSessionClosePayload,
+  CliSessionErrorPayload,
+  CliSessionHandle,
+  CliSessionStatus
+} from './types'
 import { safeSpawn } from '../../utils/safe-exec'
 import { config } from '../../config'
 
@@ -28,6 +34,8 @@ export class ProcessCliSession extends EventEmitter implements CliSessionHandle 
   toolId: string
   status: CliSessionStatus = 'running'
   msgStore: MsgStoreService
+  lastClosePayload: CliSessionClosePayload | null = null
+  lastErrorPayload: CliSessionErrorPayload | null = null
 
   private process: ChildProcess
   private stdoutBuffer = ''
@@ -154,16 +162,18 @@ export class ProcessCliSession extends EventEmitter implements CliSessionHandle 
       const forcedStatus = this.completionOverride
         ? (this.status as CliSessionStatus)
         : undefined
+      this.lastClosePayload = { sessionId, code, forcedStatus }
       this.emit('status', { sessionId, status: this.status })
-      this.emit('close', { sessionId, code, forcedStatus })
+      this.emit('close', this.lastClosePayload)
     })
 
     this.process.on('error', (error) => {
       this.clearNoOutputTimer()
       this.clearStillRunningTimer()
       this.status = 'error'
+      this.lastErrorPayload = { sessionId, error }
       this.emit('status', { sessionId, status: this.status })
-      this.emit('error', { sessionId, error })
+      this.emit('error', this.lastErrorPayload)
       this.log('process_error', {
         pid: this.process.pid,
         error: error instanceof Error ? error.message : String(error)
