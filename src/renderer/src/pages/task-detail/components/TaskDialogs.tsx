@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { PromptOptimizeButton } from '@/components/shared/PromptOptimizeButton';
 import {
   Dialog,
   DialogContent,
@@ -68,9 +69,18 @@ export function TaskDialogs({
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {t.task.createPromptLabel}
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-sm font-medium">
+                  {t.task.createPromptLabel}
+                </label>
+                <PromptOptimizeButton
+                  prompt={editPrompt}
+                  contextType="task"
+                  toolId={editCliToolId || null}
+                  agentToolConfigId={editCliConfigId || null}
+                  onApply={(optimizedPrompt) => setEditPrompt(optimizedPrompt)}
+                />
+              </div>
               <textarea
                 value={editPrompt}
                 onChange={(e) => setEditPrompt(e.target.value)}

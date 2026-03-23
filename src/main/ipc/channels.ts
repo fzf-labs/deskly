@@ -169,6 +169,9 @@ export const IPC_CHANNELS = {
     retryNode: 'workflow:retryNode',
     stopRun: 'workflow:stopRun'
   },
+  prompt: {
+    optimize: 'prompt:optimize'
+  },
   fs: {
     readFile: 'fs:readFile',
     readTextFile: 'fs:readTextFile',
@@ -515,6 +518,19 @@ export interface IpcContracts {
   >
   'workflow:retryNode': IpcContract<[string], unknown>
   'workflow:stopRun': IpcContract<[string], unknown>
+
+  'prompt:optimize': IpcContract<
+    [
+      {
+        prompt: string
+        contextType: 'task' | 'workflow-generation' | 'workflow-node' | 'automation'
+        name?: string | null
+        toolId?: string | null
+        agentToolConfigId?: string | null
+      }
+    ],
+    unknown
+  >
 
   'fs:readFile': IpcContract<[string], Uint8Array>
   'fs:readTextFile': IpcContract<[string], string>

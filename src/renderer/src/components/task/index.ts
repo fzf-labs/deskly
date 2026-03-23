@@ -4,6 +4,7 @@ export { PlanApproval } from './PlanApproval';
 export { QuestionInput } from './QuestionInput';
 export { TaskList } from './TaskList';
 export { CreateTaskDialog } from './CreateTaskDialog';
+export { TaskComposer } from './TaskComposer';
 export { TaskCreateMenu } from './TaskCreateMenu';
 export type {
   TaskMode,

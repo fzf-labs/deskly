@@ -31,6 +31,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useBeforeUnload, useBlocker } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { PromptOptimizeButton } from '@/components/shared/PromptOptimizeButton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select } from '@/components/ui/select'
 import {
@@ -1657,6 +1658,19 @@ export function WorkflowTemplateEditor({
                         </div>
                       </div>
                       <div className="mt-3 flex items-center justify-end gap-3">
+                        <PromptOptimizeButton
+                          prompt={generationPrompt}
+                          contextType="workflow-generation"
+                          name={templateName || null}
+                          toolId={generationToolId || null}
+                          agentToolConfigId={generationAgentToolConfigId || null}
+                          disabled={isGenerating}
+                          onApply={(optimizedPrompt) => {
+                            setGenerationPrompt(optimizedPrompt)
+                            setError(null)
+                          }}
+                          onError={(message) => setError(message)}
+                        />
                         <Button
                           type="button"
                           size="sm"
@@ -1906,11 +1920,31 @@ export function WorkflowTemplateEditor({
                         </div>
 
                         <div>
-                          <label className="text-sm font-medium">
-                            {selectedNode.type === 'agent'
-                              ? t.task.workflowNodePromptLabel || '提示词'
-                              : t.task.workflowNodeCommandLabel || '命令'}
-                          </label>
+                          <div className="flex items-center justify-between gap-3">
+                            <label className="text-sm font-medium">
+                              {selectedNode.type === 'agent'
+                                ? t.task.workflowNodePromptLabel || '提示词'
+                                : t.task.workflowNodeCommandLabel || '命令'}
+                            </label>
+                            {selectedNode.type === 'agent' ? (
+                              <PromptOptimizeButton
+                                prompt={selectedNode.prompt}
+                                contextType="workflow-node"
+                                name={selectedNode.name || templateName || null}
+                                toolId={selectedNode.cliToolId || null}
+                                agentToolConfigId={selectedNode.agentToolConfigId || null}
+                                onApply={(optimizedPrompt) => {
+                                  updateNode(selectedNode.id, (current) =>
+                                    current.type === 'agent'
+                                      ? { ...current, prompt: optimizedPrompt }
+                                      : current
+                                  )
+                                  setError(null)
+                                }}
+                                onError={(message) => setError(message)}
+                              />
+                            ) : null}
+                          </div>
                           <textarea
                             value={
                               selectedNode.type === 'agent'

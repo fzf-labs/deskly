@@ -117,6 +117,21 @@ export default {
   workflowGenerationFailed: 'AI workflow generation failed. Please try again.',
   workflowGenerationFallbackConfirm:
     'AI generation failed. Do you want to fall back to rule-based generation?',
+  promptOptimizeButton: 'Optimize prompt',
+  promptOptimizeLoading: 'Optimizing...',
+  promptOptimizePromptRequired: 'Please enter a prompt to optimize first.',
+  promptOptimizationApplyConfirm:
+    'Do you want to replace the current content with the optimized prompt?',
+  promptOptimizationChangedConfirm:
+    'The current content changed while optimizing. Do you still want to replace it?',
+  promptOptimizationCliUnavailable:
+    'No supported AI CLI tool was found. Please install Claude Code or Codex first.',
+  promptOptimizationRuntimeUnavailable:
+    'Prompt optimization is temporarily unavailable. Please try again.',
+  promptOptimizationNoOutput: 'The AI tool did not return a parsable optimization result.',
+  promptOptimizationParseFailed: 'The AI response could not be parsed as an optimized prompt.',
+  promptOptimizationEmptyResult: 'The AI tool did not return a usable optimized prompt.',
+  promptOptimizationFailed: 'Prompt optimization failed. Please try again.',
   workflowNodeContentRequired: 'Each workflow node needs prompt or command content.',
   workflowMoveUp: 'Up',
   workflowMoveDown: 'Down',

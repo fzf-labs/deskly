@@ -348,6 +348,16 @@ interface WorkflowAPI {
   stopRun: (runId: string) => Promise<unknown>
 }
 
+interface PromptAPI {
+  optimize: (input: {
+    prompt: string
+    contextType: 'task' | 'workflow-generation' | 'workflow-node' | 'automation'
+    name?: string | null
+    toolId?: string | null
+    agentToolConfigId?: string | null
+  }) => Promise<unknown>
+}
+
 interface FSAPI {
   readFile: (path: string) => Promise<Uint8Array>
   readTextFile: (path: string) => Promise<string>
@@ -536,6 +546,7 @@ interface API {
   task: TaskAPI
   automation: AutomationAPI
   workflow: WorkflowAPI
+  prompt: PromptAPI
 }
 
 declare global {

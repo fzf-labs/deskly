@@ -12,6 +12,7 @@ import { AutomationRepository } from './database/AutomationRepository'
 import { WorkflowDefinitionGenerationService } from './WorkflowDefinitionGenerationService'
 import { WorkflowDefinitionService } from './WorkflowDefinitionService'
 import { WorkflowRunService } from './WorkflowRunService'
+import { PromptOptimizationService } from './PromptOptimizationService'
 import { buildConversationWorkflowDefinition } from './workflow-definition-utils'
 import type { WorkflowSchedulerService } from './WorkflowSchedulerService'
 import type { CliSessionService } from './cli/CliSessionService'
@@ -41,6 +42,10 @@ import type {
   UpdateWorkflowDefinitionInput,
   WorkflowDefinition
 } from '../types/workflow-definition'
+import type {
+  OptimizePromptInput,
+  OptimizePromptResult
+} from '../types/prompt-optimization'
 import type { WorkflowRun, WorkflowRunNode } from '../types/workflow-run'
 
 const TASK_NODE_STATUS_VALUES = ['todo', 'in_progress', 'in_review', 'done', 'failed'] as const
@@ -70,6 +75,7 @@ export class DatabaseService {
   private automationRepo: AutomationRepository
   private workflowDefinitionService: WorkflowDefinitionService
   private workflowDefinitionGenerationService: WorkflowDefinitionGenerationService
+  private promptOptimizationService: PromptOptimizationService
   private workflowRunService: WorkflowRunService
   private workflowSchedulerService: WorkflowSchedulerService | null = null
   private taskNodeStatusListeners: Array<(node: TaskNode) => void> = []
@@ -94,6 +100,7 @@ export class DatabaseService {
     this.automationRepo = new AutomationRepository(this.db)
     this.workflowDefinitionService = new WorkflowDefinitionService(workflowDefinitionRepo)
     this.workflowDefinitionGenerationService = new WorkflowDefinitionGenerationService()
+    this.promptOptimizationService = new PromptOptimizationService()
     this.workflowRunService = new WorkflowRunService(
       this.taskRepo,
       workflowDefinitionRepo,
@@ -125,6 +132,18 @@ export class DatabaseService {
       cliSessionService,
       cliToolDetectorService,
       this.workflowDefinitionService,
+      settingsService
+    )
+  }
+
+  setPromptOptimizationRuntime(
+    cliSessionService: CliSessionService,
+    cliToolDetectorService: AgentCLIToolDetectorService,
+    settingsService: SettingsService
+  ): void {
+    this.promptOptimizationService.setCliRuntime(
+      cliSessionService,
+      cliToolDetectorService,
       settingsService
     )
   }
@@ -536,6 +555,29 @@ export class DatabaseService {
     }
 
     return await this.workflowDefinitionGenerationService.generateDefinition({
+      ...input,
+      resolvedToolConfig
+    })
+  }
+
+  async optimizePrompt(input: OptimizePromptInput): Promise<OptimizePromptResult> {
+    let resolvedToolConfig: Record<string, unknown> | null = null
+
+    if (input.toolId && input.agentToolConfigId) {
+      const configRecord = this.getAgentToolConfig(input.agentToolConfigId)
+      if (configRecord?.tool_id === input.toolId && configRecord.config_json) {
+        try {
+          const parsed = JSON.parse(configRecord.config_json)
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            resolvedToolConfig = parsed as Record<string, unknown>
+          }
+        } catch (error) {
+          console.error('[DatabaseService] Failed to parse prompt optimization tool config:', error)
+        }
+      }
+    }
+
+    return await this.promptOptimizationService.optimizePrompt({
       ...input,
       resolvedToolConfig
     })

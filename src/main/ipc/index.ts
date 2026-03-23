@@ -25,6 +25,7 @@ import { registerAppIpc } from './app.ipc'
 import { registerTerminalIpc } from './terminal.ipc'
 import { registerAutomationIpc } from './automation.ipc'
 import { registerWorkflowIpc } from './workflow.ipc'
+import { registerPromptIpc } from './prompt.ipc'
 
 export const registerIpcHandlers = (deps: IpcDependencies): void => {
   const handle = <C extends IpcContractChannel>(
@@ -125,6 +126,7 @@ export const registerIpcHandlers = (deps: IpcDependencies): void => {
   registerTaskIpc(context)
   registerAutomationIpc(context)
   registerWorkflowIpc(context)
+  registerPromptIpc(context)
   registerAppIpc(context)
   registerTerminalIpc(context)
 }

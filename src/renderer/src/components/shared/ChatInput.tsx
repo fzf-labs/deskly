@@ -35,6 +35,10 @@ export interface Attachment {
 }
 
 export interface ChatInputProps {
+  /** Controlled textarea value */
+  value?: string;
+  /** Controlled textarea change callback */
+  onValueChange?: (value: string) => void;
   /** Placeholder text */
   placeholder?: string;
   /** Whether the agent is running */
@@ -53,6 +57,8 @@ export interface ChatInputProps {
   autoFocus?: boolean;
   /** Extra operation controls shown in home variant */
   operationBar?: ReactNode;
+  /** Extra actions shown just to the left of the submit button in home variant */
+  submitLeftBar?: ReactNode;
   /** Optional title value for task creation mode */
   titleValue?: string;
   /** Optional title change callback for task creation mode */
@@ -98,6 +104,8 @@ const createImagePreview = (file: File): Promise<string> => {
 };
 
 export function ChatInput({
+  value: controlledValue,
+  onValueChange,
   placeholder = 'Type a message...',
   isRunning = false,
   onSubmit,
@@ -107,13 +115,14 @@ export function ChatInput({
   disabled = false,
   autoFocus = false,
   operationBar,
+  submitLeftBar,
   titleValue,
   onTitleChange,
   titlePlaceholder = '请输入标题',
   requireTitle = false,
 }: ChatInputProps) {
   const { t } = useLanguage();
-  const [value, setValue] = useState('');
+  const [uncontrolledValue, setUncontrolledValue] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -123,6 +132,18 @@ export function ChatInput({
   const isHome = variant === 'home';
   const hasTitleField = isHome && typeof onTitleChange === 'function';
   const isTaskCreateLayout = isHome && hasTitleField;
+  const isControlled = typeof controlledValue === 'string';
+  const value = isControlled ? controlledValue : uncontrolledValue;
+
+  const setValue = useCallback(
+    (nextValue: string) => {
+      if (!isControlled) {
+        setUncontrolledValue(nextValue);
+      }
+      onValueChange?.(nextValue);
+    },
+    [isControlled, onValueChange]
+  );
 
   // Auto focus on mount if autoFocus is true
   useEffect(() => {
@@ -462,6 +483,7 @@ export function ChatInput({
 
         {/* Submit/Stop Button */}
         <div className="flex items-center gap-1">
+          {isHome && submitLeftBar}
           {isRunning && onStop ? (
             <button
               type="button"

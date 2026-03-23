@@ -1,41 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bot, Sparkles } from 'lucide-react'
 
-import type { MessageAttachment } from '@/hooks/useAgent'
-import { ChatInput } from '@/components/shared/ChatInput'
 import { Select } from '@/components/ui/select'
-import {
-  TaskCreateMenu,
-  type TaskMode,
-  type TaskMenuCliToolInfo,
-  type TaskMenuWorkflowTemplate
-} from '@/components/task/TaskCreateMenu'
-import { db, type AgentToolConfig } from '@/data'
-import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
+import { TaskComposer } from '@/components/task'
 import { useProjects } from '@/hooks/useProjects'
-import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
-import { normalizeCliTools } from '@/lib/agent-cli-tools'
 import { useLanguage } from '@/providers/language-provider'
-import { notifyTasksChanged } from '@/lib/task-events'
 
 export function TasksPage() {
   const navigate = useNavigate()
   const { currentProject, currentProjectId, projects, setCurrentProjectId } = useProjects()
   const { t } = useLanguage()
-
-  const [cliTools, setCliTools] = useState<TaskMenuCliToolInfo[]>([])
-  const [selectedCliToolId, setSelectedCliToolId] = useState('')
-  const [cliConfigs, setCliConfigs] = useState<AgentToolConfig[]>([])
-  const [selectedCliConfigId, setSelectedCliConfigId] = useState('')
-  const [branches, setBranches] = useState<string[]>([])
-  const [selectedBaseBranch, setSelectedBaseBranch] = useState('')
-  const [workflowDefinitions, setWorkflowDefinitions] = useState<TaskMenuWorkflowTemplate[]>([])
-  const [selectedTemplateId, setSelectedTemplateId] = useState('')
-  const [taskMode, setTaskMode] = useState<TaskMode>('conversation')
   const workspaceOptionValue = '__deskly_workspace__'
-
-  const isGitProject = currentProject?.projectType === 'git'
   const selectedProjectValue = currentProjectId ?? workspaceOptionValue
   const projectOptions = [
     { value: workspaceOptionValue, label: 'Deskly workspace' },
@@ -44,253 +19,6 @@ export function TasksPage() {
       label: project.name
     }))
   ]
-
-  useEffect(() => {
-    let active = true
-    const loadCliTools = async () => {
-      try {
-        const detected = await window.api?.cliTools?.getSnapshot?.()
-        const settings = getSettings()
-        const tools = filterEnabledCliTools(
-          normalizeCliTools(detected) as TaskMenuCliToolInfo[],
-          settings
-        )
-        if (!active) return
-        setCliTools(tools)
-
-        const defaultCliToolId = getEnabledDefaultCliToolId(settings)
-        if (defaultCliToolId) {
-          const hasDefault = tools.some((tool) => tool.id === defaultCliToolId)
-          if (hasDefault) setSelectedCliToolId(defaultCliToolId)
-        }
-
-        void window.api?.cliTools?.refresh?.({ level: 'fast' })
-      } catch (error) {
-        if (!active) return
-        console.error('[TasksPage] Failed to load CLI tools:', error)
-        setCliTools([])
-      }
-    }
-
-    const unsubscribe = window.api?.cliTools?.onUpdated?.((tools) => {
-      if (!active) return
-      setCliTools(
-        filterEnabledCliTools(normalizeCliTools(tools) as TaskMenuCliToolInfo[], getSettings())
-      )
-    })
-
-    void loadCliTools()
-    return () => {
-      active = false
-      unsubscribe?.()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!selectedCliToolId) return
-    if (cliTools.some((tool) => tool.id === selectedCliToolId)) return
-    setSelectedCliToolId('')
-    setSelectedCliConfigId('')
-  }, [cliTools, selectedCliToolId])
-
-  useEffect(() => {
-    if (!selectedCliToolId) {
-      setCliConfigs([])
-      setSelectedCliConfigId('')
-      return
-    }
-
-    let active = true
-    const loadConfigs = async () => {
-      try {
-        const result = await db.listAgentToolConfigs(selectedCliToolId)
-        const list = Array.isArray(result) ? (result as AgentToolConfig[]) : []
-        if (!active) return
-        setCliConfigs(list)
-        const defaultConfig = list.find((cfg) => cfg.is_default)
-        setSelectedCliConfigId(defaultConfig?.id || '')
-      } catch (error) {
-        if (!active) return
-        console.error('[TasksPage] Failed to load CLI configs:', error)
-        setCliConfigs([])
-        setSelectedCliConfigId('')
-      }
-    }
-
-    void loadConfigs()
-    return () => {
-      active = false
-    }
-  }, [selectedCliToolId])
-
-  useEffect(() => {
-    if (!currentProject?.id) {
-      setWorkflowDefinitions([])
-      setSelectedTemplateId('')
-      return
-    }
-
-    let active = true
-    const loadDefinitions = async () => {
-      try {
-        const [projectDefinitions, globalDefinitions] = await Promise.all([
-          db.listWorkflowDefinitions({ scope: 'project', projectId: currentProject.id }),
-          db.listWorkflowDefinitions({ scope: 'global' })
-        ])
-        const list = [
-          ...(Array.isArray(projectDefinitions)
-            ? (projectDefinitions as TaskMenuWorkflowTemplate[])
-            : []),
-          ...((Array.isArray(globalDefinitions)
-            ? (globalDefinitions as TaskMenuWorkflowTemplate[])
-            : []
-          ).map((definition) => ({
-            id: definition.id,
-            name: `${definition.name}（全局）`
-          })))
-        ]
-        if (!active) return
-        setWorkflowDefinitions(list)
-        if (selectedTemplateId && !list.some((tpl) => tpl.id === selectedTemplateId)) {
-          setSelectedTemplateId('')
-        }
-      } catch (error) {
-        if (!active) return
-        console.error('[TasksPage] Failed to load workflow definitions:', error)
-        setWorkflowDefinitions([])
-      }
-    }
-
-    void loadDefinitions()
-    return () => {
-      active = false
-    }
-  }, [currentProject?.id, selectedTemplateId])
-
-  useEffect(() => {
-    if (taskMode !== 'workflow') return
-    if (workflowDefinitions.length === 0) {
-      if (selectedTemplateId) setSelectedTemplateId('')
-      return
-    }
-    const exists = workflowDefinitions.some((template) => template.id === selectedTemplateId)
-    if (!exists) {
-      setSelectedTemplateId(workflowDefinitions[0].id)
-    }
-  }, [selectedTemplateId, taskMode, workflowDefinitions])
-
-  useEffect(() => {
-    if (!isGitProject || !currentProject?.path) {
-      setBranches([])
-      setSelectedBaseBranch('')
-      return
-    }
-
-    let active = true
-    const loadBranches = async () => {
-      try {
-        const [branchesResult, currentResult] = await Promise.all([
-          window.api?.git?.getBranches?.(currentProject.path),
-          window.api?.git?.getCurrentBranch?.(currentProject.path)
-        ])
-
-        const branchList = Array.isArray(branchesResult)
-          ? (branchesResult as string[])
-          : Array.isArray((branchesResult as { data?: unknown[] })?.data)
-            ? ((branchesResult as { data: string[] }).data as string[])
-            : []
-        const currentBranch =
-          typeof currentResult === 'string'
-            ? currentResult
-            : ((currentResult as { data?: string })?.data as string | undefined)
-
-        if (!active) return
-        setBranches(branchList)
-        if (currentBranch && branchList.includes(currentBranch)) {
-          setSelectedBaseBranch(currentBranch)
-        } else if (branchList.length > 0) {
-          setSelectedBaseBranch(branchList[0])
-        } else {
-          setSelectedBaseBranch('')
-        }
-      } catch (error) {
-        if (!active) return
-        console.error('[TasksPage] Failed to load branches:', error)
-        setBranches([])
-        setSelectedBaseBranch('')
-      }
-    }
-
-    void loadBranches()
-    return () => {
-      active = false
-    }
-  }, [currentProject?.path, isGitProject])
-
-  const handleSubmit = useCallback(
-    async (text: string, attachments?: MessageAttachment[]) => {
-      if (!text.trim() && (!attachments || attachments.length === 0)) return
-
-      const settings = getSettings()
-      const resolvedCliToolId = selectedCliToolId || getEnabledDefaultCliToolId(settings) || ''
-      const resolvedCliConfigId =
-        selectedCliConfigId || cliConfigs.find((config) => config.is_default)?.id || ''
-      if (taskMode === 'conversation' && (!resolvedCliToolId || !resolvedCliConfigId)) {
-        return
-      }
-      if (taskMode === 'workflow' && !selectedTemplateId) {
-        return
-      }
-      if (isGitProject && !selectedBaseBranch) {
-        return
-      }
-
-      const prompt = text.trim()
-      const title =
-        prompt
-          .split('\n')
-          .map((line) => line.trim())
-          .find(Boolean)
-          ?.slice(0, 80) || 'New thread'
-
-      try {
-        const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'WT-'
-        const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
-
-        const createdTask = await window.api.task.create({
-          title,
-          prompt,
-          taskMode,
-          projectId: currentProject?.id,
-          projectPath: currentProject?.path,
-          createWorktree: Boolean(isGitProject && currentProject?.path),
-          baseBranch: isGitProject ? selectedBaseBranch || undefined : undefined,
-          worktreeBranchPrefix,
-          worktreeRootPath,
-          cliToolId: taskMode === 'conversation' ? resolvedCliToolId : undefined,
-          agentToolConfigId: taskMode === 'conversation' ? resolvedCliConfigId : undefined,
-          workflowDefinitionId: taskMode === 'workflow' ? selectedTemplateId : undefined
-        })
-
-        notifyTasksChanged()
-        navigate(`/task/${createdTask.id}`, { state: { prompt, attachments } })
-      } catch (error) {
-        console.error('[TasksPage] Failed to create task:', error)
-      }
-    },
-    [
-      cliConfigs,
-      currentProject?.id,
-      currentProject?.path,
-      isGitProject,
-      navigate,
-      selectedBaseBranch,
-      selectedCliConfigId,
-      selectedCliToolId,
-      selectedTemplateId,
-      taskMode
-    ]
-  )
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.08),transparent_26%),linear-gradient(180deg,#fbfcff_0%,#f5f7fb_100%)]">
@@ -329,32 +57,18 @@ export function TasksPage() {
           </div>
 
           <div className="w-full max-w-3xl">
-            <ChatInput
-              variant="home"
-              placeholder={t.home.inputPlaceholder}
-              onSubmit={handleSubmit}
+            <TaskComposer
+              projectId={currentProject?.id}
+              projectPath={currentProject?.path}
+              projectType={currentProject?.projectType}
+              promptPlaceholder={t.home.inputPlaceholder}
               className="w-full"
               autoFocus
-              operationBar={
-                <TaskCreateMenu
-                  taskMode={taskMode}
-                  onTaskModeChange={setTaskMode}
-                  canUseWorkflowMode={Boolean(currentProject?.id)}
-                  cliTools={cliTools}
-                  selectedCliToolId={selectedCliToolId}
-                  onSelectCliToolId={setSelectedCliToolId}
-                  cliConfigs={cliConfigs}
-                  selectedCliConfigId={selectedCliConfigId}
-                  onSelectCliConfigId={setSelectedCliConfigId}
-                  workflowTemplates={workflowDefinitions}
-                  selectedTemplateId={selectedTemplateId}
-                  onSelectTemplateId={setSelectedTemplateId}
-                  isGitProject={Boolean(isGitProject)}
-                  branches={branches}
-                  selectedBaseBranch={selectedBaseBranch}
-                  onSelectBaseBranch={setSelectedBaseBranch}
-                />
-              }
+              onCreated={async (task, context) => {
+                navigate(`/task/${(task as { id: string }).id}`, {
+                  state: { prompt: context.prompt, attachments: context.attachments }
+                })
+              }}
             />
           </div>
         </div>

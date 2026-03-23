@@ -40,10 +40,7 @@
 
 ## Open Questions
 
-* MVP 需要先落在哪一种产品形态：
-  * 仅做底层通用能力并先接 1 个入口
-  * 同时做通用能力 + 多个入口的统一按钮/交互
-  * 先只做工作流编辑器内的 prompt 优化闭环
+* 暂无阻塞性开放问题。
 
 ## Requirements (evolving)
 
@@ -70,10 +67,10 @@
 
 * [x] 明确复用现有 CLI runtime 的可行性与主要复用点
 * [x] 明确至少 4 个后续可接入的 prompt 编辑入口
-* [ ] 明确 MVP 的产品形态与首个接入点
-* [ ] 明确通用 service / IPC / renderer 复用边界
-* [ ] 明确优化结果的数据结构与失败行为
-* [ ] 明确首版是否包含“一键替换”之外的预览/差异能力
+* [x] 明确 MVP 的产品形态与首个接入点
+* [x] 明确通用 service / IPC / renderer 复用边界
+* [x] 明确优化结果的数据结构与失败行为
+* [x] 明确首版是否包含“一键替换”之外的预览/差异能力
 
 ## Definition of Done (team quality bar)
 
@@ -159,7 +156,7 @@
   * 容易把实现绑死在 workflow 语义里
   * 后续推广到 task / automation 时可能需要回头抽象
 
-**Approach C: 一次把多个入口统一做出来**
+**Approach C: 一次把多个入口统一做出来** (Selected)
 
 * How it works:
   * 抽通用 service，同时在 task create、task edit、workflow、automation 等多个入口都加“优化提示词”按钮
@@ -210,4 +207,10 @@
   * 点击“优化提示词”
   * 显示 loading
   * 返回结果后让用户确认“替换当前内容”或“取消”
-
+* 本次实现采用多入口首版：
+  * `CreateTaskDialog` 任务创建 prompt
+  * `TaskDialogs` 任务编辑 prompt
+  * `WorkflowTemplateDialog` 的 workflow goal prompt
+  * `WorkflowTemplateDialog` 的 agent 节点 prompt
+  * `AutomationFormDialog` 自动化任务 prompt
+* 首版不做 diff/双栏预览，采用“summary/warnings + confirm replace”交互。

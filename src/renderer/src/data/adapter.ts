@@ -8,6 +8,8 @@ import type {
   CreateTaskInput,
   GeneratedWorkflowDefinitionResult,
   GenerateWorkflowDefinitionInput,
+  OptimizePromptInput,
+  OptimizePromptResult,
   Task,
   TaskNode,
   UpdateTaskInput,
@@ -190,6 +192,10 @@ export const db = {
     return window.api.workflow.generateDefinition(
       input
     ) as Promise<GeneratedWorkflowDefinitionResult>
+  },
+
+  optimizePrompt: (input: OptimizePromptInput): Promise<OptimizePromptResult> => {
+    return window.api.prompt.optimize(input) as Promise<OptimizePromptResult>
   },
 
   createWorkflowDefinition: (input: Record<string, unknown>): Promise<WorkflowDefinition> => {

@@ -395,6 +395,15 @@ const api = {
     retryNode: (nodeId: string) => invoke(IPC_CHANNELS.workflow.retryNode, nodeId),
     stopRun: (runId: string) => invoke(IPC_CHANNELS.workflow.stopRun, runId)
   },
+  prompt: {
+    optimize: (input: {
+      prompt: string
+      contextType: 'task' | 'workflow-generation' | 'workflow-node' | 'automation'
+      name?: string | null
+      toolId?: string | null
+      agentToolConfigId?: string | null
+    }) => invoke(IPC_CHANNELS.prompt.optimize, input)
+  },
   fs: {
     readFile: (path: string) => invoke(IPC_CHANNELS.fs.readFile, path),
     readTextFile: (path: string) => invoke(IPC_CHANNELS.fs.readTextFile, path),

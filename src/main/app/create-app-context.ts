@@ -41,6 +41,11 @@ export const createAppContext = (): AppContext => {
     cliToolDetectorService,
     settingsService
   )
+  databaseService.setPromptOptimizationRuntime(
+    cliSessionService,
+    cliToolDetectorService,
+    settingsService
+  )
   const workflowSchedulerService = new WorkflowSchedulerService(databaseService, cliSessionService)
   databaseService.setWorkflowSchedulerService(workflowSchedulerService)
   const terminalService = new TerminalService()

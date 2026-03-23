@@ -3,11 +3,13 @@ import { Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { PromptOptimizeButton } from '@/components/shared/PromptOptimizeButton';
 import { useProjects } from '@/hooks/useProjects';
 import type { AgentToolConfig } from '@/data';
 import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement';
 import type { Automation, AutomationTriggerType } from '@/types/automation';
 import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools';
+import { useLanguage } from '@/providers/language-provider';
 
 interface AutomationFormDialogProps {
   open: boolean;
@@ -53,6 +55,7 @@ export function AutomationFormDialog({
   cliConfigs,
   onSubmit,
 }: AutomationFormDialogProps) {
+  const { t } = useLanguage();
   const { currentProject } = useProjects();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -381,7 +384,21 @@ export function AutomationFormDialog({
             </div>
 
             <div className="mt-3">
-              <label className="text-xs font-medium text-muted-foreground">任务提示词</label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-xs font-medium text-muted-foreground">任务提示词</label>
+                <PromptOptimizeButton
+                  prompt={prompt}
+                  contextType="automation"
+                  name={title || name || null}
+                  toolId={cliToolId || null}
+                  agentToolConfigId={cliConfigId || null}
+                  onApply={(optimizedPrompt) => {
+                    setPrompt(optimizedPrompt);
+                    setError(null);
+                  }}
+                  onError={(message) => setError(message || t.task.promptOptimizationFailed)}
+                />
+              </div>
               <textarea
                 className="mt-1.5 min-h-[120px] w-full rounded-md border bg-background px-3 py-2 text-sm"
                 value={prompt}
