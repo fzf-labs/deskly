@@ -521,8 +521,8 @@ export class CliSessionService extends EventEmitter {
             toolId: options.toolId,
             code: data.code,
             status: data.forcedStatus ?? handle.status,
-            stdout: stdoutChunks.join(''),
-            stderr: stderrChunks.join(''),
+            stdout: stdoutChunks.join('\n'),
+            stderr: stderrChunks.join('\n'),
             logs: msgStore.getHistory()
           })
         )

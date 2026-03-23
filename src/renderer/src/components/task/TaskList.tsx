@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Play, CheckCircle, Clock, GitBranch, Trash2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { notifyTasksChanged } from '@/lib/task-events'
 
 interface Task {
   id: string
@@ -71,6 +72,7 @@ export function TaskList({ projectId, onTaskSelect, className }: TaskListProps) 
     try {
       await window.api.task.delete(taskId, true)
       setTasks((prev) => prev.filter((t) => t.id !== taskId))
+      notifyTasksChanged()
     } catch (error) {
       console.error('Failed to delete task:', error)
     }

@@ -91,7 +91,7 @@ export interface UpdateTaskInput {
 export interface WorkflowRun {
   id: string
   task_id: string
-  workflow_definition_id: string
+  workflow_definition_id: string | null
   definition_snapshot: WorkflowDefinitionDocument
   status: 'waiting' | 'running' | 'review' | 'done' | 'failed'
   current_wave: number

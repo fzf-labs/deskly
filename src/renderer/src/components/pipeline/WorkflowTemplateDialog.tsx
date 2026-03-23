@@ -39,6 +39,7 @@ import {
   type GeneratedWorkflowDefinitionResult,
   type WorkflowDefinitionNodePosition
 } from '@/data'
+import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
 import { newUuid } from '@/lib/ids'
 import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
 import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools'
@@ -100,7 +101,8 @@ const EDITOR_TOOLBAR_GROUP_CLASS =
   'flex items-center gap-1 rounded-[6px] border border-slate-200/80 bg-white/88 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]'
 const EDITOR_RAIL_BUTTON_CLASS =
   'flex h-10 w-10 items-center justify-center rounded-[6px] border border-slate-200/80 bg-white/88 text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-white hover:text-slate-900'
-const EDITOR_PANEL_HEADER_CLASS = 'border-b border-slate-200/70 px-4 py-4 backdrop-blur'
+const EDITOR_PANEL_HEADER_CLASS =
+  'flex h-16 shrink-0 items-center border-b border-slate-200/70 px-4 py-3 backdrop-blur'
 const EDITOR_SELECT_TRIGGER_CLASS = 'rounded-[6px]'
 
 type WorkflowEditorNodeData = {
@@ -169,6 +171,22 @@ const slugifyWorkflowKey = (value: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+
+const resolveTemplateSaveErrorMessage = (
+  error: unknown,
+  taskMessages: ReturnType<typeof useLanguage>['t']['task']
+) => {
+  const message = error instanceof Error ? error.message : String(error)
+
+  if (message.includes('WORKFLOW_DEFINITION_NAME_CONFLICT')) {
+    return (
+      taskMessages.createTemplateNameConflict ||
+      '当前范围内已存在同名工作流，请修改名称后再保存。'
+    )
+  }
+
+  return message
+}
 
 const isEditableTarget = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
@@ -753,20 +771,87 @@ export function WorkflowTemplateEditor({
   const generationCliTools = useMemo(() => cliTools.filter(isWorkflowGenerationCliTool), [cliTools])
 
   useEffect(() => {
-    if (!generationToolId) return
-    if (generationCliTools.some((tool) => tool.id === generationToolId)) return
-    setGenerationToolId('')
-    setGenerationAgentToolConfigId('')
-  }, [generationCliTools, generationToolId])
+    if (!active) return
+
+    if (generationCliTools.length === 0) {
+      if (generationToolId || generationAgentToolConfigId) {
+        setGenerationToolId('')
+        setGenerationAgentToolConfigId('')
+      }
+      return
+    }
+
+    const hasSelectedTool = generationCliTools.some((tool) => tool.id === generationToolId)
+    if (hasSelectedTool) {
+      return
+    }
+
+    const settings = getSettings()
+    const defaultCliToolId = getEnabledDefaultCliToolId(settings)
+    const nextToolId =
+      generationCliTools.find((tool) => tool.id === defaultCliToolId)?.id || generationCliTools[0]?.id || ''
+
+    if (!nextToolId) {
+      setGenerationToolId('')
+      setGenerationAgentToolConfigId('')
+      return
+    }
+
+    setGenerationToolId(nextToolId)
+  }, [active, generationAgentToolConfigId, generationCliTools, generationToolId])
 
   const resolveDefaultCliConfigId = useCallback(
     async (toolId: string): Promise<string> => {
       if (!toolId) return ''
       const configs = cliConfigsByTool[toolId] || (await loadCliConfigs(toolId))
-      return configs.find((config) => config.is_default)?.id || ''
+      return configs.find((config) => config.is_default)?.id || configs[0]?.id || ''
     },
     [cliConfigsByTool, loadCliConfigs]
   )
+
+  useEffect(() => {
+    if (!active) return
+
+    if (!generationToolId) {
+      setGenerationAgentToolConfigId('')
+      return
+    }
+
+    let cancelled = false
+
+    const syncGenerationConfig = async () => {
+      const configs = cliConfigsByTool[generationToolId] || (await loadCliConfigs(generationToolId))
+      if (cancelled) return
+
+      if (configs.length === 0) {
+        if (generationAgentToolConfigId) {
+          setGenerationAgentToolConfigId('')
+        }
+        return
+      }
+
+      const hasSelectedConfig = configs.some((config) => config.id === generationAgentToolConfigId)
+      if (hasSelectedConfig) {
+        return
+      }
+
+      const nextConfigId =
+        configs.find((config) => config.is_default)?.id || configs[0]?.id || ''
+      setGenerationAgentToolConfigId(nextConfigId)
+    }
+
+    void syncGenerationConfig()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    active,
+    cliConfigsByTool,
+    generationAgentToolConfigId,
+    generationToolId,
+    loadCliConfigs
+  ])
 
   useEffect(() => {
     if (!active) return
@@ -775,7 +860,7 @@ export function WorkflowTemplateEditor({
     const loadTools = async () => {
       try {
         const detected = await window.api?.cliTools?.getSnapshot?.()
-        if (isMounted) setCliTools(filterEnabledCliTools(normalizeCliTools(detected)))
+        if (isMounted) setCliTools(filterEnabledCliTools(normalizeCliTools(detected), getSettings()))
         void window.api?.cliTools?.refresh?.({ level: 'fast' })
       } catch {
         if (isMounted) setCliTools([])
@@ -784,7 +869,7 @@ export function WorkflowTemplateEditor({
 
     const unsubscribe = window.api?.cliTools?.onUpdated?.((tools) => {
       if (!isMounted) return
-      setCliTools(filterEnabledCliTools(normalizeCliTools(tools)))
+      setCliTools(filterEnabledCliTools(normalizeCliTools(tools), getSettings()))
     })
 
     void loadTools()
@@ -890,6 +975,7 @@ export function WorkflowTemplateEditor({
     () => templateNodes.findIndex((node) => node.id === selectedNodeId),
     [selectedNodeId, templateNodes]
   )
+
   const selectedEdgeSummary = useMemo(() => {
     if (!selectedEdgeId) return null
 
@@ -969,6 +1055,91 @@ export function WorkflowTemplateEditor({
     },
     []
   )
+
+  useEffect(() => {
+    if (!active || !selectedNode || selectedNode.type !== 'agent') {
+      return
+    }
+
+    if (cliTools.length === 0) {
+      if (selectedNode.cliToolId || selectedNode.agentToolConfigId) {
+        updateNode(selectedNode.id, (current) => ({
+          ...current,
+          cliToolId: '',
+          agentToolConfigId: ''
+        }))
+      }
+      return
+    }
+
+    const hasSelectedTool = cliTools.some((tool) => tool.id === selectedNode.cliToolId)
+    if (hasSelectedTool) {
+      return
+    }
+
+    const settings = getSettings()
+    const defaultCliToolId = getEnabledDefaultCliToolId(settings)
+    const nextToolId =
+      cliTools.find((tool) => tool.id === defaultCliToolId)?.id || cliTools[0]?.id || ''
+
+    if (!nextToolId) {
+      return
+    }
+
+    updateNode(selectedNode.id, (current) => ({
+      ...current,
+      cliToolId: nextToolId
+    }))
+  }, [active, cliTools, selectedNode, updateNode])
+
+  useEffect(() => {
+    if (
+      !active ||
+      !selectedNode ||
+      selectedNode.type !== 'agent' ||
+      !selectedNode.cliToolId
+    ) {
+      return
+    }
+
+    let cancelled = false
+
+    const syncSelectedNodeConfig = async () => {
+      const configs =
+        cliConfigsByTool[selectedNode.cliToolId] || (await loadCliConfigs(selectedNode.cliToolId))
+      if (cancelled) return
+
+      if (configs.length === 0) {
+        if (selectedNode.agentToolConfigId) {
+          updateNode(selectedNode.id, (current) => ({
+            ...current,
+            agentToolConfigId: ''
+          }))
+        }
+        return
+      }
+
+      const hasSelectedConfig = configs.some(
+        (config) => config.id === selectedNode.agentToolConfigId
+      )
+      if (hasSelectedConfig) {
+        return
+      }
+
+      const nextConfigId =
+        configs.find((config) => config.is_default)?.id || configs[0]?.id || ''
+      updateNode(selectedNode.id, (current) => ({
+        ...current,
+        agentToolConfigId: nextConfigId
+      }))
+    }
+
+    void syncSelectedNodeConfig()
+
+    return () => {
+      cancelled = true
+    }
+  }, [active, cliConfigsByTool, loadCliConfigs, selectedNode, updateNode])
 
   const addNode = useCallback(() => {
     const newNode = createDefaultNode(templateNodes.length)
@@ -1228,7 +1399,7 @@ export function WorkflowTemplateEditor({
       await onSubmit(payload)
       setInitialSnapshot(serializeDrafts(payload))
     } catch (err) {
-      setError(String(err))
+      setError(resolveTemplateSaveErrorMessage(err, t.task))
     } finally {
       setSaving(false)
     }
@@ -1336,10 +1507,10 @@ export function WorkflowTemplateEditor({
       </div>
 
       <div
-        className="grid min-h-0 flex-1 overflow-hidden bg-slate-100 transition-[grid-template-columns] duration-200 grid-cols-1 xl:[grid-template-columns:var(--workflow-editor-columns)]"
+        className="grid min-h-0 flex-1 grid-cols-1 items-stretch overflow-hidden bg-slate-100 transition-[grid-template-columns] duration-200 xl:[grid-template-columns:var(--workflow-editor-columns)]"
         style={editorLayoutStyle}
       >
-        <aside className="flex min-h-0 flex-col border-r border-slate-200/80 bg-slate-50">
+        <aside className="flex h-full min-h-0 flex-col border-r border-slate-200/80 bg-slate-50">
           {leftPanelCollapsed ? (
             <div className="flex h-full flex-col items-center gap-3 px-2 py-4">
               <EditorRailButton
@@ -1355,7 +1526,7 @@ export function WorkflowTemplateEditor({
           ) : (
             <>
               <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-slate-50')}>
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex w-full items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                       <FileText className="size-3.5" />
@@ -1373,8 +1544,8 @@ export function WorkflowTemplateEditor({
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto py-4 pl-0 pr-4">
-                <div className="space-y-4">
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="space-y-4 p-2">
                   <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                     <div className="border-b border-slate-200/70 px-4 py-3">
                       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -1443,17 +1614,13 @@ export function WorkflowTemplateEditor({
                                 const defaultConfigId = await resolveDefaultCliConfigId(toolId)
                                 setGenerationAgentToolConfigId(defaultConfigId)
                               }}
-                              placeholder={t.task.workflowGenerationCliAuto || '自动选择可用 CLI'}
-                              options={[
-                                {
-                                  value: '',
-                                  label: t.task.workflowGenerationCliAuto || '自动选择可用 CLI'
-                                },
-                                ...generationCliTools.map((tool) => ({
-                                  value: tool.id,
-                                  label: tool.displayName || tool.name || tool.id
-                                }))
-                              ]}
+                              placeholder={
+                                t.task.workflowGenerationCliAuto || '从当前可用的中自动选定'
+                              }
+                              options={generationCliTools.map((tool) => ({
+                                value: tool.id,
+                                label: tool.displayName || tool.name || tool.id
+                              }))}
                             />
                           </div>
                         </div>
@@ -1474,23 +1641,17 @@ export function WorkflowTemplateEditor({
                                 !generationToolId
                                   ? t.task.createCliConfigSelectTool
                                   : t.task.workflowGenerationCliConfigDefault ||
-                                    '使用所选 CLI 的默认配置'
+                                    '从当前可用的中自动选定'
                               }
-                              options={[
-                                {
-                                  value: '',
-                                  label:
-                                    t.task.workflowGenerationCliConfigDefault ||
-                                    '使用所选 CLI 的默认配置'
-                                },
-                                ...((generationToolId
+                              options={
+                                (generationToolId
                                   ? cliConfigsByTool[generationToolId] || []
                                   : []
                                 ).map((config) => ({
                                   value: config.id,
                                   label: config.name
-                                })) ?? [])
-                              ]}
+                                })) ?? []
+                              }
                             />
                           </div>
                         </div>
@@ -1517,14 +1678,14 @@ export function WorkflowTemplateEditor({
           )}
         </aside>
 
-        <section className="flex min-h-0 flex-col bg-white">
+        <section className="flex h-full min-h-0 flex-col bg-white">
           <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-white')}>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex w-full items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   画布
                 </div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">
+                <div className="text-sm font-semibold text-slate-900">
                   {t.task.workflowCardTitle || '流程图'}
                 </div>
               </div>
@@ -1606,7 +1767,7 @@ export function WorkflowTemplateEditor({
           </div>
         </section>
 
-        <aside className="flex min-h-0 flex-col border-l border-slate-200/80 bg-slate-50">
+        <aside className="flex h-full min-h-0 flex-col border-l border-slate-200/80 bg-slate-50">
           {rightPanelCollapsed ? (
             <div className="flex h-full flex-col items-center gap-3 px-2 py-4">
               <EditorRailButton
@@ -1627,7 +1788,7 @@ export function WorkflowTemplateEditor({
           ) : (
             <>
               <div className={cn(EDITOR_PANEL_HEADER_CLASS, 'bg-slate-50')}>
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex w-full items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                       <Settings2 className="size-3.5" />
@@ -1645,9 +1806,9 @@ export function WorkflowTemplateEditor({
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto py-4 pl-4 pr-0">
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 {selectedNode ? (
-                  <div className="space-y-4">
+                  <div className="space-y-4 p-2">
                     <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                       <div className="border-b border-slate-200/70 px-4 py-3">
                         <div className="flex items-start justify-between gap-3">
@@ -1790,15 +1951,9 @@ export function WorkflowTemplateEditor({
                                 value={selectedNode.cliToolId || ''}
                                 triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
                                 onValueChange={async (toolId) => {
-                                  let defaultConfigId = ''
-                                  if (toolId) {
-                                    const configs =
-                                      cliConfigsByTool[toolId] || (await loadCliConfigs(toolId))
-                                    const defaultConfig = configs.find(
-                                      (config) => config.is_default
-                                    )
-                                    defaultConfigId = defaultConfig?.id || ''
-                                  }
+                                  const defaultConfigId = toolId
+                                    ? await resolveDefaultCliConfigId(toolId)
+                                    : ''
 
                                   updateNode(selectedNode.id, (current) => ({
                                     ...current,
@@ -1911,29 +2066,19 @@ export function WorkflowTemplateEditor({
                     </section>
                   </div>
                 ) : (
-                  <div
-                    className={cn(
-                      EDITOR_SECTION_CLASS,
-                      'flex h-full items-center justify-center px-6 py-10 text-sm text-slate-500'
-                    )}
-                  >
-                    从左侧列表或画布中选择节点进行编辑。
+                  <div className="p-2">
+                    <div
+                      className={cn(
+                        EDITOR_SECTION_CLASS,
+                        'flex h-full items-center justify-center px-6 py-10 text-sm text-slate-500'
+                      )}
+                    >
+                      从左侧列表或画布中选择节点进行编辑。
+                    </div>
                   </div>
                 )}
               </div>
 
-              <div className="border-t border-slate-200/70 py-3 pl-4 pr-0">
-                {selectedEdgeSummary ? (
-                  <div className={cn(EDITOR_SECTION_CLASS, 'px-3 py-3')}>
-                    <div className="text-xs font-medium text-slate-500">连线</div>
-                    <div className="mt-1 text-sm text-slate-900">
-                      {selectedEdgeSummary.sourceLabel} {' 到 '} {selectedEdgeSummary.targetLabel}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-slate-500">选择连线后可查看或删除。</div>
-                )}
-              </div>
             </>
           )}
         </aside>

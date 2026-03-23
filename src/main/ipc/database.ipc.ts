@@ -66,43 +66,6 @@ export const registerDatabaseIpc = ({
     databaseService.setDefaultAgentToolConfig(id)
   )
 
-  handle(IPC_CHANNELS.database.getGlobalWorkflowTemplates, [], () =>
-    databaseService.getGlobalWorkflowTemplates()
-  )
-
-  handle(IPC_CHANNELS.database.getWorkflowTemplatesByProject, [v.string()], (_, projectId) =>
-    databaseService.getWorkflowTemplatesByProject(projectId)
-  )
-
-  handle(IPC_CHANNELS.database.getWorkflowTemplate, [v.string()], (_, templateId) =>
-    databaseService.getWorkflowTemplate(templateId)
-  )
-
-  handle(IPC_CHANNELS.database.createWorkflowTemplate, [v.object()], (_, input) =>
-    databaseService.createWorkflowTemplate(
-      input as unknown as Parameters<DatabaseService['createWorkflowTemplate']>[0]
-    )
-  )
-
-  handle(IPC_CHANNELS.database.updateWorkflowTemplate, [v.object()], (_, input) =>
-    databaseService.updateWorkflowTemplate(
-      input as unknown as Parameters<DatabaseService['updateWorkflowTemplate']>[0]
-    )
-  )
-
-  handle(
-    IPC_CHANNELS.database.deleteWorkflowTemplate,
-    [v.string(), v.enum(['global', 'project'] as const)],
-    (_, templateId, scope) => databaseService.deleteWorkflowTemplate(templateId, scope)
-  )
-
-  handle(
-    IPC_CHANNELS.database.copyGlobalWorkflowToProject,
-    [v.string(), v.string()],
-    (_, globalTemplateId, projectId) =>
-      databaseService.copyGlobalWorkflowToProject(globalTemplateId, projectId)
-  )
-
   handle(IPC_CHANNELS.database.getTaskNodes, [v.string()], (_, taskId) =>
     databaseService.getTaskNodes(taskId)
   )

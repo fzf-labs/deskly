@@ -1,8 +1,6 @@
 export { DatabaseConnection } from './DatabaseConnection'
 export { TaskRepository } from './TaskRepository'
-export { TaskNodeRepository } from './TaskNodeRepository'
 export { ProjectRepository } from './ProjectRepository'
-export { WorkflowRepository } from './WorkflowRepository'
 export { AgentToolConfigRepository } from './AgentToolConfigRepository'
 export { AutomationRepository } from './AutomationRepository'
 export { DatabaseService } from '../DatabaseService'

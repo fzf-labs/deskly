@@ -12,7 +12,6 @@ interface WorkspaceSidebarProjectGroupProps {
   isExpanded: boolean
   isCurrentGroup: boolean
   activeTaskId: string | null
-  startConversationLabel: string
   onSelectProject: (projectId: string | null) => void
   onSelectTask: (taskId: string, projectId: string | null) => void
   onToggleGroup: (groupId: string) => void
@@ -24,7 +23,6 @@ export function WorkspaceSidebarProjectGroup({
   isExpanded,
   isCurrentGroup,
   activeTaskId,
-  startConversationLabel,
   onSelectProject,
   onSelectTask,
   onToggleGroup
@@ -85,15 +83,7 @@ export function WorkspaceSidebarProjectGroup({
 
       {isExpanded && (
         <div className="ml-2 space-y-0.5 pl-1">
-          {group.tasks.length === 0 ? (
-            <button
-              type="button"
-              onClick={() => onSelectProject(group.kind === 'project' ? group.id : null)}
-              className="text-sidebar-foreground/68 hover:text-sidebar-foreground flex w-full items-center rounded-sm px-2 py-2 text-xs transition-colors"
-            >
-              {startConversationLabel}
-            </button>
-          ) : (
+          {group.tasks.length > 0 ? (
             group.tasks.map((task) => (
               <WorkspaceSidebarTaskItem
                 key={task.id}
@@ -102,7 +92,7 @@ export function WorkspaceSidebarProjectGroup({
                 onClick={onSelectTask}
               />
             ))
-          )}
+          ) : null}
         </div>
       )}
     </section>

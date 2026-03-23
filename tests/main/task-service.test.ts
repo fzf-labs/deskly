@@ -42,17 +42,11 @@ const createTaskServiceDeps = () => {
       task_mode: 'workflow'
     })
   )
-  const createWorkflowDefinition = vi.fn((input) => ({
-    id: 'definition-1',
-    ...input,
-    created_at: '2026-01-01T00:00:00.000Z',
-    updated_at: '2026-01-01T00:00:00.000Z'
-  }))
   const createWorkflowRunForTask = vi.fn((input) => ({
     id: 'run-1',
     task_id: input.taskId,
-    workflow_definition_id: input.workflowDefinitionId,
-    definition_snapshot: { version: 1, nodes: [], edges: [] },
+    workflow_definition_id: input.workflowDefinitionId ?? null,
+    definition_snapshot: input.definition ?? { version: 1, nodes: [], edges: [] },
     status: 'waiting',
     current_wave: 0,
     started_at: null,
@@ -64,34 +58,7 @@ const createTaskServiceDeps = () => {
   const db = {
     getDefaultAgentToolConfig: vi.fn(() => ({ id: 'cfg-default' })),
     createTask,
-    updateCurrentTaskNodeRuntime: vi.fn(),
-    createTaskNodesFromTemplate: vi.fn(),
     getTask,
-    getWorkflowTemplate: vi.fn(() => ({
-      id: 'tpl-1',
-      name: 'Workflow template',
-      description: 'legacy template',
-      scope: 'project',
-      project_id: 'project-1',
-      created_at: '2026-01-01T00:00:00.000Z',
-      updated_at: '2026-01-01T00:00:00.000Z',
-      nodes: [
-        {
-          id: 'node-a',
-          template_id: 'tpl-1',
-          node_order: 1,
-          name: 'Analyze',
-          prompt: 'Analyze task',
-          cli_tool_id: 'codex',
-          agent_tool_config_id: 'cfg-template',
-          requires_approval: false,
-          created_at: '2026-01-01T00:00:00.000Z',
-          updated_at: '2026-01-01T00:00:00.000Z'
-        }
-      ]
-    })),
-    listWorkflowDefinitions: vi.fn(() => []),
-    createWorkflowDefinition,
     createWorkflowRunForTask
   }
 
@@ -99,99 +66,74 @@ const createTaskServiceDeps = () => {
     addWorktree: vi.fn()
   }
 
-  return { db, git, createWorkflowDefinition, createWorkflowRunForTask }
+  const settingsService = {
+    getSettings: vi.fn(() => ({
+      enabledCliTools: {
+        'claude-code': true,
+        codex: true,
+        'cursor-agent': true,
+        'gemini-cli': true,
+        opencode: true
+      }
+    }))
+  }
+
+  return { db, git, createWorkflowRunForTask, settingsService }
 }
 
 describe('TaskService workflow runtime fallback', () => {
-  it('bridges legacy workflow templates into workflow definitions when creating workflow tasks', async () => {
-    const { db, git, createWorkflowDefinition, createWorkflowRunForTask } = createTaskServiceDeps()
-    const service = new TaskService(db as any, git as any)
+  it('creates workflow tasks directly from workflow definitions', async () => {
+    const { db, git, createWorkflowRunForTask, settingsService } = createTaskServiceDeps()
+    const service = new TaskService(db as any, git as any, settingsService as any)
 
     await service.createTask({
       title: 'Workflow task',
       prompt: 'Task prompt',
       taskMode: 'workflow',
-      workflowTemplateId: 'tpl-1',
+      workflowDefinitionId: 'definition-1',
       cliToolId: 'codex'
     })
 
     expect(db.createTask).toHaveBeenCalledTimes(1)
-    expect(createWorkflowDefinition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        scope: 'project',
-        project_id: 'project-1',
-        name: 'Workflow template',
-        definition: expect.objectContaining({
-          version: 1,
-          nodes: [
-            expect.objectContaining({
-              id: 'node-a',
-              name: 'Analyze',
-              prompt: 'Analyze task',
-              cliToolId: 'codex',
-              agentToolConfigId: 'cfg-template'
-            })
-          ]
-        })
-      })
-    )
     expect(createWorkflowRunForTask).toHaveBeenCalledWith({
       taskId: expect.any(String),
       workflowDefinitionId: 'definition-1'
     })
-    expect(db.createTaskNodesFromTemplate).not.toHaveBeenCalled()
   })
 
-  it('reuses an existing matching workflow definition instead of creating a duplicate', async () => {
-    const { db, git, createWorkflowDefinition, createWorkflowRunForTask } = createTaskServiceDeps()
-    db.listWorkflowDefinitions.mockReturnValue([
-      {
-        id: 'definition-existing',
-        name: 'Workflow template',
-        scope: 'project',
-        project_id: 'project-1',
-        description: 'legacy template',
-        created_at: '2026-01-01T00:00:00.000Z',
-        updated_at: '2026-01-01T00:00:00.000Z',
-        definition: {
-          version: 1,
-          nodes: [
-            {
-              id: 'node-a',
-              key: 'legacy-template-node-1',
-              type: 'agent',
-              name: 'Analyze',
-              prompt: 'Analyze task',
-              cliToolId: 'codex',
-              agentToolConfigId: 'cfg-template',
-              requiresApprovalAfterRun: false,
-              position: null
-            }
-          ],
-          edges: []
-        }
-      }
-    ])
-    const service = new TaskService(db as any, git as any)
+  it('creates single-node workflow runs for conversation tasks', async () => {
+    const { db, git, createWorkflowRunForTask, settingsService } = createTaskServiceDeps()
+    const service = new TaskService(db as any, git as any, settingsService as any)
 
     await service.createTask({
-      title: 'Workflow task',
+      title: 'Conversation task',
       prompt: 'Task prompt',
-      taskMode: 'workflow',
-      workflowTemplateId: 'tpl-1',
+      taskMode: 'conversation',
       cliToolId: 'codex'
     })
 
-    expect(createWorkflowDefinition).not.toHaveBeenCalled()
-    expect(createWorkflowRunForTask).toHaveBeenCalledWith({
-      taskId: expect.any(String),
-      workflowDefinitionId: 'definition-existing'
-    })
+    expect(createWorkflowRunForTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: expect.any(String),
+        definition: expect.objectContaining({
+          version: 1,
+          nodes: [
+            expect.objectContaining({
+              key: 'conversation',
+              type: 'agent',
+              cliToolId: 'codex',
+              agentToolConfigId: 'cfg-default'
+            })
+          ],
+          edges: []
+        })
+      })
+    )
   })
 
   it('rejects unsupported task status updates', () => {
-    const { db, git } = createTaskServiceDeps()
-    const service = new TaskService(db as any, git as any)
+    const { db, git, settingsService } = createTaskServiceDeps()
+    const service = new TaskService(db as any, git as any, settingsService as any)
 
     expect(() => service.updateTaskStatus('task-1', 'cancelled' as any)).toThrow(
       'Unsupported task status: cancelled'

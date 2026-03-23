@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events'
 import { newUlid } from '../utils/ids'
-import { composeTaskNodePrompt, DatabaseService } from './DatabaseService'
+import { DatabaseService } from './DatabaseService'
 import { TaskService } from './TaskService'
 import { CliSessionService } from './cli/CliSessionService'
 import type { Automation, AutomationRun, AutomationRunStatus } from '../types/automation'
@@ -102,7 +102,7 @@ export class AutomationRunnerService extends EventEmitter {
 
       taskNodeId = startedNode.id
 
-      const nodePrompt = composeTaskNodePrompt(createdTask.prompt, startedNode.prompt)
+      const nodePrompt = startedNode.prompt
       const runtimeCliToolId = startedNode.cli_tool_id ?? automation.template_json.cliToolId
       if (!runtimeCliToolId) {
         throw new Error('CLI tool is required for automation run')

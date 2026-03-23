@@ -287,13 +287,6 @@ interface DatabaseAPI {
   updateAgentToolConfig: (id: string, updates: unknown) => Promise<unknown>
   deleteAgentToolConfig: (id: string) => Promise<unknown>
   setDefaultAgentToolConfig: (id: string) => Promise<unknown>
-  getGlobalWorkflowTemplates: () => Promise<unknown[]>
-  getWorkflowTemplatesByProject: (projectId: string) => Promise<unknown[]>
-  getWorkflowTemplate: (templateId: string) => Promise<unknown>
-  createWorkflowTemplate: (input: unknown) => Promise<unknown>
-  updateWorkflowTemplate: (input: unknown) => Promise<unknown>
-  deleteWorkflowTemplate: (templateId: string, scope: string) => Promise<boolean>
-  copyGlobalWorkflowToProject: (globalTemplateId: string, projectId: string) => Promise<unknown>
   getTaskNodes: (taskId: string) => Promise<unknown[]>
   getTaskNode: (nodeId: string) => Promise<unknown>
   getCurrentTaskNode: (taskId: string) => Promise<unknown>
@@ -338,7 +331,11 @@ interface WorkflowAPI {
   createDefinition: (input: unknown) => Promise<unknown>
   updateDefinition: (input: unknown) => Promise<unknown>
   deleteDefinition: (id: string) => Promise<boolean>
-  createRunForTask: (input: { taskId: string; workflowDefinitionId: string }) => Promise<unknown>
+  createRunForTask: (input: {
+    taskId: string
+    workflowDefinitionId?: string | null
+    definition?: unknown
+  }) => Promise<unknown>
   getRun: (id: string) => Promise<unknown>
   getRunByTask: (taskId: string) => Promise<unknown>
   listRunNodes: (runId: string) => Promise<unknown[]>
@@ -442,7 +439,6 @@ interface TaskAPI {
     worktreeRootPath?: string
     cliToolId?: string
     agentToolConfigId?: string
-    workflowTemplateId?: string
     workflowDefinitionId?: string
   }) => Promise<TaskWithWorktree>
   get: (id: string) => Promise<TaskWithWorktree | null>

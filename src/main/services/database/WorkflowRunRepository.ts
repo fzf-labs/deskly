@@ -35,7 +35,7 @@ export class WorkflowRunRepository {
       .run(
         id,
         input.task_id,
-        input.workflow_definition_id,
+        input.workflow_definition_id ?? null,
         input.status ?? 'waiting',
         JSON.stringify(input.definition_snapshot, null, 2),
         input.current_wave ?? 0,

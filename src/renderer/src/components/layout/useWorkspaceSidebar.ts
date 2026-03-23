@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { db, type Task } from '@/data';
 import { useProjects } from '@/hooks/useProjects';
+import { TASKS_CHANGED_EVENT } from '@/lib/task-events';
 
 export interface WorkspaceTaskItem {
   id: string;
@@ -18,7 +19,7 @@ export interface WorkspaceProjectGroup {
   name: string;
   tasks: WorkspaceTaskItem[];
   isCurrent: boolean;
-  kind: 'project' | 'unassigned';
+  kind: 'project';
 }
 
 export type WorkspaceSidebarSortMode = 'recent' | 'title';
@@ -26,8 +27,6 @@ export type WorkspaceSidebarSortMode = 'recent' | 'title';
 interface RefreshWorkspaceSidebarOptions {
   silent?: boolean;
 }
-
-const UNASSIGNED_GROUP_ID = '__unassigned__';
 
 function toTaskItem(task: Task): WorkspaceTaskItem {
   return {
@@ -84,9 +83,6 @@ function sortGroups(
   sortMode: WorkspaceSidebarSortMode
 ): WorkspaceProjectGroup[] {
   return [...groups].sort((left, right) => {
-    if (left.kind === 'unassigned' && right.kind !== 'unassigned') return 1;
-    if (right.kind === 'unassigned' && left.kind !== 'unassigned') return -1;
-
     if (sortMode === 'title') {
       return compareGroupName(left, right);
     }
@@ -140,18 +136,26 @@ export function useWorkspaceSidebar(
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const handleTasksChanged = () => {
+      void refresh({ silent: true });
+    };
+
+    window.addEventListener(TASKS_CHANGED_EVENT, handleTasksChanged);
+    return () => {
+      window.removeEventListener(TASKS_CHANGED_EVENT, handleTasksChanged);
+    };
+  }, [refresh]);
+
   const projectGroups = useMemo<WorkspaceProjectGroup[]>(() => {
     const grouped = new Map<string, WorkspaceTaskItem[]>();
-    const unassignedTasks: WorkspaceTaskItem[] = [];
 
     for (const task of tasks) {
       if (task.projectId) {
         const currentTasks = grouped.get(task.projectId) ?? [];
         currentTasks.push(task);
         grouped.set(task.projectId, currentTasks);
-        continue;
       }
-      unassignedTasks.push(task);
     }
 
     const groups: WorkspaceProjectGroup[] = projects.map((project) => ({
@@ -161,16 +165,6 @@ export function useWorkspaceSidebar(
       isCurrent: currentProjectId === project.id,
       kind: 'project' as const,
     }));
-
-    if (unassignedTasks.length > 0) {
-      groups.push({
-        id: UNASSIGNED_GROUP_ID,
-        name: 'Unassigned',
-        tasks: sortTasks(unassignedTasks, sortMode),
-        isCurrent: false,
-        kind: 'unassigned',
-      });
-    }
 
     return sortGroups(groups, sortMode);
   }, [currentProjectId, projects, sortMode, tasks]);

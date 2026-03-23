@@ -142,13 +142,6 @@ export const IPC_CHANNELS = {
     updateAgentToolConfig: 'db:updateAgentToolConfig',
     deleteAgentToolConfig: 'db:deleteAgentToolConfig',
     setDefaultAgentToolConfig: 'db:setDefaultAgentToolConfig',
-    getGlobalWorkflowTemplates: 'db:getGlobalWorkflowTemplates',
-    getWorkflowTemplatesByProject: 'db:getWorkflowTemplatesByProject',
-    getWorkflowTemplate: 'db:getWorkflowTemplate',
-    createWorkflowTemplate: 'db:createWorkflowTemplate',
-    updateWorkflowTemplate: 'db:updateWorkflowTemplate',
-    deleteWorkflowTemplate: 'db:deleteWorkflowTemplate',
-    copyGlobalWorkflowToProject: 'db:copyGlobalWorkflowToProject',
     getTaskNodes: 'db:getTaskNodes',
     getTaskNode: 'db:getTaskNode',
     getCurrentTaskNode: 'db:getCurrentTaskNode',
@@ -438,13 +431,6 @@ export interface IpcContracts {
   'db:updateAgentToolConfig': IpcContract<[string, UnknownRecord], unknown>
   'db:deleteAgentToolConfig': IpcContract<[string], unknown>
   'db:setDefaultAgentToolConfig': IpcContract<[string], unknown>
-  'db:getGlobalWorkflowTemplates': IpcContract<[], unknown[]>
-  'db:getWorkflowTemplatesByProject': IpcContract<[string], unknown[]>
-  'db:getWorkflowTemplate': IpcContract<[string], unknown>
-  'db:createWorkflowTemplate': IpcContract<[UnknownRecord], unknown>
-  'db:updateWorkflowTemplate': IpcContract<[UnknownRecord], unknown>
-  'db:deleteWorkflowTemplate': IpcContract<[string, 'global' | 'project'], unknown>
-  'db:copyGlobalWorkflowToProject': IpcContract<[string, string], unknown>
   'db:getTaskNodes': IpcContract<[string], unknown[]>
   'db:getTaskNode': IpcContract<[string], unknown>
   'db:getCurrentTaskNode': IpcContract<[string], unknown>
@@ -506,7 +492,8 @@ export interface IpcContracts {
     [
       {
         taskId: string
-        workflowDefinitionId: string
+        workflowDefinitionId?: string | null
+        definition?: UnknownRecord
       }
     ],
     unknown
@@ -572,7 +559,6 @@ export interface IpcContracts {
         worktreeRootPath?: string
         cliToolId?: string
         agentToolConfigId?: string
-        workflowTemplateId?: string
         workflowDefinitionId?: string
       }
     ],

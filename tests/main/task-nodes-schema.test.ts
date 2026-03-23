@@ -4,8 +4,8 @@ import { tmpdir } from 'os'
 import { describe, expect, it } from 'vitest'
 import { DatabaseConnection } from '../../src/main/services/database/DatabaseConnection'
 
-describe('task nodes schema', () => {
-  it('migrates to latest schema and creates unique in-progress index', () => {
+describe('workflow runtime schema', () => {
+  it('migrates to latest schema without legacy task/template tables', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'deskly-task-nodes-'))
     const dbPath = join(tempDir, 'test.db')
 
@@ -26,29 +26,33 @@ describe('task nodes schema', () => {
     connection.initTables()
 
     const userVersion = Number(db.pragma('user_version', { simple: true }) ?? 0)
-    expect(userVersion).toBe(9)
+    expect(userVersion).toBe(10)
 
     const taskNodesTable = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='task_nodes'")
       .get() as { name?: string } | undefined
-    expect(taskNodesTable?.name).toBe('task_nodes')
+    expect(taskNodesTable?.name).toBeUndefined()
 
-    const uniqIndex = db
+    const workflowTemplatesTable = db
       .prepare(
-        "SELECT name FROM sqlite_master WHERE type='index' AND name='uniq_task_nodes_single_in_progress'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='workflow_templates'"
       )
       .get() as { name?: string } | undefined
-    expect(uniqIndex?.name).toBe('uniq_task_nodes_single_in_progress')
+    expect(workflowTemplatesTable?.name).toBeUndefined()
 
-    const sessionIndex = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_task_nodes_session_id'")
+    const workflowTemplateNodesTable = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='workflow_template_nodes'"
+      )
       .get() as { name?: string } | undefined
-    expect(sessionIndex?.name).toBe('idx_task_nodes_session_id')
+    expect(workflowTemplateNodesTable?.name).toBeUndefined()
 
-    const taskNodeColumns = db
-      .prepare("PRAGMA table_info(task_nodes)")
-      .all() as Array<{ name?: string }>
-    expect(taskNodeColumns.some((column) => column.name === 'resume_session_id')).toBe(true)
+    const workflowRunsColumns = db
+      .prepare("PRAGMA table_info(workflow_runs)")
+      .all() as Array<{ name?: string; notnull?: number }>
+    expect(
+      workflowRunsColumns.find((column) => column.name === 'workflow_definition_id')?.notnull
+    ).toBe(0)
 
     const automationTable = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='automations'")
@@ -70,35 +74,80 @@ describe('task nodes schema', () => {
       .get() as { name?: string } | undefined
     expect(runsIdx?.name).toBe('idx_runs_automation_created')
 
+    const workflowRunNodeIndex = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name='uniq_workflow_run_nodes_single_running'"
+      )
+      .get() as { name?: string } | undefined
+    expect(workflowRunNodeIndex?.name).toBe('uniq_workflow_run_nodes_single_running')
+
     const now = new Date().toISOString()
     db.prepare(
       `INSERT INTO tasks (id, title, prompt, status, task_mode, created_at, updated_at)
-       VALUES (?, ?, ?, 'todo', 'workflow', ?, ?)`
+       VALUES (?, ?, ?, 'todo', 'conversation', ?, ?)`
     ).run('task-1', 'Task 1', 'prompt', now, now)
 
     db.prepare(
-      `INSERT INTO task_nodes (
-         id, task_id, node_order, name, prompt, status, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, 'todo', ?, ?)`
-    ).run('node-1', 'task-1', 1, 'Node 1', 'prompt', now, now)
-
-    db.prepare(
-      `INSERT INTO task_nodes (
-         id, task_id, node_order, name, prompt, status, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, 'todo', ?, ?)`
-    ).run('node-2', 'task-1', 2, 'Node 2', 'prompt', now, now)
-
-    db.prepare(`UPDATE task_nodes SET status = 'in_progress', started_at = ?, updated_at = ? WHERE id = ?`).run(
+      `INSERT INTO workflow_runs (
+         id, task_id, workflow_definition_id, status, definition_snapshot_json, current_wave, created_at, updated_at
+       ) VALUES (?, ?, NULL, 'waiting', ?, 0, ?, ?)`
+    ).run(
+      'run-1',
+      'task-1',
+      JSON.stringify({
+        version: 1,
+        nodes: [{ id: 'def-node-1', key: 'conversation', type: 'agent', name: 'Conversation', prompt: null, command: null, cliToolId: null, agentToolConfigId: null, requiresApprovalAfterRun: false, position: null }],
+        edges: []
+      }),
       now,
-      now,
-      'node-1'
+      now
     )
 
-    expect(() => {
-      db.prepare(
-        `UPDATE task_nodes SET status = 'in_progress', started_at = ?, updated_at = ? WHERE id = ?`
-      ).run(now, now, 'node-2')
-    }).toThrow()
+    db.prepare(
+      `INSERT INTO automations (
+         id, name, enabled, trigger_type, trigger_json, timezone, source_task_id, template_json,
+         next_run_at, last_run_at, last_status, created_at, updated_at
+       ) VALUES (?, ?, 1, 'interval', ?, 'Asia/Shanghai', NULL, ?, ?, NULL, NULL, ?, ?)`
+    ).run(
+      'automation-1',
+      'Automation 1',
+      JSON.stringify({ interval_seconds: 60 }),
+      JSON.stringify({ title: 'Task 1', prompt: 'prompt', taskMode: 'conversation' }),
+      now,
+      now,
+      now
+    )
+
+    db.prepare(
+      `INSERT INTO workflow_run_nodes (
+         id, workflow_run_id, definition_node_id, node_key, name, node_type, prompt, command,
+         cli_tool_id, agent_tool_config_id, requires_approval_after_run, status, failure_reason,
+         session_id, resume_session_id, result_summary, error_message, cost, duration, attempt_count,
+         started_at, completed_at, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?, NULL, ?, ?)`
+    ).run(
+      'node-1',
+      'run-1',
+      'def-node-1',
+      'conversation',
+      'Conversation',
+      'agent',
+      'prompt',
+      null,
+      null,
+      null,
+      0,
+      now,
+      now,
+      now
+    )
+
+    db.prepare(
+      `INSERT INTO automation_runs (
+         id, automation_id, scheduled_at, triggered_at, status, task_id, task_node_id, session_id,
+         error_message, finished_at, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, 'running', ?, ?, NULL, NULL, NULL, ?, ?)`
+    ).run('automation-run-1', 'automation-1', now, now, 'task-1', 'node-1', now, now)
 
     connection.close()
     rmSync(tempDir, { recursive: true, force: true })

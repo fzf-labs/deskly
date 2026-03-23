@@ -127,31 +127,25 @@ export class TaskRepository {
         `
           SELECT
             CASE
-              WHEN SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) > 0
-                THEN 'in_progress'
-              WHEN SUM(CASE WHEN status = 'in_review' THEN 1 ELSE 0 END) > 0
-                THEN 'in_review'
-              WHEN SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END) > 0
-                   AND SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) > 0
-                THEN 'in_progress'
-              WHEN SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) = COUNT(*)
-                   AND COUNT(*) > 0
-                THEN 'done'
-              WHEN SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END) = COUNT(*)
-                   AND COUNT(*) > 0
-                THEN 'todo'
+              WHEN wr.status = 'waiting' THEN 'todo'
+              WHEN wr.status = 'running' THEN 'in_progress'
+              WHEN wr.status = 'review' THEN 'in_review'
+              WHEN wr.status = 'done' THEN 'done'
+              WHEN wr.status = 'failed' THEN 'failed'
               ELSE 'todo'
             END AS task_status,
-            MIN(started_at) AS started_at,
-            MAX(completed_at) AS completed_at,
-            SUM(cost) AS cost,
+            wr.started_at AS started_at,
+            wr.completed_at AS completed_at,
+            SUM(wrn.cost) AS cost,
             CASE
-              WHEN MIN(started_at) IS NOT NULL AND MAX(completed_at) IS NOT NULL
-                THEN CAST((julianday(MAX(completed_at)) - julianday(MIN(started_at))) * 86400 AS REAL)
+              WHEN wr.started_at IS NOT NULL AND wr.completed_at IS NOT NULL
+                THEN CAST((julianday(wr.completed_at) - julianday(wr.started_at)) * 86400 AS REAL)
               ELSE NULL
             END AS duration
-          FROM task_nodes
-          WHERE task_id = ?
+          FROM workflow_runs wr
+          LEFT JOIN workflow_run_nodes wrn ON wrn.workflow_run_id = wr.id
+          WHERE wr.task_id = ?
+          GROUP BY wr.id, wr.status, wr.started_at, wr.completed_at
         `
       )
       .get(taskId) as {
@@ -160,6 +154,14 @@ export class TaskRepository {
       completed_at: string | null
       cost: number | null
       duration: number | null
+    } | undefined
+
+    const resolvedAggregate = aggregate ?? {
+      task_status: 'todo',
+      started_at: null,
+      completed_at: null,
+      cost: null,
+      duration: null
     }
 
     this.db
@@ -177,11 +179,11 @@ export class TaskRepository {
         `
       )
       .run(
-        aggregate.task_status ?? 'todo',
-        aggregate.started_at ?? null,
-        aggregate.completed_at ?? null,
-        aggregate.cost ?? null,
-        aggregate.duration ?? null,
+        resolvedAggregate.task_status ?? 'todo',
+        resolvedAggregate.started_at ?? null,
+        resolvedAggregate.completed_at ?? null,
+        resolvedAggregate.cost ?? null,
+        resolvedAggregate.duration ?? null,
         now,
         taskId
       )

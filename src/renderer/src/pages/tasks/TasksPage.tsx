@@ -17,6 +17,7 @@ import { useProjects } from '@/hooks/useProjects'
 import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
 import { normalizeCliTools } from '@/lib/agent-cli-tools'
 import { useLanguage } from '@/providers/language-provider'
+import { notifyTasksChanged } from '@/lib/task-events'
 
 export function TasksPage() {
   const navigate = useNavigate()
@@ -271,6 +272,7 @@ export function TasksPage() {
           workflowDefinitionId: taskMode === 'workflow' ? selectedTemplateId : undefined
         })
 
+        notifyTasksChanged()
         navigate(`/task/${createdTask.id}`, { state: { prompt, attachments } })
       } catch (error) {
         console.error('[TasksPage] Failed to create task:', error)

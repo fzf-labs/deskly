@@ -337,19 +337,6 @@ const api = {
     deleteAgentToolConfig: (id: string) => invoke(IPC_CHANNELS.database.deleteAgentToolConfig, id),
     setDefaultAgentToolConfig: (id: string) =>
       invoke(IPC_CHANNELS.database.setDefaultAgentToolConfig, id),
-    getGlobalWorkflowTemplates: () => invoke(IPC_CHANNELS.database.getGlobalWorkflowTemplates),
-    getWorkflowTemplatesByProject: (projectId: string) =>
-      invoke(IPC_CHANNELS.database.getWorkflowTemplatesByProject, projectId),
-    getWorkflowTemplate: (templateId: string) =>
-      invoke(IPC_CHANNELS.database.getWorkflowTemplate, templateId),
-    createWorkflowTemplate: (input: unknown) =>
-      invoke(IPC_CHANNELS.database.createWorkflowTemplate, input),
-    updateWorkflowTemplate: (input: unknown) =>
-      invoke(IPC_CHANNELS.database.updateWorkflowTemplate, input),
-    deleteWorkflowTemplate: (templateId: string, scope: string) =>
-      invoke(IPC_CHANNELS.database.deleteWorkflowTemplate, templateId, scope),
-    copyGlobalWorkflowToProject: (globalTemplateId: string, projectId: string) =>
-      invoke(IPC_CHANNELS.database.copyGlobalWorkflowToProject, globalTemplateId, projectId),
     getTaskNodes: (taskId: string) => invoke(IPC_CHANNELS.database.getTaskNodes, taskId),
     getTaskNode: (nodeId: string) => invoke(IPC_CHANNELS.database.getTaskNode, nodeId),
     getCurrentTaskNode: (taskId: string) =>
@@ -462,7 +449,6 @@ const api = {
       worktreeRootPath?: string
       cliToolId?: string
       agentToolConfigId?: string
-      workflowTemplateId?: string
       workflowDefinitionId?: string
     }) => invoke(IPC_CHANNELS.task.create, options),
     get: (id: string) => invoke(IPC_CHANNELS.task.get, id),

@@ -3,6 +3,7 @@ import {
   notifyTaskNeedsReview,
   playTaskReviewSound
 } from '@/lib/notifications'
+import { notifyTasksChanged } from '@/lib/task-events'
 import type {
   CreateTaskInput,
   GeneratedWorkflowDefinitionResult,
@@ -17,8 +18,10 @@ import type {
 import type { Automation, AutomationRun } from './types'
 
 export const db = {
-  createTask: (input: CreateTaskInput): Promise<Task> => {
-    return window.api.database.createTask(input) as Promise<Task>
+  createTask: async (input: CreateTaskInput): Promise<Task> => {
+    const createdTask = (await window.api.database.createTask(input)) as Task
+    notifyTasksChanged()
+    return createdTask
   },
 
   getTask: (id: string): Promise<Task | null> => {
@@ -56,11 +59,19 @@ export const db = {
       void playTaskReviewSound()
     }
 
+    if (updatedTask) {
+      notifyTasksChanged()
+    }
+
     return updatedTask
   },
 
-  deleteTask: (id: string, removeWorktree: boolean = true): Promise<boolean> => {
-    return window.api.task.delete(id, removeWorktree)
+  deleteTask: async (id: string, removeWorktree: boolean = true): Promise<boolean> => {
+    const deleted = await window.api.task.delete(id, removeWorktree)
+    if (deleted) {
+      notifyTasksChanged()
+    }
+    return deleted
   },
 
   listAgentToolConfigs: (toolId?: string): Promise<unknown[]> => {
@@ -85,37 +96,6 @@ export const db = {
 
   setDefaultAgentToolConfig: (id: string): Promise<unknown> => {
     return window.api.database.setDefaultAgentToolConfig(id) as Promise<unknown>
-  },
-
-  getGlobalWorkflowTemplates: (): Promise<unknown[]> => {
-    return window.api.database.getGlobalWorkflowTemplates() as Promise<unknown[]>
-  },
-
-  getWorkflowTemplatesByProject: (projectId: string): Promise<unknown[]> => {
-    return window.api.database.getWorkflowTemplatesByProject(projectId) as Promise<unknown[]>
-  },
-
-  getWorkflowTemplate: (templateId: string): Promise<unknown> => {
-    return window.api.database.getWorkflowTemplate(templateId) as Promise<unknown>
-  },
-
-  createWorkflowTemplate: (input: unknown): Promise<unknown> => {
-    return window.api.database.createWorkflowTemplate(input) as Promise<unknown>
-  },
-
-  updateWorkflowTemplate: (input: unknown): Promise<unknown> => {
-    return window.api.database.updateWorkflowTemplate(input) as Promise<unknown>
-  },
-
-  deleteWorkflowTemplate: (templateId: string, scope: string): Promise<boolean> => {
-    return window.api.database.deleteWorkflowTemplate(templateId, scope) as Promise<boolean>
-  },
-
-  copyGlobalWorkflowToProject: (globalTemplateId: string, projectId: string): Promise<unknown> => {
-    return window.api.database.copyGlobalWorkflowToProject(
-      globalTemplateId,
-      projectId
-    ) as Promise<unknown>
   },
 
   getTaskNodes: (taskId: string): Promise<TaskNode[]> => {

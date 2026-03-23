@@ -391,6 +391,12 @@ const extractCodexContent = (msg: RecordLike): string | undefined => {
   const direct = pickCodexContent(msg)
   if (direct) return direct
 
+  const item = isRecord(msg.item) ? msg.item : null
+  if (item) {
+    const itemDirect = pickCodexContent(item)
+    if (itemDirect) return itemDirect
+  }
+
   const params = isRecord(msg.params) ? msg.params : null
   if (params) {
     const paramsDirect = pickCodexContent(params)
@@ -412,12 +418,32 @@ const extractCodexContent = (msg: RecordLike): string | undefined => {
   return undefined
 }
 
+const getCodexItem = (msg: RecordLike): RecordLike | null => {
+  if (isRecord(msg.item)) {
+    return msg.item
+  }
+
+  const params = isRecord(msg.params) ? msg.params : null
+  if (params && isRecord(params.item)) {
+    return params.item
+  }
+
+  const result = isRecord(msg.result) ? msg.result : null
+  if (result && isRecord(result.item)) {
+    return result.item
+  }
+
+  return null
+}
+
 const normalizeCodexType = (msg: RecordLike): string => {
   const params = isRecord(msg.params) ? msg.params : null
   const paramsEvent = params && isRecord(params.event) ? params.event : null
   const result = isRecord(msg.result) ? msg.result : null
+  const item = getCodexItem(msg)
 
   return (
+    (item ? getString(item.type) : undefined) ||
     getString(msg.event) ||
     getString(msg.method) ||
     getString(msg.type) ||
@@ -459,6 +485,55 @@ const extractCodexAssistantTexts = (stdout: string): string[] => {
   }
 
   return texts
+}
+
+const extractCodexErrorMessage = (msg: RecordLike): string | undefined => {
+  const direct = getString(msg.message)
+  if (direct) return direct
+
+  const errorRecord = isRecord(msg.error) ? msg.error : null
+  const fromError = errorRecord ? getString(errorRecord.message) : undefined
+  if (fromError) return fromError
+
+  const result = isRecord(msg.result) ? msg.result : null
+  if (result) {
+    const resultDirect = getString(result.message)
+    if (resultDirect) return resultDirect
+
+    const nestedError = isRecord(result.error) ? result.error : null
+    const nestedMessage = nestedError ? getString(nestedError.message) : undefined
+    if (nestedMessage) return nestedMessage
+  }
+
+  return undefined
+}
+
+const extractCodexFailure = (stdout: string): string | null => {
+  for (const rawLine of stdout.split('\n')) {
+    const line = rawLine.trim()
+    if (!line) continue
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(line)
+    } catch {
+      continue
+    }
+
+    if (!isRecord(parsed)) continue
+
+    const normalizedType = normalizeCodexType(parsed)
+    if (normalizedType !== 'error' && normalizedType !== 'turn.failed') {
+      continue
+    }
+
+    const message = extractCodexErrorMessage(parsed)
+    if (message) {
+      return message
+    }
+  }
+
+  return null
 }
 
 const extractStructuredCandidates = (
@@ -596,6 +671,13 @@ export class WorkflowDefinitionGenerationService {
           throw error
         }
         continue
+      }
+    }
+
+    if (toolId === 'codex') {
+      const codexFailure = extractCodexFailure(result.stdout)
+      if (codexFailure) {
+        throw new Error('WORKFLOW_AI_GENERATION_FAILED')
       }
     }
 

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { normalizeCliToolConfig } from '../../../shared/agent-cli-config-spec'
 
-const TARGET_SCHEMA_VERSION = 9
+const TARGET_SCHEMA_VERSION = 10
 
 export class DatabaseConnection {
   private dbPath: string
@@ -103,33 +103,6 @@ export class DatabaseConnection {
         updated_at TEXT NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS workflow_templates (
-        id TEXT PRIMARY KEY,
-        scope TEXT NOT NULL CHECK (scope IN ('global', 'project')),
-        project_id TEXT,
-        name TEXT NOT NULL,
-        description TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS workflow_template_nodes (
-        id TEXT PRIMARY KEY,
-        template_id TEXT NOT NULL,
-        node_order INTEGER NOT NULL CHECK (node_order >= 1),
-        name TEXT NOT NULL,
-        prompt TEXT NOT NULL,
-        cli_tool_id TEXT,
-        agent_tool_config_id TEXT,
-        requires_approval INTEGER NOT NULL DEFAULT 0 CHECK (requires_approval IN (0, 1)),
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE,
-        FOREIGN KEY (agent_tool_config_id) REFERENCES agent_tool_configs(id) ON DELETE SET NULL,
-        UNIQUE (template_id, node_order)
-      );
-
       CREATE TABLE IF NOT EXISTS automations (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -161,7 +134,7 @@ export class DatabaseConnection {
         updated_at TEXT NOT NULL,
         FOREIGN KEY (automation_id) REFERENCES automations(id) ON DELETE CASCADE,
         FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
-        FOREIGN KEY (task_node_id) REFERENCES task_nodes(id) ON DELETE SET NULL,
+        FOREIGN KEY (task_node_id) REFERENCES workflow_run_nodes(id) ON DELETE SET NULL,
         UNIQUE (automation_id, scheduled_at)
       );
     `)
@@ -202,42 +175,6 @@ export class DatabaseConnection {
         )
       );
 
-      CREATE TABLE IF NOT EXISTS task_nodes (
-        id TEXT PRIMARY KEY,
-        task_id TEXT NOT NULL,
-
-        node_order INTEGER NOT NULL CHECK (node_order >= 1),
-
-        name TEXT NOT NULL,
-        prompt TEXT NOT NULL,
-        cli_tool_id TEXT
-          CHECK (cli_tool_id IS NULL OR cli_tool_id IN (
-            'claude-code', 'cursor-agent', 'gemini-cli', 'codex', 'codex-cli', 'opencode'
-          )),
-        agent_tool_config_id TEXT,
-
-        requires_approval INTEGER NOT NULL DEFAULT 0 CHECK (requires_approval IN (0, 1)),
-
-        status TEXT NOT NULL DEFAULT 'todo'
-          CHECK (status IN ('todo', 'in_progress', 'in_review', 'done')),
-
-        session_id TEXT,
-        resume_session_id TEXT,
-        result_summary TEXT,
-        error_message TEXT,
-        cost REAL,
-        duration REAL,
-
-        started_at TEXT,
-        completed_at TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-
-        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-        FOREIGN KEY (agent_tool_config_id) REFERENCES agent_tool_configs(id) ON DELETE SET NULL,
-        UNIQUE (task_id, node_order)
-      );
-
       CREATE TABLE IF NOT EXISTS workflow_definitions (
         id TEXT PRIMARY KEY,
         scope TEXT NOT NULL CHECK (scope IN ('global', 'project')),
@@ -253,7 +190,7 @@ export class DatabaseConnection {
       CREATE TABLE IF NOT EXISTS workflow_runs (
         id TEXT PRIMARY KEY,
         task_id TEXT NOT NULL UNIQUE,
-        workflow_definition_id TEXT NOT NULL,
+        workflow_definition_id TEXT,
         status TEXT NOT NULL
           CHECK (status IN ('waiting', 'running', 'review', 'done', 'failed')),
         definition_snapshot_json TEXT NOT NULL,
@@ -322,16 +259,6 @@ export class DatabaseConnection {
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_projects_path ON projects(path);
 
-      CREATE UNIQUE INDEX IF NOT EXISTS uniq_global_template_name
-        ON workflow_templates(name)
-        WHERE scope = 'global';
-      CREATE UNIQUE INDEX IF NOT EXISTS uniq_project_template_name
-        ON workflow_templates(project_id, name)
-        WHERE scope = 'project';
-
-      CREATE INDEX IF NOT EXISTS idx_workflow_template_nodes_template_id
-        ON workflow_template_nodes(template_id);
-
       CREATE INDEX IF NOT EXISTS idx_agent_tool_configs_tool_id ON agent_tool_configs(tool_id);
 
       DROP INDEX IF EXISTS uniq_agent_tool_config;
@@ -362,15 +289,6 @@ export class DatabaseConnection {
       CREATE UNIQUE INDEX IF NOT EXISTS uniq_tasks_project_branch
         ON tasks(project_id, branch_name)
         WHERE project_id IS NOT NULL AND branch_name IS NOT NULL;
-
-      CREATE INDEX IF NOT EXISTS idx_task_nodes_task_id ON task_nodes(task_id);
-      CREATE INDEX IF NOT EXISTS idx_task_nodes_status ON task_nodes(status);
-      CREATE INDEX IF NOT EXISTS idx_task_nodes_task_status_order
-        ON task_nodes(task_id, status, node_order);
-      CREATE INDEX IF NOT EXISTS idx_task_nodes_session_id ON task_nodes(session_id);
-      CREATE UNIQUE INDEX IF NOT EXISTS uniq_task_nodes_single_in_progress
-        ON task_nodes(task_id)
-        WHERE status = 'in_progress';
 
       CREATE UNIQUE INDEX IF NOT EXISTS uniq_workflow_definitions_global_name
         ON workflow_definitions(name)
@@ -434,7 +352,7 @@ export class DatabaseConnection {
 
     if (currentVersion < 5) {
       const migrateToV5 = db.transaction(() => {
-        if (!this.tableHasColumn(db, 'task_nodes', 'resume_session_id')) {
+        if (this.tableExists(db, 'task_nodes') && !this.tableHasColumn(db, 'task_nodes', 'resume_session_id')) {
           db.exec(`ALTER TABLE task_nodes ADD COLUMN resume_session_id TEXT`)
         }
         db.pragma('user_version = 5')
@@ -638,6 +556,104 @@ export class DatabaseConnection {
         migrateToV9()
         currentVersion = 9
         console.log('[DatabaseService] Migrated schema to v9')
+      } finally {
+        db.pragma('foreign_keys = ON')
+      }
+    }
+
+    if (currentVersion < 10) {
+      db.pragma('foreign_keys = OFF')
+      const migrateToV10 = db.transaction(() => {
+        db.exec(`
+          DROP INDEX IF EXISTS uniq_global_template_name;
+          DROP INDEX IF EXISTS uniq_project_template_name;
+          DROP INDEX IF EXISTS idx_workflow_template_nodes_template_id;
+          DROP INDEX IF EXISTS idx_task_nodes_task_id;
+          DROP INDEX IF EXISTS idx_task_nodes_status;
+          DROP INDEX IF EXISTS idx_task_nodes_task_status_order;
+          DROP INDEX IF EXISTS idx_task_nodes_session_id;
+          DROP INDEX IF EXISTS uniq_task_nodes_single_in_progress;
+          DROP TABLE IF EXISTS workflow_template_nodes;
+          DROP TABLE IF EXISTS workflow_templates;
+          DROP TABLE IF EXISTS task_nodes;
+        `)
+
+        db.exec(`
+          DROP TABLE IF EXISTS workflow_runs_v10;
+          CREATE TABLE workflow_runs_v10 (
+            id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL UNIQUE,
+            workflow_definition_id TEXT,
+            status TEXT NOT NULL
+              CHECK (status IN ('waiting', 'running', 'review', 'done', 'failed')),
+            definition_snapshot_json TEXT NOT NULL,
+            current_wave INTEGER NOT NULL DEFAULT 0,
+            started_at TEXT,
+            completed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+            FOREIGN KEY (workflow_definition_id) REFERENCES workflow_definitions(id) ON DELETE RESTRICT
+          );
+
+          INSERT INTO workflow_runs_v10 (
+            id, task_id, workflow_definition_id, status, definition_snapshot_json,
+            current_wave, started_at, completed_at, created_at, updated_at
+          )
+          SELECT
+            id, task_id, workflow_definition_id, status, definition_snapshot_json,
+            current_wave, started_at, completed_at, created_at, updated_at
+          FROM workflow_runs;
+
+          DROP TABLE workflow_runs;
+          ALTER TABLE workflow_runs_v10 RENAME TO workflow_runs;
+        `)
+
+        db.exec(`
+          DROP TABLE IF EXISTS automation_runs_v10;
+          CREATE TABLE automation_runs_v10 (
+            id TEXT PRIMARY KEY,
+            automation_id TEXT NOT NULL,
+            scheduled_at TEXT NOT NULL,
+            triggered_at TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('running', 'success', 'failed', 'skipped')),
+            task_id TEXT,
+            task_node_id TEXT,
+            session_id TEXT,
+            error_message TEXT,
+            finished_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (automation_id) REFERENCES automations(id) ON DELETE CASCADE,
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+            FOREIGN KEY (task_node_id) REFERENCES workflow_run_nodes(id) ON DELETE SET NULL,
+            UNIQUE (automation_id, scheduled_at)
+          );
+
+          INSERT INTO automation_runs_v10 (
+            id, automation_id, scheduled_at, triggered_at, status, task_id, task_node_id,
+            session_id, error_message, finished_at, created_at, updated_at
+          )
+          SELECT
+            id, automation_id, scheduled_at, triggered_at, status, task_id, task_node_id,
+            session_id, error_message, finished_at, created_at, updated_at
+          FROM automation_runs;
+
+          DROP TABLE automation_runs;
+          ALTER TABLE automation_runs_v10 RENAME TO automation_runs;
+        `)
+
+        this.createBaseTables(db)
+        this.createBaseIndexes(db)
+        this.createRuntimeTables(db)
+        this.createRuntimeIndexes(db)
+        db.pragma('user_version = 10')
+      })
+
+      try {
+        migrateToV10()
+        currentVersion = 10
+        console.log('[DatabaseService] Migrated schema to v10')
       } finally {
         db.pragma('foreign_keys = ON')
       }

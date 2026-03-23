@@ -55,61 +55,69 @@ export class WorkflowDefinitionRepository {
   createDefinition(input: CreateWorkflowDefinitionInput): WorkflowDefinition {
     const now = new Date().toISOString()
     const id = newUlid()
-    this.db
-      .prepare(
-        `
-          INSERT INTO workflow_definitions (
-            id,
-            scope,
-            project_id,
-            name,
-            description,
-            definition_json,
-            created_at,
-            updated_at
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `
-      )
-      .run(
-        id,
-        input.scope,
-        input.scope === 'project' ? (input.project_id ?? null) : null,
-        input.name,
-        input.description ?? null,
-        JSON.stringify(input.definition, null, 2),
-        now,
-        now
-      )
+    try {
+      this.db
+        .prepare(
+          `
+            INSERT INTO workflow_definitions (
+              id,
+              scope,
+              project_id,
+              name,
+              description,
+              definition_json,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `
+        )
+        .run(
+          id,
+          input.scope,
+          input.scope === 'project' ? (input.project_id ?? null) : null,
+          input.name,
+          input.description ?? null,
+          JSON.stringify(input.definition, null, 2),
+          now,
+          now
+        )
+    } catch (error) {
+      this.rethrowFriendlyConstraintError(error)
+    }
 
     return this.getDefinition(id)!
   }
 
   updateDefinition(input: UpdateWorkflowDefinitionInput): WorkflowDefinition {
     const now = new Date().toISOString()
-    this.db
-      .prepare(
-        `
-          UPDATE workflow_definitions
-          SET
-            scope = ?,
-            project_id = ?,
-            name = ?,
-            description = ?,
-            definition_json = ?,
-            updated_at = ?
-          WHERE id = ?
-        `
-      )
-      .run(
-        input.scope,
-        input.scope === 'project' ? (input.project_id ?? null) : null,
-        input.name,
-        input.description ?? null,
-        JSON.stringify(input.definition, null, 2),
-        now,
-        input.id
-      )
+    try {
+      this.db
+        .prepare(
+          `
+            UPDATE workflow_definitions
+            SET
+              scope = ?,
+              project_id = ?,
+              name = ?,
+              description = ?,
+              definition_json = ?,
+              updated_at = ?
+            WHERE id = ?
+          `
+        )
+        .run(
+          input.scope,
+          input.scope === 'project' ? (input.project_id ?? null) : null,
+          input.name,
+          input.description ?? null,
+          JSON.stringify(input.definition, null, 2),
+          now,
+          input.id
+        )
+    } catch (error) {
+      this.rethrowFriendlyConstraintError(error)
+    }
 
     return this.getDefinition(input.id)!
   }
@@ -137,5 +145,17 @@ export class WorkflowDefinitionRepository {
       created_at: row.created_at,
       updated_at: row.updated_at
     }
+  }
+
+  private rethrowFriendlyConstraintError(error: unknown): never {
+    if (
+      error instanceof Error &&
+      error.message.includes('UNIQUE constraint failed') &&
+      error.message.includes('workflow_definitions')
+    ) {
+      throw new Error('WORKFLOW_DEFINITION_NAME_CONFLICT')
+    }
+
+    throw error
   }
 }

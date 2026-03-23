@@ -5,10 +5,12 @@ import type { WorkflowRunRepository } from './database/WorkflowRunRepository'
 import type { WorkflowRunReviewRepository } from './database/WorkflowRunReviewRepository'
 import type {
   CreateWorkflowRunReviewInput,
+  CreateWorkflowRunInput,
   WorkflowRun,
   WorkflowRunNode,
   WorkflowRunStatus
 } from '../types/workflow-run'
+import type { WorkflowDefinitionDocument } from '../types/workflow-definition'
 
 const composeWorkflowNodePrompt = (
   taskPrompt: string | null | undefined,
@@ -45,7 +47,11 @@ export class WorkflowRunService {
     this.reviewRepo = reviewRepo
   }
 
-  createRunForTask(input: { taskId: string; workflowDefinitionId: string }): WorkflowRun {
+  createRunForTask(input: {
+    taskId: string
+    workflowDefinitionId?: string | null
+    definition?: WorkflowDefinitionDocument
+  }): WorkflowRun {
     const task = this.taskRepo.getTask(input.taskId)
     if (!task) {
       throw new Error(`Task not found: ${input.taskId}`)
@@ -56,22 +62,35 @@ export class WorkflowRunService {
       throw new Error(`Workflow run already exists for task: ${input.taskId}`)
     }
 
-    const definition = this.definitionRepo.getDefinition(input.workflowDefinitionId)
+    let workflowDefinitionId: string | null = null
+    let definition: WorkflowDefinitionDocument | null = null
+
+    if (input.workflowDefinitionId) {
+      const storedDefinition = this.definitionRepo.getDefinition(input.workflowDefinitionId)
+      if (!storedDefinition) {
+        throw new Error(`Workflow definition not found: ${input.workflowDefinitionId}`)
+      }
+      workflowDefinitionId = storedDefinition.id
+      definition = storedDefinition.definition
+    } else if (input.definition) {
+      definition = input.definition
+    }
+
     if (!definition) {
-      throw new Error(`Workflow definition not found: ${input.workflowDefinitionId}`)
+      throw new Error('Workflow definition snapshot is required')
     }
 
     const run = this.runRepo.createRun({
       task_id: input.taskId,
-      workflow_definition_id: definition.id,
-      definition_snapshot: definition.definition,
+      workflow_definition_id: workflowDefinitionId,
+      definition_snapshot: definition,
       status: 'waiting',
       current_wave: 0
-    })
+    } satisfies CreateWorkflowRunInput)
 
     this.runNodeRepo.createRunNodes(
       run.id,
-      definition.definition.nodes.map((node) => ({
+      definition.nodes.map((node) => ({
         workflow_run_id: run.id,
         definition_node_id: node.id,
         node_key: node.key,

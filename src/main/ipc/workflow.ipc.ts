@@ -63,7 +63,8 @@ export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): 
     [
       v.shape({
         taskId: v.string(),
-        workflowDefinitionId: v.string()
+        workflowDefinitionId: v.optional(v.nullable(v.string({ allowEmpty: true }))),
+        definition: v.optional(v.object())
       })
     ],
     (_, input) =>

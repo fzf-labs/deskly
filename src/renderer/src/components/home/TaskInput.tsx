@@ -3,6 +3,7 @@ import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings';
 import type { MessageAttachment } from '@/hooks/useAgent';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/providers/language-provider';
+import { notifyTasksChanged } from '@/lib/task-events';
 import { FileText, Globe, Palette, Smartphone } from 'lucide-react';
 
 import { ChatInput } from '@/components/shared/ChatInput';
@@ -67,6 +68,7 @@ export function TaskInput() {
         taskMode: 'conversation',
         cliToolId: defaultCliToolId,
       });
+      notifyTasksChanged();
       navigate(`/task/${createdTask.id}`, {
         state: { prompt, attachments },
       });

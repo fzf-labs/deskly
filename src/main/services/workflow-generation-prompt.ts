@@ -1,5 +1,26 @@
 import type { GenerateWorkflowDefinitionInput } from '../types/workflow-definition'
 
+const WORKFLOW_NODE_PROPERTIES = {
+  id: { type: 'string' },
+  key: { type: 'string' },
+  type: { type: 'string', enum: ['agent', 'command'] },
+  name: { type: 'string' },
+  prompt: { type: ['string', 'null'] },
+  command: { type: ['string', 'null'] },
+  cliToolId: { type: ['string', 'null'] },
+  agentToolConfigId: { type: ['string', 'null'] },
+  requiresApprovalAfterRun: { type: 'boolean' },
+  position: {
+    type: ['object', 'null'],
+    additionalProperties: false,
+    required: ['x', 'y'],
+    properties: {
+      x: { type: 'number' },
+      y: { type: 'number' }
+    }
+  }
+} as const
+
 const WORKFLOW_GENERATION_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -19,27 +40,8 @@ const WORKFLOW_GENERATION_SCHEMA = {
           items: {
             type: 'object',
             additionalProperties: false,
-            required: ['id', 'key', 'type', 'name', 'requiresApprovalAfterRun'],
-            properties: {
-              id: { type: 'string' },
-              key: { type: 'string' },
-              type: { type: 'string', enum: ['agent', 'command'] },
-              name: { type: 'string' },
-              prompt: { type: ['string', 'null'] },
-              command: { type: ['string', 'null'] },
-              cliToolId: { type: ['string', 'null'] },
-              agentToolConfigId: { type: ['string', 'null'] },
-              requiresApprovalAfterRun: { type: 'boolean' },
-              position: {
-                type: ['object', 'null'],
-                additionalProperties: false,
-                required: ['x', 'y'],
-                properties: {
-                  x: { type: 'number' },
-                  y: { type: 'number' }
-                }
-              }
-            }
+            required: Object.keys(WORKFLOW_NODE_PROPERTIES),
+            properties: WORKFLOW_NODE_PROPERTIES
           }
         },
         edges: {

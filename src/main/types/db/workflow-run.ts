@@ -5,7 +5,7 @@ export type WorkflowRunStatus = 'waiting' | 'running' | 'review' | 'done' | 'fai
 export interface DbWorkflowRun {
   id: string
   task_id: string
-  workflow_definition_id: string
+  workflow_definition_id: string | null
   status: WorkflowRunStatus
   definition_snapshot_json: string
   current_wave: number
@@ -17,7 +17,7 @@ export interface DbWorkflowRun {
 
 export interface CreateWorkflowRunInput {
   task_id: string
-  workflow_definition_id: string
+  workflow_definition_id?: string | null
   status?: WorkflowRunStatus
   definition_snapshot: WorkflowDefinitionDocument
   current_wave?: number

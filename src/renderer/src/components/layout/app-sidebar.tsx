@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowUpDown,
@@ -69,9 +69,8 @@ export function WorkspaceSidebarContent() {
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [sortMode, setSortMode] = useState<WorkspaceSidebarSortMode>(getInitialSidebarSortMode)
-  const hasMountedRef = useRef(false)
   const activeTaskId = useActiveTaskId()
-  const { addProject, currentProjectId, projectGroups, loading, refresh, setCurrentProjectId } =
+  const { addProject, currentProjectId, projectGroups, loading, setCurrentProjectId } =
     useWorkspaceSidebar(sortMode)
   const isWorkspaceRoute =
     location.pathname.startsWith('/tasks') || location.pathname.startsWith('/home')
@@ -97,15 +96,6 @@ export function WorkspaceSidebarContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectGroups.map((group) => group.id).join('|')])
 
-  useEffect(() => {
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true
-      return
-    }
-
-    void refresh({ silent: true })
-  }, [location.pathname, refresh])
-
   const handleOpenWorkspace = () => {
     navigate('/tasks')
   }
@@ -121,7 +111,7 @@ export function WorkspaceSidebarContent() {
   }
 
   const handleSelectTask = (taskId: string, projectId: string | null) => {
-    if (projectId) {
+    if (projectId && projectId !== currentProjectId) {
       setCurrentProjectId(projectId)
     }
     navigate(`/task/${taskId}`)
@@ -256,7 +246,6 @@ export function WorkspaceSidebarContent() {
             leftOpen
             loading={loading}
             emptyLabel={t.nav.noTasksYet}
-            startConversationLabel={t.nav.startConversation}
             activeTaskId={activeTaskId}
             activeProjectGroupId={isComposerRoute ? currentProjectId : null}
             projectGroups={projectGroups}

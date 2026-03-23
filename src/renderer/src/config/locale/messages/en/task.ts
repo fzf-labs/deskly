@@ -100,10 +100,10 @@ export default {
   workflowGenerateButton: 'Generate workflow',
   workflowGenerateLoading: 'Generating...',
   workflowGenerationPromptLabel: 'Generate from goal',
-  workflowGenerationCliLabel: 'Generation CLI',
-  workflowGenerationCliConfigLabel: 'Generation config',
-  workflowGenerationCliAuto: 'Auto-select an available CLI',
-  workflowGenerationCliConfigDefault: 'Use the selected CLI default config',
+  workflowGenerationCliLabel: 'CLI Tool',
+  workflowGenerationCliConfigLabel: 'CLI Config',
+  workflowGenerationCliAuto: 'Auto-pick from currently available options',
+  workflowGenerationCliConfigDefault: 'Auto-pick from currently available options',
   workflowGenerationPromptPlaceholder: 'Describe the workflow you want to generate.',
   workflowGenerationPromptRequired: 'Please enter a workflow goal first.',
   workflowGenerationCliUnavailable:
@@ -141,6 +141,8 @@ export default {
   createTemplateNameRequired: 'Template name is required.',
   createTemplateStageRequired: 'At least one stage prompt is required.',
   createTemplateFailed: 'Failed to create pipeline template.',
+  createTemplateNameConflict:
+    'A workflow with the same name already exists in this scope. Please choose a different name.',
   createTaskFailed: 'Failed to create task.',
   pipelineTemplatePageTitle: 'Task Pipeline Templates',
   pipelineTemplatePageDescription: 'Manage templates for project "{project}".',

@@ -73,6 +73,10 @@ export function useProjects() {
   }, []);
 
   const setCurrentProjectId = useCallback((id: string | null) => {
+    if (id === currentProjectId) {
+      return;
+    }
+
     setCurrentProjectIdState(id);
     if (id) {
       localStorage.setItem(CURRENT_PROJECT_KEY, id);
@@ -81,7 +85,7 @@ export function useProjects() {
     }
     // Notify other components about the change
     window.dispatchEvent(new CustomEvent(CURRENT_PROJECT_CHANGED_EVENT, { detail: id }));
-  }, []);
+  }, [currentProjectId]);
 
   useEffect(() => {
     if (loading) return;

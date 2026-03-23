@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import type { MessageAttachment } from '@/hooks/useAgent'
 import { useLanguage } from '@/providers/language-provider'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
+import { notifyTasksChanged } from '@/lib/task-events'
 
 import { ChatInput } from '@/components/shared/ChatInput'
 
@@ -29,6 +30,7 @@ export function HomePage() {
         taskMode: 'conversation',
         cliToolId: defaultCliToolId
       })
+      notifyTasksChanged()
       navigate(`/task/${createdTask.id}`, {
         state: { prompt, attachments }
       })

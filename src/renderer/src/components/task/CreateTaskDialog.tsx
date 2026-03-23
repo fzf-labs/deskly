@@ -16,6 +16,7 @@ import { useLanguage } from '@/providers/language-provider'
 import type { MessageAttachment } from '@/hooks/useAgent'
 import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools'
 import { Sparkles } from 'lucide-react'
+import { notifyTasksChanged } from '@/lib/task-events'
 
 interface CreateTaskDialogProps {
   open: boolean
@@ -274,6 +275,7 @@ export function CreateTaskDialog({
         workflowDefinitionId: taskMode === 'workflow' ? selectedTemplateId : undefined
       })
 
+      notifyTasksChanged()
       onTaskCreated?.(createdTask)
       resetForm()
       onOpenChange(false)

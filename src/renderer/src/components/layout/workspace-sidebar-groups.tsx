@@ -7,7 +7,6 @@ interface WorkspaceSidebarGroupsProps {
   leftOpen: boolean
   loading: boolean
   emptyLabel: string
-  startConversationLabel: string
   activeTaskId: string | null
   activeProjectGroupId: string | null
   projectGroups: WorkspaceProjectGroup[]
@@ -21,7 +20,6 @@ export function WorkspaceSidebarGroups({
   leftOpen,
   loading,
   emptyLabel,
-  startConversationLabel,
   activeTaskId,
   activeProjectGroupId,
   projectGroups,
@@ -63,7 +61,6 @@ export function WorkspaceSidebarGroups({
                 isExpanded={isExpanded}
                 isCurrentGroup={isCurrentGroup}
                 activeTaskId={activeTaskId}
-                startConversationLabel={startConversationLabel}
                 onSelectProject={onSelectProject}
                 onSelectTask={onSelectTask}
                 onToggleGroup={onToggleGroup}

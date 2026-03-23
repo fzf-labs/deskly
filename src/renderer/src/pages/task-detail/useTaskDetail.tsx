@@ -1044,8 +1044,6 @@ export function useTaskDetail({
       await loadCurrentNodeRuntime()
       if (!active) return
       await loadWorkflowStatus()
-      if (!active) return
-      await refreshTask()
     })()
     const shouldPoll = isRunning || cliStatus === 'running'
     const interval = shouldPoll
@@ -1061,19 +1059,6 @@ export function useTaskDetail({
       if (interval) clearInterval(interval)
     }
   }, [taskId, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask, isRunning, cliStatus])
-
-  useEffect(() => {
-    if (!taskId || isRunning || cliStatus === 'running') return
-    let attempts = 0
-    const interval = setInterval(() => {
-      attempts++
-      void loadCurrentNodeRuntime()
-      void loadWorkflowStatus()
-      void refreshTask()
-      if (attempts >= 8) clearInterval(interval)
-    }, 500)
-    return () => clearInterval(interval)
-  }, [taskId, isRunning, cliStatus, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask])
 
   const handleApproveTaskNode = useCallback(async () => {
     if (!currentTaskNode) return

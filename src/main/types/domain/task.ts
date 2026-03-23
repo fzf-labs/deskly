@@ -10,7 +10,6 @@ export interface CreateTaskOptions {
   worktreeRootPath?: string
   cliToolId?: string
   agentToolConfigId?: string
-  workflowTemplateId?: string
   workflowDefinitionId?: string
 }
 
