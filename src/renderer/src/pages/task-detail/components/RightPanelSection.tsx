@@ -1,17 +1,20 @@
-import { ArtifactPreview, type Artifact } from '@/components/artifacts';
-import { RightPanel } from '@/components/task';
+import { ArtifactPreview, type Artifact } from '@/components/artifacts'
+import { RightPanel } from '@/components/task'
+import type { RightPanelTab } from '@/components/task/RightPanel'
 
 interface RightPanelSectionProps {
-  isVisible: boolean;
-  taskId: string | null;
-  workingDir: string | null;
-  branchName: string | null;
-  baseBranch: string | null;
-  selectedArtifact: Artifact | null;
-  artifacts: Artifact[];
-  onSelectArtifact: (artifact: Artifact | null) => void;
-  workspaceRefreshToken?: number;
-  onClosePreview: () => void;
+  isVisible: boolean
+  taskId: string | null
+  workingDir: string | null
+  branchName: string | null
+  baseBranch: string | null
+  activeTab: RightPanelTab
+  selectedArtifact: Artifact | null
+  artifacts: Artifact[]
+  onSelectArtifact: (artifact: Artifact | null) => void
+  workspaceRefreshToken?: number
+  onClosePanel: () => void
+  onClosePreview: () => void
 }
 
 export function RightPanelSection({
@@ -20,13 +23,15 @@ export function RightPanelSection({
   workingDir,
   branchName,
   baseBranch,
+  activeTab,
   selectedArtifact,
   artifacts,
   onSelectArtifact,
   workspaceRefreshToken,
-  onClosePreview,
+  onClosePanel,
+  onClosePreview
 }: RightPanelSectionProps) {
-  if (!isVisible) return null;
+  if (!isVisible) return null
 
   return (
     <div className="bg-muted/10 flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -35,9 +40,11 @@ export function RightPanelSection({
         workingDir={workingDir}
         branchName={branchName}
         baseBranch={baseBranch}
+        activeTab={activeTab}
         selectedArtifact={selectedArtifact}
         onSelectArtifact={onSelectArtifact}
         workspaceRefreshToken={workspaceRefreshToken}
+        onClose={onClosePanel}
         renderFilePreview={() => (
           <ArtifactPreview
             artifact={selectedArtifact}
@@ -47,5 +54,5 @@ export function RightPanelSection({
         )}
       />
     </div>
-  );
+  )
 }

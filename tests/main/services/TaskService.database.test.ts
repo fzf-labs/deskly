@@ -103,4 +103,58 @@ describe('TaskService + DatabaseService conversation runtime', () => {
       db.close()
     }
   })
+
+  it('writes workflow node cli_tool_id when a workflow task inherits the task default CLI', async () => {
+    const setup = await setupTaskServiceWithRealDatabase()
+    if (!setup) {
+      return
+    }
+    const { db, taskService } = setup
+
+    try {
+      const definition = db.createWorkflowDefinition({
+        scope: 'project',
+        project_id: 'project-1',
+        name: 'Workflow runtime defaults',
+        definition: {
+          version: 1,
+          nodes: [
+            {
+              id: 'node-1',
+              key: 'analyze',
+              type: 'agent',
+              name: 'Analyze',
+              prompt: 'Inspect the task',
+              cliToolId: null,
+              agentToolConfigId: null,
+              requiresApprovalAfterRun: false,
+              position: { x: 0, y: 0 }
+            }
+          ],
+          edges: []
+        }
+      })
+
+      const task = await taskService.createTask({
+        title: 'Workflow task',
+        prompt: 'Solve the issue',
+        taskMode: 'workflow',
+        projectId: 'project-1',
+        workflowDefinitionId: definition.id,
+        cliToolId: 'codex'
+      })
+
+      const nodes = db.getTaskNodes(task.id)
+      expect(nodes).toHaveLength(1)
+      expect(nodes[0]).toEqual(
+        expect.objectContaining({
+          task_id: task.id,
+          cli_tool_id: 'codex',
+          status: 'todo'
+        })
+      )
+    } finally {
+      db.close()
+    }
+  })
 })

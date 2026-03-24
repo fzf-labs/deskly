@@ -12,7 +12,14 @@ type WorkflowDefinitionFilter = {
   projectId?: string | null
 }
 
-export const validateWorkflowDefinitionDocument = (document: WorkflowDefinitionDocument): void => {
+type WorkflowDefinitionValidationOptions = {
+  allowEmptyPromptForKeys?: string[]
+}
+
+export const validateWorkflowDefinitionDocument = (
+  document: WorkflowDefinitionDocument,
+  options: WorkflowDefinitionValidationOptions = {}
+): void => {
   if (document.version !== 1) {
     throw new Error('Workflow definition version must be 1')
   }
@@ -28,6 +35,7 @@ export const validateWorkflowDefinitionDocument = (document: WorkflowDefinitionD
   const nodeIds = new Set<string>()
   const nodeKeys = new Set<string>()
   const nodesById = new Map<string, WorkflowDefinitionNode>()
+  const promptOptionalKeys = new Set(options.allowEmptyPromptForKeys ?? [])
 
   document.nodes.forEach((node) => {
     if (!node.id?.trim()) {
@@ -45,7 +53,10 @@ export const validateWorkflowDefinitionDocument = (document: WorkflowDefinitionD
     if (nodeKeys.has(node.key)) {
       throw new Error(`Duplicate workflow node key: ${node.key}`)
     }
-    if (!node.prompt?.trim()) {
+    const hasPrompt = Boolean(node.prompt?.trim())
+    const promptOptional = promptOptionalKeys.has(node.key)
+
+    if (!hasPrompt && !promptOptional) {
       throw new Error(`Agent node requires prompt: ${node.id}`)
     }
 

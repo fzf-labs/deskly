@@ -10,7 +10,11 @@ import { getAppPaths } from '../app/AppPaths'
 import { isCliToolEnabled } from '../../shared/agent-cli-tool-enablement'
 import type { CreateTaskOptions, TaskWithWorktree } from '../types/domain/task'
 import type { TaskStatus } from '../types/task'
-import { buildConversationWorkflowDefinition } from './workflow-definition-utils'
+import type { WorkflowDefinition } from '../types/workflow-definition'
+import {
+  applyWorkflowDefinitionRuntimeDefaults,
+  buildConversationWorkflowDefinition
+} from './workflow-definition-utils'
 
 const TASK_STATUS_VALUES = ['todo', 'in_progress', 'in_review', 'done', 'failed'] as const
 type TaskStatusValue = (typeof TASK_STATUS_VALUES)[number]
@@ -121,7 +125,6 @@ export class TaskService {
     }
 
     if (
-      options.taskMode === 'conversation' &&
       options.cliToolId &&
       !isCliToolEnabled(options.cliToolId, this.settingsService.getSettings().enabledCliTools)
     ) {
@@ -135,8 +138,9 @@ export class TaskService {
       throw new Error('Workflow definition is required for workflow tasks')
     }
 
+    let workflowDefinition: WorkflowDefinition | null = null
     if (options.taskMode === 'workflow' && options.workflowDefinitionId) {
-      const workflowDefinition = this.db.getWorkflowDefinition(options.workflowDefinitionId)
+      workflowDefinition = this.db.getWorkflowDefinition(options.workflowDefinitionId)
       if (!workflowDefinition) {
         throw new Error(`Workflow definition not found: ${options.workflowDefinitionId}`)
       }
@@ -173,7 +177,13 @@ export class TaskService {
     } else if (options.workflowDefinitionId) {
       this.db.createWorkflowRunForTask({
         taskId,
-        workflowDefinitionId: options.workflowDefinitionId
+        workflowDefinitionId: options.workflowDefinitionId,
+        definition: workflowDefinition
+          ? applyWorkflowDefinitionRuntimeDefaults(workflowDefinition.definition, {
+              cliToolId: options.cliToolId ?? null,
+              agentToolConfigId: agentToolConfigId ?? null
+            })
+          : undefined
       })
     }
 

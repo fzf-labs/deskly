@@ -1,26 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileText, GitBranch, Terminal } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { useLanguage } from '@/providers/language-provider';
-import type { Artifact } from '@/components/artifacts';
-import { GitDiffView } from '@/components/git';
-import { shell } from '@/lib/electron-api';
-import { TerminalPanel } from '@/components/terminal';
-import { FileListPanel } from './FileListPanel';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { FileText, GitBranch, Terminal, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { useLanguage } from '@/providers/language-provider'
+import type { Artifact } from '@/components/artifacts'
+import { GitDiffView } from '@/components/git'
+import { shell } from '@/lib/electron-api'
+import { TerminalPanel } from '@/components/terminal'
+import { FileListPanel } from './FileListPanel'
 
-export type RightPanelTab = 'files' | 'git' | 'terminal';
+export type RightPanelTab = 'files' | 'git' | 'terminal'
 
 interface RightPanelProps {
-  taskId: string | null;
-  workingDir: string | null;
-  branchName?: string | null;
-  baseBranch?: string | null;
-  selectedArtifact: Artifact | null;
-  onSelectArtifact: (artifact: Artifact | null) => void;
-  workspaceRefreshToken?: number;
+  taskId: string | null
+  workingDir: string | null
+  branchName?: string | null
+  baseBranch?: string | null
+  activeTab: RightPanelTab
+  selectedArtifact: Artifact | null
+  onSelectArtifact: (artifact: Artifact | null) => void
+  workspaceRefreshToken?: number
+  onClose: () => void
   // File preview component
-  renderFilePreview: () => React.ReactNode;
+  renderFilePreview: () => React.ReactNode
 }
 
 export function RightPanel({
@@ -28,62 +30,70 @@ export function RightPanel({
   workingDir,
   branchName,
   baseBranch,
+  activeTab,
   selectedArtifact,
   onSelectArtifact,
   workspaceRefreshToken,
-  renderFilePreview,
+  onClose,
+  renderFilePreview
 }: RightPanelProps) {
-  const [activeTab, setActiveTab] = useState<RightPanelTab>('files');
-  const [hasOpenedTerminal, setHasOpenedTerminal] = useState(false);
-  const [terminalOpenRequestId, setTerminalOpenRequestId] = useState(0);
-  const { t } = useLanguage();
+  const [hasOpenedTerminal, setHasOpenedTerminal] = useState(false)
+  const [terminalOpenRequestId, setTerminalOpenRequestId] = useState(0)
+  const { t } = useLanguage()
+  const previousActiveTabRef = useRef<RightPanelTab | null>(null)
   const handleSelectArtifact = useCallback(
     (artifact: Artifact) => {
-      onSelectArtifact(artifact);
+      onSelectArtifact(artifact)
     },
     [onSelectArtifact]
-  );
+  )
 
-  const tabs: { id: RightPanelTab; label: string; icon: typeof FileText }[] = [
-    { id: 'files', label: t.preview.filesTab, icon: FileText },
-    { id: 'git', label: t.preview.gitTab, icon: GitBranch },
-    { id: 'terminal', label: t.preview.terminalTab, icon: Terminal },
-  ];
-
-  const handleTabChange = useCallback((tab: RightPanelTab) => {
-    setActiveTab(tab);
-    if (tab === 'terminal') {
-      setHasOpenedTerminal(true);
-      setTerminalOpenRequestId((prev) => prev + 1);
-    }
-  }, []);
+  const tabMeta: Record<RightPanelTab, { label: string; icon: typeof FileText }> = {
+    files: { label: t.preview.filesTab, icon: FileText },
+    git: { label: t.preview.gitTab, icon: GitBranch },
+    terminal: { label: t.preview.terminalTab, icon: Terminal }
+  }
+  const currentTab = tabMeta[activeTab]
+  const CurrentTabIcon = currentTab.icon
 
   useEffect(() => {
-    if (activeTab === 'terminal' && !hasOpenedTerminal) {
-      setHasOpenedTerminal(true);
+    const previousTab = previousActiveTabRef.current
+    previousActiveTabRef.current = activeTab
+
+    if (activeTab !== 'terminal') {
+      return
     }
-  }, [activeTab, hasOpenedTerminal]);
+
+    if (previousTab !== 'terminal') {
+      setTerminalOpenRequestId((prev) => prev + 1)
+    }
+
+    if (!hasOpenedTerminal) {
+      setHasOpenedTerminal(true)
+    }
+  }, [activeTab, hasOpenedTerminal])
 
   return (
     <div className="flex h-full flex-col">
-      {/* Tab Bar */}
-      <div className="border-b px-4 py-2">
-        <div className="flex gap-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleTabChange(tab.id)}
-                className="gap-2"
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </Button>
-            );
-          })}
+      <div className="border-b px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
+              <CurrentTabIcon className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-foreground truncate text-sm font-medium">{currentTab.label}</div>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onClose}
+            aria-label={t.preview.close}
+          >
+            <X className="size-4" />
+          </Button>
         </div>
       </div>
 
@@ -102,9 +112,7 @@ export function RightPanel({
           </div>
         )}
 
-        {activeTab === 'git' && (
-          <GitPanel workingDir={workingDir} baseBranch={baseBranch} />
-        )}
+        {activeTab === 'git' && <GitPanel workingDir={workingDir} baseBranch={baseBranch} />}
 
         {hasOpenedTerminal && (
           <div className={cn('h-full', activeTab !== 'terminal' && 'hidden')}>
@@ -118,33 +126,33 @@ export function RightPanel({
         )}
       </div>
     </div>
-  );
+  )
 }
 
 // Git Panel Component
 interface GitPanelProps {
-  workingDir: string | null;
-  baseBranch?: string | null;
+  workingDir: string | null
+  baseBranch?: string | null
 }
 
-type GitSubTab = 'changes' | 'compare';
+type GitSubTab = 'changes' | 'compare'
 
 interface GitFile {
-  path: string;
-  status: string;
-  staged: boolean;
+  path: string
+  status: string
+  staged: boolean
 }
 
 interface WorktreeInfo {
-  path: string;
-  head?: string;
-  branch?: string;
-  detached?: boolean;
+  path: string
+  head?: string
+  branch?: string
+  detached?: boolean
 }
 
 interface BranchDiffFile {
-  path: string;
-  status: string;
+  path: string
+  status: string
 }
 
 type RepoStatus =
@@ -154,558 +162,602 @@ type RepoStatus =
   | 'git-unavailable'
   | 'not-repo'
   | 'ready'
-  | 'error';
+  | 'error'
 
 function unwrapResult<T>(result: any): { ok: boolean; data?: T; error?: string } {
   if (result === null || result === undefined) {
-    return { ok: false, error: 'API 不可用' };
+    return { ok: false, error: 'API 不可用' }
   }
   if (typeof result === 'object' && 'success' in result) {
     return (result as { success: boolean; data?: T; error?: string }).success
       ? { ok: true, data: (result as { data?: T }).data }
-      : { ok: false, error: (result as { error?: string }).error || '未知错误' };
+      : { ok: false, error: (result as { error?: string }).error || '未知错误' }
   }
-  return { ok: true, data: result as T };
+  return { ok: true, data: result as T }
 }
 
 function formatError(error?: string | null) {
-  if (!error) return '未知错误';
-  return error.replace(/^Error:\s*/i, '');
+  if (!error) return '未知错误'
+  return error.replace(/^Error:\s*/i, '')
 }
 
 function getStatusCode(status: string) {
-  const normalized = status.trim();
-  if (!normalized) return '?';
-  if (normalized.includes('?')) return '?';
-  if (normalized.includes('R')) return 'R';
-  if (normalized.includes('D')) return 'D';
-  if (normalized.includes('A')) return 'A';
-  if (normalized.includes('M')) return 'M';
-  return '?';
+  const normalized = status.trim()
+  if (!normalized) return '?'
+  if (normalized.includes('?')) return '?'
+  if (normalized.includes('R')) return 'R'
+  if (normalized.includes('D')) return 'D'
+  if (normalized.includes('A')) return 'A'
+  if (normalized.includes('M')) return 'M'
+  return '?'
 }
 
 function hasUnstagedStatus(status: string) {
-  if (!status) return false;
-  const worktreeStatus = status[1] ?? ' ';
-  return worktreeStatus !== ' ';
+  if (!status) return false
+  const worktreeStatus = status[1] ?? ' '
+  return worktreeStatus !== ' '
 }
 
-function parseRemoteUrl(remoteUrl: string): { host: string; path: string; protocol: string } | null {
-  const trimmed = remoteUrl.trim().replace(/\.git$/i, '');
-  if (!trimmed) return null;
+function parseRemoteUrl(
+  remoteUrl: string
+): { host: string; path: string; protocol: string } | null {
+  const trimmed = remoteUrl.trim().replace(/\.git$/i, '')
+  if (!trimmed) return null
 
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('ssh://')) {
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('ssh://')
+  ) {
     try {
-      const url = new URL(trimmed);
+      const url = new URL(trimmed)
       return {
         host: url.host,
         path: url.pathname.replace(/^\/+/, ''),
-        protocol: url.protocol.replace(':', '') || 'https',
-      };
+        protocol: url.protocol.replace(':', '') || 'https'
+      }
     } catch {
-      return null;
+      return null
     }
   }
 
-  const scpMatch = trimmed.match(/^(?:[^@]+@)?([^:]+):(.+)$/);
+  const scpMatch = trimmed.match(/^(?:[^@]+@)?([^:]+):(.+)$/)
   if (scpMatch) {
-    return { host: scpMatch[1], path: scpMatch[2], protocol: 'https' };
+    return { host: scpMatch[1], path: scpMatch[2], protocol: 'https' }
   }
 
-  return null;
+  return null
 }
 
 function buildRepositoryUrl(remoteUrl: string): string | null {
-  const parsed = parseRemoteUrl(remoteUrl);
-  if (!parsed) return null;
-  const protocol = parsed.protocol === 'http' ? 'http' : 'https';
-  return `${protocol}://${parsed.host}/${parsed.path}`;
+  const parsed = parseRemoteUrl(remoteUrl)
+  if (!parsed) return null
+  const protocol = parsed.protocol === 'http' ? 'http' : 'https'
+  return `${protocol}://${parsed.host}/${parsed.path}`
 }
 
-function buildPullRequestUrl(remoteUrl: string, baseBranch: string, headBranch: string): string | null {
-  const parsed = parseRemoteUrl(remoteUrl);
-  if (!parsed) return null;
-  const repoUrl = buildRepositoryUrl(remoteUrl);
-  if (!repoUrl) return null;
+function buildPullRequestUrl(
+  remoteUrl: string,
+  baseBranch: string,
+  headBranch: string
+): string | null {
+  const parsed = parseRemoteUrl(remoteUrl)
+  if (!parsed) return null
+  const repoUrl = buildRepositoryUrl(remoteUrl)
+  if (!repoUrl) return null
 
-  const base = encodeURIComponent(baseBranch);
-  const head = encodeURIComponent(headBranch);
-  const host = parsed.host.toLowerCase();
+  const base = encodeURIComponent(baseBranch)
+  const head = encodeURIComponent(headBranch)
+  const host = parsed.host.toLowerCase()
 
   if (host.includes('github.com')) {
-    return `${repoUrl}/compare/${base}...${head}?expand=1`;
+    return `${repoUrl}/compare/${base}...${head}?expand=1`
   }
   if (host.includes('gitlab')) {
-    return `${repoUrl}/-/merge_requests/new?merge_request[source_branch]=${head}&merge_request[target_branch]=${base}`;
+    return `${repoUrl}/-/merge_requests/new?merge_request[source_branch]=${head}&merge_request[target_branch]=${base}`
   }
   if (host.includes('bitbucket')) {
-    return `${repoUrl}/pull-requests/new?source=${head}&dest=${base}`;
+    return `${repoUrl}/pull-requests/new?source=${head}&dest=${base}`
   }
-  return null;
+  return null
 }
 
 function formatConflictMessage(actionLabel: string, conflicts?: string[]) {
   if (!conflicts || conflicts.length === 0) {
-    return `${actionLabel}发生冲突，请先处理冲突。`;
+    return `${actionLabel}发生冲突，请先处理冲突。`
   }
-  const preview = conflicts.slice(0, 3).join(', ');
-  const suffix = conflicts.length > 3 ? ` 等 ${conflicts.length} 个文件` : '';
-  return `${actionLabel}产生冲突：${preview}${suffix}`;
+  const preview = conflicts.slice(0, 3).join(', ')
+  const suffix = conflicts.length > 3 ? ` 等 ${conflicts.length} 个文件` : ''
+  return `${actionLabel}产生冲突：${preview}${suffix}`
 }
 
 function GitPanel({ workingDir, baseBranch }: GitPanelProps) {
-  const [subTab, setSubTab] = useState<GitSubTab>('changes');
-  const [files, setFiles] = useState<GitFile[]>([]);
-  const [currentBranch, setCurrentBranch] = useState<string | null>(null);
-  const [repoStatus, setRepoStatus] = useState<RepoStatus>('idle');
-  const [repoError, setRepoError] = useState<string | null>(null);
-  const [changesLoading, setChangesLoading] = useState(false);
-  const [branchDiffLoading, setBranchDiffLoading] = useState(false);
-  const [branchDiffDetailLoading, setBranchDiffDetailLoading] = useState(false);
-  const [diffLoading, setDiffLoading] = useState(false);
-  const [changesError, setChangesError] = useState<string | null>(null);
-  const [branchDiffError, setBranchDiffError] = useState<string | null>(null);
-  const [branchDiffDetailError, setBranchDiffDetailError] = useState<string | null>(null);
-  const [diffError, setDiffError] = useState<string | null>(null);
-  const [fileActions, setFileActions] = useState<Record<string, boolean>>({});
-  const [bulkStageLoading, setBulkStageLoading] = useState(false);
-  const [commitMessage, setCommitMessage] = useState('');
-  const [commitLoading, setCommitLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState<'merge' | 'pr' | 'rebase' | null>(null);
+  const [subTab, setSubTab] = useState<GitSubTab>('changes')
+  const [files, setFiles] = useState<GitFile[]>([])
+  const [currentBranch, setCurrentBranch] = useState<string | null>(null)
+  const [repoStatus, setRepoStatus] = useState<RepoStatus>('idle')
+  const [repoError, setRepoError] = useState<string | null>(null)
+  const [changesLoading, setChangesLoading] = useState(false)
+  const [branchDiffLoading, setBranchDiffLoading] = useState(false)
+  const [branchDiffDetailLoading, setBranchDiffDetailLoading] = useState(false)
+  const [diffLoading, setDiffLoading] = useState(false)
+  const [changesError, setChangesError] = useState<string | null>(null)
+  const [branchDiffError, setBranchDiffError] = useState<string | null>(null)
+  const [branchDiffDetailError, setBranchDiffDetailError] = useState<string | null>(null)
+  const [diffError, setDiffError] = useState<string | null>(null)
+  const [fileActions, setFileActions] = useState<Record<string, boolean>>({})
+  const [bulkStageLoading, setBulkStageLoading] = useState(false)
+  const [commitMessage, setCommitMessage] = useState('')
+  const [commitLoading, setCommitLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState<'merge' | 'pr' | 'rebase' | null>(null)
   const [actionMessage, setActionMessage] = useState<{
-    type: 'success' | 'error' | 'info';
-    text: string;
-  } | null>(null);
-  const [branchDiffFiles, setBranchDiffFiles] = useState<BranchDiffFile[]>([]);
-  const [branchDiffSelectedPath, setBranchDiffSelectedPath] = useState<string | null>(null);
-  const [branchDiffText, setBranchDiffText] = useState('');
-  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
-  const [diffText, setDiffText] = useState('');
-  const [stagedDiffText, setStagedDiffText] = useState('');
+    type: 'success' | 'error' | 'info'
+    text: string
+  } | null>(null)
+  const [branchDiffFiles, setBranchDiffFiles] = useState<BranchDiffFile[]>([])
+  const [branchDiffSelectedPath, setBranchDiffSelectedPath] = useState<string | null>(null)
+  const [branchDiffText, setBranchDiffText] = useState('')
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
+  const [diffText, setDiffText] = useState('')
+  const [stagedDiffText, setStagedDiffText] = useState('')
 
-  const gitApi = window.api?.git;
+  const gitApi = window.api?.git
 
-  const ensureRepoReady = useCallback(async (options?: { force?: boolean }) => {
-    const force = options?.force ?? false;
-    if (!workingDir) {
-      setRepoStatus('no-working-dir');
-      setRepoError(null);
-      return false;
-    }
-    if (!gitApi) {
-      setRepoStatus('error');
-      setRepoError('Git API 未就绪');
-      return false;
-    }
-    if (!force) {
-      if (repoStatus === 'ready') return true;
-      if (['checking', 'no-working-dir', 'git-unavailable', 'not-repo', 'error'].includes(repoStatus)) {
-        return false;
+  const ensureRepoReady = useCallback(
+    async (options?: { force?: boolean }) => {
+      const force = options?.force ?? false
+      if (!workingDir) {
+        setRepoStatus('no-working-dir')
+        setRepoError(null)
+        return false
       }
-    }
-    setRepoStatus('checking');
-    setRepoError(null);
+      if (!gitApi) {
+        setRepoStatus('error')
+        setRepoError('Git API 未就绪')
+        return false
+      }
+      if (!force) {
+        if (repoStatus === 'ready') return true
+        if (
+          ['checking', 'no-working-dir', 'git-unavailable', 'not-repo', 'error'].includes(
+            repoStatus
+          )
+        ) {
+          return false
+        }
+      }
+      setRepoStatus('checking')
+      setRepoError(null)
 
-    const installedResult = unwrapResult<boolean>(await gitApi.checkInstalled());
-    if (!installedResult.ok || installedResult.data === false) {
-      setRepoStatus('git-unavailable');
-      setRepoError(formatError(installedResult.error) || 'Git 不可用');
-      return false;
-    }
+      const installedResult = unwrapResult<boolean>(await gitApi.checkInstalled())
+      if (!installedResult.ok || installedResult.data === false) {
+        setRepoStatus('git-unavailable')
+        setRepoError(formatError(installedResult.error) || 'Git 不可用')
+        return false
+      }
 
-    const branchResult = unwrapResult<string>(await gitApi.getCurrentBranch(workingDir));
-    if (!branchResult.ok) {
-      const errorMessage = formatError(branchResult.error);
-      const normalized = errorMessage.toLowerCase();
-      const isNotRepo =
-        normalized.includes('not a git repository') ||
-        normalized.includes('not a git repo') ||
-        normalized.includes('不是 git 仓库');
-      setRepoStatus(isNotRepo ? 'not-repo' : 'error');
-      setRepoError(errorMessage || '无法读取 Git 仓库');
-      return false;
-    }
-    setCurrentBranch(branchResult.data || null);
-    setRepoStatus('ready');
-    return true;
-  }, [gitApi, repoStatus, workingDir]);
+      const branchResult = unwrapResult<string>(await gitApi.getCurrentBranch(workingDir))
+      if (!branchResult.ok) {
+        const errorMessage = formatError(branchResult.error)
+        const normalized = errorMessage.toLowerCase()
+        const isNotRepo =
+          normalized.includes('not a git repository') ||
+          normalized.includes('not a git repo') ||
+          normalized.includes('不是 git 仓库')
+        setRepoStatus(isNotRepo ? 'not-repo' : 'error')
+        setRepoError(errorMessage || '无法读取 Git 仓库')
+        return false
+      }
+      setCurrentBranch(branchResult.data || null)
+      setRepoStatus('ready')
+      return true
+    },
+    [gitApi, repoStatus, workingDir]
+  )
 
-  const loadChanges = useCallback(async (force = false) => {
-    if (!(await ensureRepoReady({ force })) || !workingDir || !gitApi) return;
-    setChangesLoading(true);
-    setChangesError(null);
-    const result = unwrapResult<GitFile[]>(
-      await gitApi.getChangedFiles(workingDir)
-    );
-    if (result.ok) {
-      setFiles(Array.isArray(result.data) ? result.data : []);
-    } else {
-      setFiles([]);
-      setChangesError(formatError(result.error));
-    }
-    setChangesLoading(false);
-  }, [ensureRepoReady, gitApi, workingDir]);
+  const loadChanges = useCallback(
+    async (force = false) => {
+      if (!(await ensureRepoReady({ force })) || !workingDir || !gitApi) return
+      setChangesLoading(true)
+      setChangesError(null)
+      const result = unwrapResult<GitFile[]>(await gitApi.getChangedFiles(workingDir))
+      if (result.ok) {
+        setFiles(Array.isArray(result.data) ? result.data : [])
+      } else {
+        setFiles([])
+        setChangesError(formatError(result.error))
+      }
+      setChangesLoading(false)
+    },
+    [ensureRepoReady, gitApi, workingDir]
+  )
 
-  const loadBranchDiff = useCallback(async (force = false) => {
-    if (!(await ensureRepoReady({ force })) || !workingDir || !gitApi) return;
-    if (!baseBranch) {
-      setBranchDiffFiles([]);
-      setBranchDiffError(null);
-      return;
-    }
-    setBranchDiffLoading(true);
-    setBranchDiffError(null);
-    const result = unwrapResult<BranchDiffFile[]>(
-      await gitApi.getBranchDiffFiles(workingDir, baseBranch, currentBranch || undefined)
-    );
-    if (result.ok) {
-      setBranchDiffFiles(Array.isArray(result.data) ? result.data : []);
-    } else {
-      setBranchDiffFiles([]);
-      setBranchDiffError(formatError(result.error));
-    }
-    setBranchDiffLoading(false);
-  }, [baseBranch, currentBranch, ensureRepoReady, gitApi, workingDir]);
+  const loadBranchDiff = useCallback(
+    async (force = false) => {
+      if (!(await ensureRepoReady({ force })) || !workingDir || !gitApi) return
+      if (!baseBranch) {
+        setBranchDiffFiles([])
+        setBranchDiffError(null)
+        return
+      }
+      setBranchDiffLoading(true)
+      setBranchDiffError(null)
+      const result = unwrapResult<BranchDiffFile[]>(
+        await gitApi.getBranchDiffFiles(workingDir, baseBranch, currentBranch || undefined)
+      )
+      if (result.ok) {
+        setBranchDiffFiles(Array.isArray(result.data) ? result.data : [])
+      } else {
+        setBranchDiffFiles([])
+        setBranchDiffError(formatError(result.error))
+      }
+      setBranchDiffLoading(false)
+    },
+    [baseBranch, currentBranch, ensureRepoReady, gitApi, workingDir]
+  )
 
-  const loadBranchDiffDetail = useCallback(async (force = false, filePath?: string | null) => {
-    if (!(await ensureRepoReady({ force })) || !workingDir || !gitApi || !baseBranch) return;
-    setBranchDiffDetailLoading(true);
-    setBranchDiffDetailError(null);
-    const targetPath = filePath?.trim() ? filePath.trim() : undefined;
-    const result = unwrapResult<string>(
-      await gitApi.getBranchDiff(workingDir, baseBranch, currentBranch || undefined, targetPath)
-    );
-    if (result.ok) {
-      setBranchDiffText(result.data || '');
-    } else {
-      setBranchDiffText('');
-      setBranchDiffDetailError(formatError(result.error));
-    }
-    setBranchDiffDetailLoading(false);
-  }, [baseBranch, currentBranch, ensureRepoReady, gitApi, workingDir]);
+  const loadBranchDiffDetail = useCallback(
+    async (force = false, filePath?: string | null) => {
+      if (!(await ensureRepoReady({ force })) || !workingDir || !gitApi || !baseBranch) return
+      setBranchDiffDetailLoading(true)
+      setBranchDiffDetailError(null)
+      const targetPath = filePath?.trim() ? filePath.trim() : undefined
+      const result = unwrapResult<string>(
+        await gitApi.getBranchDiff(workingDir, baseBranch, currentBranch || undefined, targetPath)
+      )
+      if (result.ok) {
+        setBranchDiffText(result.data || '')
+      } else {
+        setBranchDiffText('')
+        setBranchDiffDetailError(formatError(result.error))
+      }
+      setBranchDiffDetailLoading(false)
+    },
+    [baseBranch, currentBranch, ensureRepoReady, gitApi, workingDir]
+  )
 
-  const loadDiff = useCallback(async (force = false, filePath?: string | null) => {
-    if (!(await ensureRepoReady({ force })) || !workingDir || !gitApi) return;
-    setDiffLoading(true);
-    setDiffError(null);
-    const targetPath = filePath?.trim() ? filePath.trim() : undefined;
+  const loadDiff = useCallback(
+    async (force = false, filePath?: string | null) => {
+      if (!(await ensureRepoReady({ force })) || !workingDir || !gitApi) return
+      setDiffLoading(true)
+      setDiffError(null)
+      const targetPath = filePath?.trim() ? filePath.trim() : undefined
 
-    const [unstagedResultRaw, stagedResultRaw] = await Promise.all([
-      gitApi.getDiff(workingDir, targetPath),
-      gitApi.getStagedDiff(workingDir, targetPath),
-    ]);
+      const [unstagedResultRaw, stagedResultRaw] = await Promise.all([
+        gitApi.getDiff(workingDir, targetPath),
+        gitApi.getStagedDiff(workingDir, targetPath)
+      ])
 
-    const unstagedResult = unwrapResult<string>(unstagedResultRaw);
-    const stagedResult = unwrapResult<string>(stagedResultRaw);
+      const unstagedResult = unwrapResult<string>(unstagedResultRaw)
+      const stagedResult = unwrapResult<string>(stagedResultRaw)
 
-    if (unstagedResult.ok) {
-      setDiffText(unstagedResult.data || '');
-    } else {
-      setDiffText('');
-      setDiffError(formatError(unstagedResult.error));
-    }
+      if (unstagedResult.ok) {
+        setDiffText(unstagedResult.data || '')
+      } else {
+        setDiffText('')
+        setDiffError(formatError(unstagedResult.error))
+      }
 
-    if (stagedResult.ok) {
-      setStagedDiffText(stagedResult.data || '');
-    } else {
-      setStagedDiffText('');
-      setDiffError((prev) => prev || formatError(stagedResult.error));
-    }
+      if (stagedResult.ok) {
+        setStagedDiffText(stagedResult.data || '')
+      } else {
+        setStagedDiffText('')
+        setDiffError((prev) => prev || formatError(stagedResult.error))
+      }
 
-    setDiffLoading(false);
-  }, [ensureRepoReady, gitApi, workingDir]);
+      setDiffLoading(false)
+    },
+    [ensureRepoReady, gitApi, workingDir]
+  )
 
   const handleStageToggle = useCallback(
     async (file: GitFile) => {
-      if (!workingDir || !gitApi) return;
-      setFileActions((prev) => ({ ...prev, [file.path]: true }));
-      setChangesError(null);
+      if (!workingDir || !gitApi) return
+      setFileActions((prev) => ({ ...prev, [file.path]: true }))
+      setChangesError(null)
       try {
-        const action = file.staged ? gitApi.unstageFiles : gitApi.stageFiles;
-        await action(workingDir, [file.path]);
+        const action = file.staged ? gitApi.unstageFiles : gitApi.stageFiles
+        await action(workingDir, [file.path])
       } catch (error) {
-        setChangesError(formatError(error instanceof Error ? error.message : String(error)));
+        setChangesError(formatError(error instanceof Error ? error.message : String(error)))
       }
-      await loadChanges();
-      await loadDiff(false, selectedFilePath);
+      await loadChanges()
+      await loadDiff(false, selectedFilePath)
       setFileActions((prev) => {
-        const next = { ...prev };
-        delete next[file.path];
-        return next;
-      });
+        const next = { ...prev }
+        delete next[file.path]
+        return next
+      })
     },
     [gitApi, loadChanges, loadDiff, selectedFilePath, workingDir]
-  );
+  )
 
   const hasUnstagedFiles = useMemo(
     () => files.some((file) => hasUnstagedStatus(file.status)),
     [files]
-  );
-  const hasStagedFiles = useMemo(
-    () => files.some((file) => file.staged),
-    [files]
-  );
+  )
+  const hasStagedFiles = useMemo(() => files.some((file) => file.staged), [files])
 
   const handleStageAll = useCallback(async () => {
-    if (!workingDir || !gitApi) return;
-    const targets = files
-      .filter((file) => hasUnstagedStatus(file.status))
-      .map((file) => file.path);
-    if (targets.length === 0) return;
-    setBulkStageLoading(true);
-    setChangesError(null);
+    if (!workingDir || !gitApi) return
+    const targets = files.filter((file) => hasUnstagedStatus(file.status)).map((file) => file.path)
+    if (targets.length === 0) return
+    setBulkStageLoading(true)
+    setChangesError(null)
     try {
-      await gitApi.stageFiles(workingDir, targets);
+      await gitApi.stageFiles(workingDir, targets)
     } catch (error) {
-      setChangesError(formatError(error instanceof Error ? error.message : String(error)));
+      setChangesError(formatError(error instanceof Error ? error.message : String(error)))
     }
-    await loadChanges(true);
-    await loadDiff(false, selectedFilePath);
-    setBulkStageLoading(false);
-  }, [files, gitApi, loadChanges, loadDiff, selectedFilePath, workingDir]);
+    await loadChanges(true)
+    await loadDiff(false, selectedFilePath)
+    setBulkStageLoading(false)
+  }, [files, gitApi, loadChanges, loadDiff, selectedFilePath, workingDir])
 
   const handleCommit = useCallback(async () => {
-    if (!workingDir || !gitApi) return;
-    const message = commitMessage.trim();
+    if (!workingDir || !gitApi) return
+    const message = commitMessage.trim()
     if (!message) {
-      setActionMessage({ type: 'error', text: '提交信息不能为空。' });
-      return;
+      setActionMessage({ type: 'error', text: '提交信息不能为空。' })
+      return
     }
-    setCommitLoading(true);
-    setActionMessage(null);
+    setCommitLoading(true)
+    setActionMessage(null)
     try {
-      await gitApi.commit(workingDir, message);
-      setCommitMessage('');
-      setActionMessage({ type: 'success', text: '提交成功。' });
-      await loadChanges(true);
-      await loadDiff(true, selectedFilePath);
-      await loadBranchDiff(true);
+      await gitApi.commit(workingDir, message)
+      setCommitMessage('')
+      setActionMessage({ type: 'success', text: '提交成功。' })
+      await loadChanges(true)
+      await loadDiff(true, selectedFilePath)
+      await loadBranchDiff(true)
     } catch (error) {
       setActionMessage({
         type: 'error',
-        text: formatError(error instanceof Error ? error.message : String(error)),
-      });
+        text: formatError(error instanceof Error ? error.message : String(error))
+      })
     } finally {
-      setCommitLoading(false);
+      setCommitLoading(false)
     }
-  }, [commitMessage, gitApi, loadBranchDiff, loadChanges, loadDiff, selectedFilePath, workingDir]);
+  }, [commitMessage, gitApi, loadBranchDiff, loadChanges, loadDiff, selectedFilePath, workingDir])
 
   const handleMerge = useCallback(async () => {
-    if (!(await ensureRepoReady({ force: true })) || !workingDir || !gitApi || !baseBranch) return;
+    if (!(await ensureRepoReady({ force: true })) || !workingDir || !gitApi || !baseBranch) return
     if (!currentBranch || baseBranch === currentBranch) {
-      setActionMessage({ type: 'info', text: '当前分支已是基准分支，无需合并。' });
-      return;
+      setActionMessage({ type: 'info', text: '当前分支已是基准分支，无需合并。' })
+      return
     }
-    setActionLoading('merge');
-    setActionMessage(null);
+    setActionLoading('merge')
+    setActionMessage(null)
     try {
-      const worktreeResult = unwrapResult<WorktreeInfo[]>(
-        await gitApi.listWorktrees(workingDir)
-      );
+      const worktreeResult = unwrapResult<WorktreeInfo[]>(await gitApi.listWorktrees(workingDir))
       if (!worktreeResult.ok) {
         setActionMessage({
           type: 'error',
           text: formatError(worktreeResult.error) || '无法读取 worktree 列表。'
-        });
-        return;
+        })
+        return
       }
-      const worktrees = Array.isArray(worktreeResult.data) ? worktreeResult.data : [];
-      const targetRef = `refs/heads/${baseBranch}`;
-      const targetWorktree = worktrees.find((worktree) => worktree.branch === targetRef);
+      const worktrees = Array.isArray(worktreeResult.data) ? worktreeResult.data : []
+      const targetRef = `refs/heads/${baseBranch}`
+      const targetWorktree = worktrees.find((worktree) => worktree.branch === targetRef)
       if (!targetWorktree?.path) {
         setActionMessage({
           type: 'error',
           text: `未找到基准分支 ${baseBranch} 的工作区，请先在某个工作区检出该分支。`
-        });
-        return;
+        })
+        return
       }
 
-      const result = await gitApi.mergeBranch(targetWorktree.path, currentBranch) as {
-        success?: boolean;
-        conflicts?: string[];
-      };
+      const result = (await gitApi.mergeBranch(targetWorktree.path, currentBranch)) as {
+        success?: boolean
+        conflicts?: string[]
+      }
       if (result && result.success === false) {
         setActionMessage({
           type: 'error',
           text: formatConflictMessage(`合并到 ${baseBranch}`, result.conflicts)
-        });
+        })
       } else {
         setActionMessage({
           type: 'success',
           text: `已将 ${currentBranch} 合并到 ${baseBranch}`
-        });
+        })
       }
     } catch (error) {
       setActionMessage({
         type: 'error',
-        text: formatError(error instanceof Error ? error.message : String(error)),
-      });
+        text: formatError(error instanceof Error ? error.message : String(error))
+      })
     } finally {
-      setActionLoading(null);
-      void loadChanges(true);
-      void loadDiff(true, selectedFilePath);
-      void loadBranchDiff(true);
+      setActionLoading(null)
+      void loadChanges(true)
+      void loadDiff(true, selectedFilePath)
+      void loadBranchDiff(true)
     }
-  }, [baseBranch, currentBranch, ensureRepoReady, gitApi, loadBranchDiff, loadChanges, loadDiff, selectedFilePath, workingDir]);
+  }, [
+    baseBranch,
+    currentBranch,
+    ensureRepoReady,
+    gitApi,
+    loadBranchDiff,
+    loadChanges,
+    loadDiff,
+    selectedFilePath,
+    workingDir
+  ])
 
   const handleRebase = useCallback(async () => {
-    if (!(await ensureRepoReady({ force: true })) || !workingDir || !gitApi || !baseBranch) return;
+    if (!(await ensureRepoReady({ force: true })) || !workingDir || !gitApi || !baseBranch) return
     if (!currentBranch || baseBranch === currentBranch) {
-      setActionMessage({ type: 'info', text: '当前分支已是基准分支，无需变基。' });
-      return;
+      setActionMessage({ type: 'info', text: '当前分支已是基准分支，无需变基。' })
+      return
     }
-    setActionLoading('rebase');
-    setActionMessage(null);
+    setActionLoading('rebase')
+    setActionMessage(null)
     try {
-      const result = await gitApi.rebaseBranch(workingDir, baseBranch) as {
-        success?: boolean;
-        conflicts?: string[];
-      };
+      const result = (await gitApi.rebaseBranch(workingDir, baseBranch)) as {
+        success?: boolean
+        conflicts?: string[]
+      }
       if (result && result.success === false) {
-        setActionMessage({ type: 'error', text: formatConflictMessage('变基', result.conflicts) });
+        setActionMessage({ type: 'error', text: formatConflictMessage('变基', result.conflicts) })
       } else {
-        setActionMessage({ type: 'success', text: `已变基到 ${baseBranch}` });
+        setActionMessage({ type: 'success', text: `已变基到 ${baseBranch}` })
       }
     } catch (error) {
       setActionMessage({
         type: 'error',
-        text: formatError(error instanceof Error ? error.message : String(error)),
-      });
+        text: formatError(error instanceof Error ? error.message : String(error))
+      })
     } finally {
-      setActionLoading(null);
-      void loadChanges(true);
-      void loadDiff(true, selectedFilePath);
-      void loadBranchDiff(true);
+      setActionLoading(null)
+      void loadChanges(true)
+      void loadDiff(true, selectedFilePath)
+      void loadBranchDiff(true)
     }
-  }, [baseBranch, currentBranch, ensureRepoReady, gitApi, loadBranchDiff, loadChanges, loadDiff, selectedFilePath, workingDir]);
+  }, [
+    baseBranch,
+    currentBranch,
+    ensureRepoReady,
+    gitApi,
+    loadBranchDiff,
+    loadChanges,
+    loadDiff,
+    selectedFilePath,
+    workingDir
+  ])
 
   const handleCreatePr = useCallback(async () => {
-    if (!(await ensureRepoReady({ force: true })) || !workingDir || !gitApi) return;
+    if (!(await ensureRepoReady({ force: true })) || !workingDir || !gitApi) return
     if (!baseBranch || !currentBranch || baseBranch === currentBranch) {
-      setActionMessage({ type: 'info', text: '缺少基准分支或当前分支，无法创建 PR。' });
-      return;
+      setActionMessage({ type: 'info', text: '缺少基准分支或当前分支，无法创建 PR。' })
+      return
     }
-    setActionLoading('pr');
-    setActionMessage(null);
+    setActionLoading('pr')
+    setActionMessage(null)
     try {
-      const remoteUrl = await gitApi.getRemoteUrl(workingDir) as string;
+      const remoteUrl = (await gitApi.getRemoteUrl(workingDir)) as string
       if (!remoteUrl || !remoteUrl.trim()) {
-        throw new Error('无法获取远程仓库地址');
+        throw new Error('无法获取远程仓库地址')
       }
-      await gitApi.pushBranch(workingDir, currentBranch);
+      await gitApi.pushBranch(workingDir, currentBranch)
 
-      const prUrl = buildPullRequestUrl(remoteUrl, baseBranch, currentBranch);
+      const prUrl = buildPullRequestUrl(remoteUrl, baseBranch, currentBranch)
       if (prUrl) {
-        await shell.openUrl(prUrl);
-        setActionMessage({ type: 'success', text: '已打开 PR 创建页面。' });
+        await shell.openUrl(prUrl)
+        setActionMessage({ type: 'success', text: '已打开 PR 创建页面。' })
       } else {
-        const repoUrl = buildRepositoryUrl(remoteUrl);
+        const repoUrl = buildRepositoryUrl(remoteUrl)
         if (!repoUrl) {
-          throw new Error('无法解析远程仓库地址');
+          throw new Error('无法解析远程仓库地址')
         }
-        await shell.openUrl(repoUrl);
-        setActionMessage({ type: 'info', text: '已打开远程仓库，请手动创建 PR。' });
+        await shell.openUrl(repoUrl)
+        setActionMessage({ type: 'info', text: '已打开远程仓库，请手动创建 PR。' })
       }
     } catch (error) {
       setActionMessage({
         type: 'error',
-        text: formatError(error instanceof Error ? error.message : String(error)),
-      });
+        text: formatError(error instanceof Error ? error.message : String(error))
+      })
     } finally {
-      setActionLoading(null);
+      setActionLoading(null)
     }
-  }, [baseBranch, currentBranch, ensureRepoReady, gitApi, workingDir]);
+  }, [baseBranch, currentBranch, ensureRepoReady, gitApi, workingDir])
 
   const handleSelectFile = useCallback(
     (filePath: string | null) => {
-      setSelectedFilePath(filePath);
-      void loadDiff(true, filePath);
+      setSelectedFilePath(filePath)
+      void loadDiff(true, filePath)
     },
     [loadDiff]
-  );
+  )
 
   useEffect(() => {
-    setRepoStatus('idle');
-    setRepoError(null);
-    setChangesError(null);
-    setBranchDiffError(null);
-    setDiffError(null);
-    setFiles([]);
-    setBranchDiffFiles([]);
-    setBranchDiffSelectedPath(null);
-    setBranchDiffText('');
-    setDiffText('');
-    setStagedDiffText('');
-    setDiffLoading(false);
-    setBranchDiffDetailLoading(false);
-    setBranchDiffDetailError(null);
-    setCurrentBranch(null);
-    setSelectedFilePath(null);
-    setBulkStageLoading(false);
-    setCommitMessage('');
-    setCommitLoading(false);
-    setActionLoading(null);
-    setActionMessage(null);
-  }, [workingDir]);
+    setRepoStatus('idle')
+    setRepoError(null)
+    setChangesError(null)
+    setBranchDiffError(null)
+    setDiffError(null)
+    setFiles([])
+    setBranchDiffFiles([])
+    setBranchDiffSelectedPath(null)
+    setBranchDiffText('')
+    setDiffText('')
+    setStagedDiffText('')
+    setDiffLoading(false)
+    setBranchDiffDetailLoading(false)
+    setBranchDiffDetailError(null)
+    setCurrentBranch(null)
+    setSelectedFilePath(null)
+    setBulkStageLoading(false)
+    setCommitMessage('')
+    setCommitLoading(false)
+    setActionLoading(null)
+    setActionMessage(null)
+  }, [workingDir])
 
   useEffect(() => {
     if (subTab === 'changes') {
-      void loadChanges();
-      void loadDiff(false, selectedFilePath);
+      void loadChanges()
+      void loadDiff(false, selectedFilePath)
     } else {
-      void loadBranchDiff();
+      void loadBranchDiff()
     }
-  }, [loadBranchDiff, loadChanges, loadDiff, selectedFilePath, subTab]);
+  }, [loadBranchDiff, loadChanges, loadDiff, selectedFilePath, subTab])
 
   useEffect(() => {
-    if (!selectedFilePath) return;
+    if (!selectedFilePath) return
     if (!files.some((file) => file.path === selectedFilePath)) {
-      setSelectedFilePath(null);
-      void loadDiff(true, null);
+      setSelectedFilePath(null)
+      void loadDiff(true, null)
     }
-  }, [files, loadDiff, selectedFilePath]);
+  }, [files, loadDiff, selectedFilePath])
 
   useEffect(() => {
-    if (subTab !== 'compare') return;
+    if (subTab !== 'compare') return
     if (branchDiffFiles.length === 0) {
-      setBranchDiffSelectedPath(null);
-      setBranchDiffText('');
-      setBranchDiffDetailError(null);
-      return;
+      setBranchDiffSelectedPath(null)
+      setBranchDiffText('')
+      setBranchDiffDetailError(null)
+      return
     }
-    if (branchDiffSelectedPath && branchDiffFiles.some((file) => file.path === branchDiffSelectedPath)) {
-      return;
+    if (
+      branchDiffSelectedPath &&
+      branchDiffFiles.some((file) => file.path === branchDiffSelectedPath)
+    ) {
+      return
     }
-    const nextPath = branchDiffFiles[0]?.path || null;
-    setBranchDiffSelectedPath(nextPath);
+    const nextPath = branchDiffFiles[0]?.path || null
+    setBranchDiffSelectedPath(nextPath)
     if (nextPath) {
-      void loadBranchDiffDetail(true, nextPath);
+      void loadBranchDiffDetail(true, nextPath)
     }
-  }, [branchDiffFiles, branchDiffSelectedPath, loadBranchDiffDetail, subTab]);
+  }, [branchDiffFiles, branchDiffSelectedPath, loadBranchDiffDetail, subTab])
 
   const repoMessage = useMemo(() => {
     switch (repoStatus) {
       case 'no-working-dir':
-        return { title: '没有工作目录', description: '该任务未绑定工作目录。' };
+        return { title: '没有工作目录', description: '该任务未绑定工作目录。' }
       case 'git-unavailable':
-        return { title: 'Git 不可用', description: repoError || '请检查 Git 安装状态。' };
+        return { title: 'Git 不可用', description: repoError || '请检查 Git 安装状态。' }
       case 'not-repo':
-        return { title: '非 Git 仓库', description: repoError || '当前目录不是 Git 仓库。' };
+        return { title: '非 Git 仓库', description: repoError || '当前目录不是 Git 仓库。' }
       case 'checking':
-        return { title: '正在检测 Git', description: '请稍候…' };
+        return { title: '正在检测 Git', description: '请稍候…' }
       case 'error':
-        return { title: '无法加载 Git', description: repoError || '请稍后重试。' };
+        return { title: '无法加载 Git', description: repoError || '请稍后重试。' }
       default:
-        return null;
+        return null
     }
-  }, [repoError, repoStatus]);
+  }, [repoError, repoStatus])
 
   const canRunBranchActions = Boolean(
     repoStatus === 'ready' && baseBranch && currentBranch && baseBranch !== currentBranch
-  );
-  const actionBusy = actionLoading !== null;
-  const stageAllDisabled = !hasUnstagedFiles || bulkStageLoading || repoStatus !== 'ready';
-  const commitDisabled = !hasStagedFiles || !commitMessage.trim() || commitLoading || repoStatus !== 'ready';
+  )
+  const actionBusy = actionLoading !== null
+  const stageAllDisabled = !hasUnstagedFiles || bulkStageLoading || repoStatus !== 'ready'
+  const commitDisabled =
+    !hasStagedFiles || !commitMessage.trim() || commitLoading || repoStatus !== 'ready'
 
   return (
     <div className="flex h-full flex-col">
@@ -744,8 +796,8 @@ function GitPanel({ workingDir, baseBranch }: GitPanelProps) {
                 diffError={diffError}
                 selectedFilePath={selectedFilePath}
                 onRefresh={() => {
-                  void loadChanges(true);
-                  void loadDiff(true, selectedFilePath);
+                  void loadChanges(true)
+                  void loadDiff(true, selectedFilePath)
                 }}
                 onSelectFile={handleSelectFile}
                 onToggleStage={handleStageToggle}
@@ -763,13 +815,13 @@ function GitPanel({ workingDir, baseBranch }: GitPanelProps) {
                 diffError={branchDiffDetailError}
                 selectedFilePath={branchDiffSelectedPath}
                 onSelectFile={(filePath) => {
-                  setBranchDiffSelectedPath(filePath);
-                  void loadBranchDiffDetail(true, filePath);
+                  setBranchDiffSelectedPath(filePath)
+                  void loadBranchDiffDetail(true, filePath)
                 }}
                 onRefresh={() => {
-                  void loadBranchDiff(true);
+                  void loadBranchDiff(true)
                   if (branchDiffSelectedPath) {
-                    void loadBranchDiffDetail(true, branchDiffSelectedPath);
+                    void loadBranchDiffDetail(true, branchDiffSelectedPath)
                   }
                 }}
                 className="h-full overflow-auto"
@@ -811,8 +863,8 @@ function GitPanel({ workingDir, baseBranch }: GitPanelProps) {
             onChange={(event) => setCommitMessage(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !commitDisabled) {
-                event.preventDefault();
-                void handleCommit();
+                event.preventDefault()
+                void handleCommit()
               }
             }}
             disabled={!hasStagedFiles || commitLoading || repoStatus !== 'ready'}
@@ -858,23 +910,23 @@ function GitPanel({ workingDir, baseBranch }: GitPanelProps) {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 // Git Changes Panel Component
 interface GitChangesPanelProps {
-  files: GitFile[];
-  loading: boolean;
-  error: string | null;
-  diffText: string;
-  stagedDiffText: string;
-  diffLoading: boolean;
-  diffError: string | null;
-  selectedFilePath: string | null;
-  onRefresh: () => void;
-  onSelectFile: (filePath: string | null) => void;
-  onToggleStage: (file: GitFile) => void;
-  busyMap: Record<string, boolean>;
+  files: GitFile[]
+  loading: boolean
+  error: string | null
+  diffText: string
+  stagedDiffText: string
+  diffLoading: boolean
+  diffError: string | null
+  selectedFilePath: string | null
+  onRefresh: () => void
+  onSelectFile: (filePath: string | null) => void
+  onToggleStage: (file: GitFile) => void
+  busyMap: Record<string, boolean>
 }
 
 function GitChangesPanel({
@@ -889,15 +941,15 @@ function GitChangesPanel({
   onRefresh,
   onSelectFile,
   onToggleStage,
-  busyMap,
+  busyMap
 }: GitChangesPanelProps) {
   const statusColors: Record<string, string> = {
     M: 'text-amber-500',
     A: 'text-green-500',
     D: 'text-red-500',
     R: 'text-blue-500',
-    '?': 'text-muted-foreground',
-  };
+    '?': 'text-muted-foreground'
+  }
 
   return (
     <div className="flex h-full min-h-0 gap-4">
@@ -909,9 +961,7 @@ function GitChangesPanel({
           </Button>
         </div>
 
-        {error && (
-          <div className="text-destructive text-sm">{error}</div>
-        )}
+        {error && <div className="text-destructive text-sm">{error}</div>}
 
         <div className="flex-1 overflow-auto">
           {files.length === 0 ? (
@@ -924,8 +974,8 @@ function GitChangesPanel({
                 onClick={() => onSelectFile(null)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    onSelectFile(null);
+                    event.preventDefault()
+                    onSelectFile(null)
                   }
                 }}
                 className={cn(
@@ -944,8 +994,8 @@ function GitChangesPanel({
                   onClick={() => onSelectFile(file.path)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      onSelectFile(file.path);
+                      event.preventDefault()
+                      onSelectFile(file.path)
                     }
                   }}
                   className={cn(
@@ -953,12 +1003,7 @@ function GitChangesPanel({
                     selectedFilePath === file.path && 'bg-muted/60'
                   )}
                 >
-                  <span
-                    className={cn(
-                      'font-mono',
-                      statusColors[getStatusCode(file.status)]
-                    )}
-                  >
+                  <span className={cn('font-mono', statusColors[getStatusCode(file.status)])}>
                     {getStatusCode(file.status)}
                   </span>
                   <span className="flex-1 truncate">{file.path}</span>
@@ -971,8 +1016,8 @@ function GitChangesPanel({
                     variant="ghost"
                     size="sm"
                     onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleStage(file);
+                      event.stopPropagation()
+                      onToggleStage(file)
                     }}
                     disabled={loading || busyMap[file.path]}
                   >
@@ -995,7 +1040,7 @@ function GitChangesPanel({
         />
       </div>
     </div>
-  );
+  )
 }
 
 function GitBranchDiffPanel({
@@ -1010,32 +1055,30 @@ function GitBranchDiffPanel({
   selectedFilePath,
   onSelectFile,
   onRefresh,
-  className,
+  className
 }: {
-  files: BranchDiffFile[];
-  baseBranch?: string | null;
-  currentBranch: string | null;
-  loading: boolean;
-  error: string | null;
-  diffText: string;
-  diffLoading: boolean;
-  diffError: string | null;
-  selectedFilePath: string | null;
-  onSelectFile: (filePath: string | null) => void;
-  onRefresh: () => void;
-  className?: string;
+  files: BranchDiffFile[]
+  baseBranch?: string | null
+  currentBranch: string | null
+  loading: boolean
+  error: string | null
+  diffText: string
+  diffLoading: boolean
+  diffError: string | null
+  selectedFilePath: string | null
+  onSelectFile: (filePath: string | null) => void
+  onRefresh: () => void
+  className?: string
 }) {
   const statusColors: Record<string, string> = {
     M: 'text-amber-500',
     A: 'text-green-500',
     D: 'text-red-500',
     R: 'text-blue-500',
-    '?': 'text-muted-foreground',
-  };
+    '?': 'text-muted-foreground'
+  }
 
-  const compareLabel = baseBranch
-    ? `${baseBranch} → ${currentBranch || '当前'}`
-    : null;
+  const compareLabel = baseBranch ? `${baseBranch} → ${currentBranch || '当前'}` : null
 
   return (
     <div className={cn('flex h-full min-h-0 gap-4', className)}>
@@ -1046,19 +1089,12 @@ function GitBranchDiffPanel({
           ) : (
             <span />
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRefresh}
-            disabled={loading || !baseBranch}
-          >
+          <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading || !baseBranch}>
             {loading ? '加载中...' : '刷新'}
           </Button>
         </div>
 
-        {error && (
-          <div className="text-destructive text-sm">{error}</div>
-        )}
+        {error && <div className="text-destructive text-sm">{error}</div>}
 
         <div className="flex-1 overflow-auto">
           {!baseBranch ? (
@@ -1075,8 +1111,8 @@ function GitBranchDiffPanel({
                   onClick={() => onSelectFile(file.path)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      onSelectFile(file.path);
+                      event.preventDefault()
+                      onSelectFile(file.path)
                     }
                   }}
                   className={cn(
@@ -1084,12 +1120,7 @@ function GitBranchDiffPanel({
                     selectedFilePath === file.path && 'bg-muted/60'
                   )}
                 >
-                  <span
-                    className={cn(
-                      'font-mono',
-                      statusColors[getStatusCode(file.status)]
-                    )}
-                  >
+                  <span className={cn('font-mono', statusColors[getStatusCode(file.status)])}>
                     {getStatusCode(file.status)}
                   </span>
                   <span className="flex-1 truncate">{file.path}</span>
@@ -1114,7 +1145,7 @@ function GitBranchDiffPanel({
         )}
       </div>
     </div>
-  );
+  )
 }
 
 function GitEmptyState({ title, description }: { title: string; description?: string }) {
@@ -1123,5 +1154,5 @@ function GitEmptyState({ title, description }: { title: string; description?: st
       <div className="text-foreground text-sm font-medium">{title}</div>
       {description && <div className="max-w-[240px] text-xs">{description}</div>}
     </div>
-  );
+  )
 }

@@ -10,7 +10,7 @@ import { ToolSelectionContext } from '@/components/task'
 import { ExecutionPanel } from './components/ExecutionPanel'
 import { ReplyCard } from './components/ReplyCard'
 import { RightPanelSection } from './components/RightPanelSection'
-import { TaskCard } from './components/TaskCard'
+import { TaskDetailHeader } from './components/TaskDetailHeader'
 import { TaskDialogs } from './components/TaskDialogs'
 import { WorkflowCard } from './components/WorkflowCard'
 import { useTaskDetail } from './useTaskDetail'
@@ -66,37 +66,12 @@ export function TaskDetailContainer() {
   const shellConfig = useMemo(
     () => ({
       right: {
-        content: (
-          <RightPanelSection
-            isVisible={detail.isPreviewVisible}
-            taskId={taskId ?? null}
-            workingDir={detail.workingDir}
-            branchName={detail.task?.branch_name || null}
-            baseBranch={detail.task?.base_branch || null}
-            selectedArtifact={detail.selectedArtifact}
-            artifacts={detail.artifacts}
-            onSelectArtifact={detail.handleSelectArtifact}
-            workspaceRefreshToken={detail.workspaceRefreshToken}
-            onClosePreview={detail.handleClosePreview}
-          />
-        ),
-        visible: detail.isPreviewVisible,
+        visible: false,
         width: 'clamp(360px, 40vw, 920px)',
         variant: 'detail' as const
       }
     }),
-    [
-      detail.artifacts,
-      detail.handleClosePreview,
-      detail.handleSelectArtifact,
-      detail.isPreviewVisible,
-      detail.selectedArtifact,
-      detail.task?.base_branch,
-      detail.task?.branch_name,
-      detail.workingDir,
-      detail.workspaceRefreshToken,
-      taskId
-    ]
+    []
   )
 
   useAppShell(shellConfig)
@@ -107,68 +82,114 @@ export function TaskDetailContainer() {
         <div
           className={cn('bg-background flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl')}
         >
-          <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
-            <TaskCard
+          <div className="shrink-0">
+            <TaskDetailHeader
               t={t}
               title={detail.displayTitle || `Task ${taskId}`}
               metaRows={detail.visibleMetaRows}
               showActionButton={detail.showActionButton}
               actionDisabled={detail.actionDisabled}
+              actionKind={detail.actionKind}
               actionLabel={detail.actionLabel}
               onAction={handleAction}
               onToggleSidebar={toggleLeft}
+              activePanelTab={detail.isPreviewVisible ? detail.activePreviewTab : null}
+              onTogglePanelTab={detail.handleTogglePreviewTab}
               onEdit={detail.handleOpenEdit}
               onDelete={() => detail.setIsDeleteOpen(true)}
               canEdit={detail.task?.status === 'todo'}
             />
+          </div>
 
-            {detail.showWorkflowCard && (
-              <WorkflowCard
-                t={t}
-                graph={detail.workflowGraph}
-                currentTaskNode={detail.currentTaskNode}
-                selectedNodeId={detail.selectedWorkflowNodeId}
-                onSelectNode={detail.handleSelectWorkflowNode}
-                onApproveCurrent={detail.handleApproveTaskNode}
-              />
-            )}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="flex h-full min-w-0">
+              <div className="min-h-0 min-w-0 flex flex-1 flex-col overflow-hidden">
+                <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+                  <div className="min-h-0 shrink-0">
+                    {detail.showWorkflowCard && (
+                      <WorkflowCard
+                        t={t}
+                        graph={detail.workflowGraph}
+                        summary={detail.workflowSummary}
+                        expanded={detail.isWorkflowExpanded}
+                        currentTaskNode={detail.currentTaskNode}
+                        selectedNodeId={detail.selectedWorkflowNodeId}
+                        onSelectNode={detail.handleSelectWorkflowNode}
+                        onToggleExpanded={detail.toggleWorkflowExpanded}
+                        onApproveCurrent={detail.handleApproveTaskNode}
+                      />
+                    )}
+                  </div>
 
-            <ExecutionPanel
-              t={t}
-              isLoading={detail.isLoading}
-              pipelineBanner={detail.pipelineBanner}
-              useCliSession={detail.showExecutionLogPanel}
-              cliStatusInfo={detail.cliStatusInfo}
-              cliToolLabel={detail.cliToolLabel}
-              messages={messages}
-              phase={phase}
-              onApprovePlan={approvePlan}
-              onRejectPlan={rejectPlan}
-              isRunning={isRunning}
-              taskId={taskId ?? null}
-              taskNodeId={detail.executionTaskNodeId}
-              logTaskNodeId={detail.executionLogTaskNodeId}
-              logSource={detail.executionLogSource}
-              logToolId={detail.executionLogToolId}
-              sessionId={detail.executionSessionId}
-              toolId={detail.executionCliToolId}
-              configId={detail.agentToolConfigId}
-              workingDir={detail.workingDir}
-              prompt={detail.taskPrompt}
-              cliSessionRef={detail.cliSessionRef}
-              onCliStatusChange={detail.handleCliStatusChange}
-              messagesContainerRef={detail.messagesContainerRef}
-              messagesEndRef={detail.messagesEndRef}
-            />
+                  <ExecutionPanel
+                    t={t}
+                    isLoading={detail.isLoading}
+                    pipelineBanner={detail.pipelineBanner}
+                    useCliSession={detail.showExecutionLogPanel}
+                    cliStatusInfo={detail.cliStatusInfo}
+                    cliToolLabel={detail.cliToolLabel}
+                    messages={messages}
+                    phase={phase}
+                    onApprovePlan={approvePlan}
+                    onRejectPlan={rejectPlan}
+                    isRunning={isRunning}
+                    taskId={taskId ?? null}
+                    taskNodeId={detail.executionTaskNodeId}
+                    logTaskNodeId={detail.executionLogTaskNodeId}
+                    logSource={detail.executionLogSource}
+                    logToolId={detail.executionLogToolId}
+                    sessionId={detail.executionSessionId}
+                    toolId={detail.executionCliToolId}
+                    configId={detail.agentToolConfigId}
+                    workingDir={detail.workingDir}
+                    prompt={detail.taskPrompt}
+                    cliSessionRef={detail.cliSessionRef}
+                    onCliStatusChange={detail.handleCliStatusChange}
+                    messagesContainerRef={detail.messagesContainerRef}
+                    messagesEndRef={detail.messagesEndRef}
+                    className="min-h-0 flex-1"
+                  />
+                </div>
 
-            <ReplyCard
-              t={t}
-              isRunning={detail.replyIsRunning}
-              disabled={detail.replyDisabled}
-              placeholder={detail.replyPlaceholder}
-              onStop={detail.handleStopExecution}
-              onSubmit={detail.handleReply}
-            />
+                <div className="border-border/60 bg-background/95 shrink-0 border-t p-3 backdrop-blur">
+                  <ReplyCard
+                    t={t}
+                    isRunning={detail.replyIsRunning}
+                    disabled={detail.replyDisabled}
+                    placeholder={detail.replyPlaceholder}
+                    onStop={detail.handleStopExecution}
+                    onSubmit={detail.handleReply}
+                  />
+                </div>
+              </div>
+
+              <aside
+                className={cn(
+                  'border-border/70 bg-background/94 min-w-0 shrink-0 overflow-hidden border-l backdrop-blur-xl',
+                  'transition-[width,opacity,transform,border-color] duration-300',
+                  detail.isPreviewVisible
+                    ? 'translate-x-0 opacity-100'
+                    : 'pointer-events-none translate-x-3 opacity-0 border-transparent'
+                )}
+                aria-hidden={!detail.isPreviewVisible}
+                style={{ width: detail.isPreviewVisible ? 'clamp(360px, 40vw, 920px)' : 0 }}
+              >
+                <RightPanelSection
+                  isVisible={detail.isPreviewVisible}
+                  taskId={taskId ?? null}
+                  workingDir={detail.workingDir}
+                  branchName={detail.task?.branch_name || null}
+                  baseBranch={detail.task?.base_branch || null}
+                  activeTab={detail.activePreviewTab}
+                  selectedArtifact={detail.selectedArtifact}
+                  artifacts={detail.artifacts}
+                  onSelectArtifact={detail.handleSelectArtifact}
+                  workspaceRefreshToken={detail.workspaceRefreshToken}
+                  onClosePanel={detail.handleClosePreviewPanel}
+                  onClosePreview={detail.handleClosePreview}
+                />
+              </aside>
+            </div>
           </div>
         </div>
       </div>

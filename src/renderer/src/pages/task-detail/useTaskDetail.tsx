@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
-import { Clock, GitBranch } from 'lucide-react'
+import { Clock } from 'lucide-react'
 
 import { db, type Task, type WorkflowRun, type WorkflowRunNode } from '@/data'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
@@ -25,6 +25,7 @@ import { normalizeCliTools } from '@/lib/agent-cli-tools'
 import { newUuid } from '@/lib/ids'
 import type { AgentMessage, MessageAttachment } from '@/hooks/useAgent'
 import { hasValidSearchResults, type Artifact } from '@/components/artifacts'
+import type { RightPanelTab } from '@/components/task/RightPanel'
 import { getArtifactTypeFromExt } from '@/components/task'
 import type { CLISessionHandle } from '@/components/cli'
 
@@ -43,6 +44,7 @@ import {
   type WorkflowGraph,
   type WorkflowNode,
   type WorkflowReviewNode,
+  type WorkflowSummary,
   type LanguageStrings
 } from './types'
 
@@ -153,9 +155,7 @@ export function useTaskDetail({
 
       for (let attempt = 0; attempt < WORKFLOW_RUNTIME_RETRY_ATTEMPTS; attempt += 1) {
         const workflowRun = await db.getWorkflowRunByTask(currentTaskId)
-        const runNodes = workflowRun
-          ? await db.listWorkflowRunNodes(workflowRun.id)
-          : []
+        const runNodes = workflowRun ? await db.listWorkflowRunNodes(workflowRun.id) : []
 
         if (workflowRun && Array.isArray(runNodes) && runNodes.length > 0) {
           return {
@@ -819,6 +819,7 @@ export function useTaskDetail({
   const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([])
   const [workflowCurrentNode, setWorkflowCurrentNode] = useState<WorkflowCurrentNode | null>(null)
   const [selectedWorkflowNodeId, setSelectedWorkflowNodeId] = useState<string | null>(null)
+  const [isWorkflowExpanded, setIsWorkflowExpanded] = useState(false)
 
   const isMountedRef = useRef(true)
   const workflowPrevTaskIdRef = useRef<string | undefined>(undefined)
@@ -831,6 +832,7 @@ export function useTaskDetail({
         setWorkflowNodes([])
         setWorkflowCurrentNode(null)
         setSelectedWorkflowNodeId(null)
+        setIsWorkflowExpanded(false)
         lastAutoRunTaskNodeIdRef.current = null
       }
       workflowPrevTaskIdRef.current = taskId
@@ -1137,9 +1139,7 @@ export function useTaskDetail({
       }
 
       setPipelineStatus('failed')
-      await appendPipelineNotice(
-        t.common.errors.serverNotRunning || 'CLI session is not running.'
-      )
+      await appendPipelineNotice(t.common.errors.serverNotRunning || 'CLI session is not running.')
     },
     [
       appendCliUserLog,
@@ -1339,7 +1339,8 @@ export function useTaskDetail({
   // Section 12: Artifacts
   // ===========================================================================
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null)
-  const [isPreviewVisible, setIsPreviewVisible] = useState(true)
+  const [activePreviewTab, setActivePreviewTab] = useState<RightPanelTab>('files')
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false)
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0)
 
   const lastWorkspaceRefreshMessageIndexRef = useRef(0)
@@ -1353,6 +1354,7 @@ export function useTaskDetail({
     if (artifactsPrevTaskIdRef.current !== taskId) {
       if (artifactsPrevTaskIdRef.current !== undefined) {
         setIsPreviewVisible(false)
+        setActivePreviewTab('files')
         setSelectedArtifact(null)
         setArtifacts([])
         lastWorkspaceRefreshMessageIndexRef.current = 0
@@ -1362,9 +1364,34 @@ export function useTaskDetail({
     }
   }, [taskId])
 
+  const handleOpenPreviewTab = useCallback((tab: RightPanelTab) => {
+    setActivePreviewTab(tab)
+    setIsPreviewVisible(true)
+  }, [])
+
+  const handleTogglePreviewTab = useCallback(
+    (tab: RightPanelTab) => {
+      if (isPreviewVisible && activePreviewTab === tab) {
+        setIsPreviewVisible(false)
+        return
+      }
+
+      setActivePreviewTab(tab)
+      setIsPreviewVisible(true)
+    },
+    [activePreviewTab, isPreviewVisible]
+  )
+
+  const handleClosePreviewPanel = useCallback(() => {
+    setIsPreviewVisible(false)
+  }, [])
+
   const handleSelectArtifact = useCallback((artifact: Artifact | null) => {
     setSelectedArtifact(artifact)
-    if (artifact) setIsPreviewVisible(true)
+    if (artifact) {
+      setActivePreviewTab('files')
+      setIsPreviewVisible(true)
+    }
   }, [])
 
   const handleClosePreview = useCallback(() => {
@@ -1586,21 +1613,40 @@ export function useTaskDetail({
   ])
 
   const showWorkflowCard = useMemo(
-    () =>
-      Boolean(
-        task?.task_mode === 'workflow' ||
-        workflowNodes.length ||
-        pipelineTemplate?.nodes?.length ||
-        backendWorkflowRun?.definition_snapshot.nodes.length ||
-        currentTaskNode?.status === 'in_review'),
-    [
-      backendWorkflowRun?.definition_snapshot.nodes.length,
-      currentTaskNode?.status,
-      pipelineTemplate?.nodes?.length,
-      task?.task_mode,
-      workflowNodes.length
-    ]
+    () => Boolean(task?.task_mode === 'workflow'),
+    [task?.task_mode]
   )
+
+  const workflowSummary = useMemo<WorkflowSummary | null>(() => {
+    if (!showWorkflowCard) return null
+
+    const nodes = [...workflowGraph.nodes].sort((a, b) => a.node_order - b.node_order)
+    const total = nodes.length
+    const completed = nodes.filter((node) => node.status === 'done').length
+    const inProgress = nodes.filter((node) => node.status === 'in_progress').length
+    const inReview = nodes.filter((node) => node.status === 'in_review').length
+    const failed = nodes.filter((node) => node.status === 'failed').length
+    const pending = Math.max(total - completed - inProgress - inReview - failed, 0)
+
+    const runtimeNodeId = workflowCurrentNode?.id ?? currentTaskNode?.id ?? null
+    const currentGraphNode =
+      (runtimeNodeId ? nodes.find((node) => node.id === runtimeNodeId) : null) ??
+      nodes.find((node) => node.isCurrent) ??
+      nodes.find((node) => node.status === 'in_review' || node.status === 'in_progress') ??
+      nodes[0] ??
+      null
+
+    return {
+      total,
+      completed,
+      pending,
+      inProgress,
+      inReview,
+      failed,
+      currentNodeName: currentTaskNode?.name ?? currentGraphNode?.name ?? null,
+      currentNodeStatus: currentTaskNode?.status ?? currentGraphNode?.status ?? null
+    }
+  }, [currentTaskNode, showWorkflowCard, workflowCurrentNode?.id, workflowGraph.nodes])
 
   const workflowLinearNodes = useMemo(() => {
     if (workflowNodes.length > 0)
@@ -1687,6 +1733,11 @@ export function useTaskDetail({
   )
 
   const showActionButton = showStartButton || isCliTaskReviewPending || selectedWorkflowNodeIsFailed
+  const actionKind = selectedWorkflowNodeIsFailed
+    ? ('retry' as const)
+    : isCliTaskReviewPending
+      ? ('complete' as const)
+      : ('start' as const)
   const actionLabel = selectedWorkflowNodeIsFailed
     ? 'Retry node'
     : isCliTaskReviewPending
@@ -1740,11 +1791,7 @@ export function useTaskDetail({
     if (task?.task_mode !== 'workflow') return 'session' as const
     if (!executionTaskNodeId || !executionLogTaskNodeId) return 'session' as const
     return executionLogTaskNodeId === executionTaskNodeId ? ('session' as const) : ('file' as const)
-  }, [
-    executionLogTaskNodeId,
-    executionTaskNodeId,
-    task?.task_mode
-  ])
+  }, [executionLogTaskNodeId, executionTaskNodeId, task?.task_mode])
 
   const executionSessionId = useMemo(() => {
     if (task?.task_mode !== 'workflow') {
@@ -1852,14 +1899,6 @@ export function useTaskDetail({
   const metaRows = useMemo<TaskMetaRow[]>(
     () => [
       {
-        key: 'branch',
-        icon: GitBranch,
-        value: task?.branch_name ? (
-          <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{task.branch_name}</code>
-        ) : null,
-        visible: Boolean(task?.branch_name)
-      },
-      {
         key: 'status',
         icon: StatusIcon,
         value: statusInfo ? (
@@ -1868,7 +1907,7 @@ export function useTaskDetail({
         visible: Boolean(statusInfo)
       }
     ],
-    [statusInfo, StatusIcon, task?.branch_name]
+    [statusInfo, StatusIcon]
   )
 
   const visibleMetaRows = filterVisibleMetaRows(metaRows)
@@ -2072,7 +2111,7 @@ export function useTaskDetail({
     startPipelineStage,
     t.common.errors.serverNotRunning,
     task,
-    taskId,
+    taskId
   ])
 
   const handleApproveCliTask = useCallback(async () => {
@@ -2125,6 +2164,9 @@ export function useTaskDetail({
   }, [cliStatus, isRunning, useCliSession])
 
   const agentToolConfigId = executionAgentToolConfigId
+  const toggleWorkflowExpanded = useCallback(() => {
+    setIsWorkflowExpanded((prev) => !prev)
+  }, [])
 
   // ===========================================================================
   // Return
@@ -2194,6 +2236,9 @@ export function useTaskDetail({
     currentTaskNode,
     workflowNodes,
     workflowCurrentNode,
+    workflowSummary,
+    isWorkflowExpanded,
+    toggleWorkflowExpanded,
     selectedWorkflowNodeId: selectedWorkflowNode?.id ?? null,
     handleSelectWorkflowNode,
     handleApproveTaskNode,
@@ -2201,8 +2246,12 @@ export function useTaskDetail({
     // Artifacts
     artifacts,
     selectedArtifact,
+    activePreviewTab,
     isPreviewVisible,
     workspaceRefreshToken,
+    handleOpenPreviewTab,
+    handleTogglePreviewTab,
+    handleClosePreviewPanel,
     handleSelectArtifact,
     handleClosePreview,
     setIsPreviewVisible,
@@ -2212,6 +2261,7 @@ export function useTaskDetail({
     cliToolLabel,
     cliStatusInfo,
     showActionButton,
+    actionKind,
     actionLabel,
     actionDisabled,
     showWorkflowCard,

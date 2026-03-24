@@ -129,7 +129,7 @@ describe('TaskService workflow runtime', () => {
             key: 'conversation',
             type: 'agent',
             name: 'Conversation',
-            prompt: null,
+            prompt: '',
             cliToolId: 'codex',
             agentToolConfigId: 'cfg-a',
             requiresApprovalAfterRun: false
@@ -140,8 +140,26 @@ describe('TaskService workflow runtime', () => {
     })
   })
 
-  it('creates workflow runs from workflow definitions without legacy template bridging', async () => {
-    const createdRuns: Array<{ taskId: string; workflowDefinitionId?: string | null }> = []
+  it('applies task-level CLI defaults to workflow run snapshots', async () => {
+    const createdRuns: Array<{
+      taskId: string
+      workflowDefinitionId?: string | null
+      definition?: {
+        version: 1
+        nodes: Array<{
+          id: string
+          key: string
+          type: 'agent'
+          name: string
+          prompt?: string | null
+          cliToolId?: string | null
+          agentToolConfigId?: string | null
+          requiresApprovalAfterRun: boolean
+          position?: { x: number; y: number }
+        }>
+        edges: Array<{ from: string; to: string }>
+      }
+    }> = []
     const db = {
       getWorkflowDefinition: vi.fn(() => ({
         id: 'definition-1',
@@ -231,10 +249,27 @@ describe('TaskService workflow runtime', () => {
       taskMode: 'workflow',
       projectId: 'project-1',
       projectPath: '/tmp/project',
-      workflowDefinitionId: 'definition-1'
+      workflowDefinitionId: 'definition-1',
+      cliToolId: 'codex'
     })
 
-    expect(createdRuns).toEqual([{ taskId: expect.any(String), workflowDefinitionId: 'definition-1' }])
+    expect(createdRuns).toEqual([
+      {
+        taskId: expect.any(String),
+        workflowDefinitionId: 'definition-1',
+        definition: {
+          version: 1,
+          nodes: [
+            expect.objectContaining({
+              id: 'node-1',
+              key: 'analyze',
+              cliToolId: 'codex'
+            })
+          ],
+          edges: []
+        }
+      }
+    ])
   })
 
   it('rejects invalid or legacy workflow definitions before creating the task record', async () => {
@@ -270,6 +305,68 @@ describe('TaskService workflow runtime', () => {
         workflowDefinitionId: 'legacy-definition'
       })
     ).rejects.toThrow('Workflow definition not found: legacy-definition')
+
+    expect(db.createTask).not.toHaveBeenCalled()
+    expect(db.createWorkflowRunForTask).not.toHaveBeenCalled()
+  })
+
+  it('rejects workflow task defaults that point to a disabled CLI tool', async () => {
+    const db = {
+      getWorkflowDefinition: vi.fn(() => ({
+        id: 'definition-1',
+        scope: 'project',
+        project_id: 'project-1',
+        name: 'Workflow',
+        description: null,
+        created_at: '2026-03-22T00:00:00.000Z',
+        updated_at: '2026-03-22T00:00:00.000Z',
+        definition: {
+          version: 1,
+          nodes: [
+            {
+              id: 'node-1',
+              key: 'analyze',
+              type: 'agent',
+              name: 'Analyze',
+              prompt: 'Inspect the task',
+              requiresApprovalAfterRun: false,
+              position: { x: 0, y: 0 }
+            }
+          ],
+          edges: []
+        }
+      })),
+      getDefaultAgentToolConfig: vi.fn(() => null),
+      createTask: vi.fn(),
+      getTask: vi.fn(),
+      createWorkflowRunForTask: vi.fn()
+    }
+
+    const git = { addWorktree: vi.fn() }
+    const settings = {
+      getSettings: vi.fn(() => ({
+        enabledCliTools: {
+          'claude-code': true,
+          codex: false,
+          'cursor-agent': true,
+          'gemini-cli': true,
+          opencode: true
+        }
+      }))
+    }
+    const service = new TaskService(db as never, git as never, settings as never)
+
+    await expect(
+      service.createTask({
+        title: 'Workflow task',
+        prompt: 'Solve the issue',
+        taskMode: 'workflow',
+        projectId: 'project-1',
+        projectPath: '/tmp/project',
+        workflowDefinitionId: 'definition-1',
+        cliToolId: 'codex'
+      })
+    ).rejects.toThrow('CLI tool is disabled in Settings -> Agent CLI')
 
     expect(db.createTask).not.toHaveBeenCalled()
     expect(db.createWorkflowRunForTask).not.toHaveBeenCalled()

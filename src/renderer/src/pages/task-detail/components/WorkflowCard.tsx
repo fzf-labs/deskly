@@ -1,4 +1,13 @@
-import { AlertTriangle, Bot, CheckCircle2, Clock3, ListChecks } from 'lucide-react'
+import {
+  AlertTriangle,
+  Bot,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  ListChecks,
+  PlayCircle
+} from 'lucide-react'
 import { useMemo } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -9,15 +18,19 @@ import type {
   PipelineDisplayStatus,
   WorkflowGraph,
   WorkflowGraphNode,
+  WorkflowSummary,
   WorkflowReviewNode
 } from '../types'
 
 interface WorkflowCardProps {
   t: LanguageStrings
   graph: WorkflowGraph
+  summary: WorkflowSummary | null
+  expanded: boolean
   currentTaskNode: WorkflowReviewNode | null
   selectedNodeId?: string | null
   onSelectNode?: (nodeId: string) => void
+  onToggleExpanded: () => void
   onApproveCurrent: () => void
 }
 
@@ -58,6 +71,26 @@ const getEdgeStroke = (status: PipelineDisplayStatus | undefined) => {
   return 'rgba(148, 163, 184, 0.3)'
 }
 
+const getCompactNodeTone = (status: PipelineDisplayStatus, isCurrent: boolean, selected: boolean) =>
+  cn(
+    'border-border/70 bg-background text-foreground hover:border-primary/35 flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-left transition-colors',
+    status === 'done' && 'border-emerald-500/35 bg-emerald-500/8 text-emerald-700',
+    status === 'in_progress' && 'border-sky-500/40 bg-sky-500/10 text-sky-700',
+    status === 'in_review' && 'border-amber-500/40 bg-amber-500/10 text-amber-700',
+    status === 'failed' && 'border-red-500/40 bg-red-500/10 text-red-700',
+    status === 'todo' && 'text-muted-foreground',
+    isCurrent && 'ring-2 ring-sky-500/20',
+    selected && 'ring-primary/35 ring-2'
+  )
+
+const getConnectorTone = (status: PipelineDisplayStatus) => {
+  if (status === 'done') return 'bg-emerald-500/35'
+  if (status === 'in_progress') return 'bg-sky-500/35'
+  if (status === 'in_review') return 'bg-amber-500/35'
+  if (status === 'failed') return 'bg-red-500/35'
+  return 'bg-border'
+}
+
 type NormalizedNode = WorkflowGraphNode & {
   left: number
   top: number
@@ -76,9 +109,12 @@ function buildEdgePath(source: NormalizedNode, target: NormalizedNode) {
 export function WorkflowCard({
   t,
   graph,
+  summary,
+  expanded,
   currentTaskNode,
   selectedNodeId,
   onSelectNode,
+  onToggleExpanded,
   onApproveCurrent
 }: WorkflowCardProps) {
   const layout = useMemo(() => {
@@ -108,17 +144,97 @@ export function WorkflowCard({
     [layout.nodes]
   )
 
+  const compactNodes = useMemo(
+    () => [...graph.nodes].sort((a, b) => a.node_order - b.node_order),
+    [graph.nodes]
+  )
+
   return (
     <section className="border-border/50 bg-background/95 overflow-hidden rounded-xl border shadow-sm">
-      <div className="border-border/50 flex items-center gap-2 border-b px-3 py-2">
-        <ListChecks className="text-muted-foreground size-3.5" />
-        <span className="text-muted-foreground text-xs font-semibold">
-          {t.task.workflowCardTitle || 'Workflow'}
-        </span>
+      <div className="border-border/50 flex items-center justify-between gap-3 border-b px-3 py-2">
+        <div className="flex items-center gap-2">
+          <ListChecks className="text-muted-foreground size-3.5" />
+          <span className="text-muted-foreground text-xs font-semibold">
+            {t.task.workflowCardTitle || 'Workflow'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {currentTaskNode?.status === 'in_review' && (
+            <Button size="sm" className="h-8 gap-1.5 px-3 text-xs" onClick={onApproveCurrent}>
+              <PlayCircle className="size-3.5" />
+              {t.task.confirmComplete || 'Confirm complete'}
+            </Button>
+          )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground h-8 gap-1.5 px-2.5 text-xs"
+            onClick={onToggleExpanded}
+          >
+            {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            {expanded
+              ? t.task.workflowCardCollapse || 'Collapse'
+              : t.task.workflowCardExpand || 'Expand'}
+          </Button>
+        </div>
       </div>
 
-      <div className="space-y-2 px-3 py-2">
-        {layout.nodes.length > 0 && (
+      <div className="space-y-3 px-3 py-3">
+        {summary && summary.total > 0 ? (
+          <div className="from-background via-muted/10 to-background min-w-0 rounded-2xl border border-border/60 bg-linear-to-r px-3 py-3">
+            <div className="-mx-1 -my-1 flex items-center overflow-x-auto overflow-y-visible px-1 py-1.5">
+              {compactNodes.map((node, index) => {
+                const isSelected = selectedNodeId === node.id
+
+                return (
+                  <div key={node.id} className="flex items-center">
+                    {index > 0 && (
+                      <div
+                        className={cn(
+                          'mx-1 h-px w-6 shrink-0 sm:w-8',
+                          getConnectorTone(compactNodes[index - 1]!.status)
+                        )}
+                      />
+                    )}
+
+                    <button
+                      type="button"
+                      title={node.name}
+                      className={getCompactNodeTone(node.status, node.isCurrent, isSelected)}
+                      onClick={() => onSelectNode?.(node.id)}
+                    >
+                      <div className="shrink-0">{getStatusIcon(node.status)}</div>
+                      <span className="max-w-[132px] truncate text-xs font-medium">{node.name}</span>
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-muted-foreground rounded-xl border border-dashed border-border/60 px-3 py-6 text-center text-sm">
+              {t.task.workflowCardEmpty || 'Workflow nodes will appear here once the task loads.'}
+            </div>
+
+            {currentTaskNode?.status === 'in_review' && (
+              <div className="border-amber-500/30 bg-amber-50/40 flex items-center gap-2 rounded-xl border px-3 py-2">
+                <PlayCircle className="size-4 text-amber-700" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-amber-700">
+                    {t.task.taskNodeReviewTitle || 'Task node review'}
+                  </p>
+                  <p className="text-muted-foreground truncate text-xs">{currentTaskNode.name}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {expanded && layout.nodes.length > 0 && (
           <div className="from-background via-background/96 to-muted/35 overflow-auto rounded-xl border border-border/50 bg-linear-to-br">
             <div
               className="relative min-h-[220px]"
@@ -203,28 +319,6 @@ export function WorkflowCard({
                   </button>
                 )
               })}
-            </div>
-          </div>
-        )}
-
-        {layout.nodes.length === 0 && (
-          <div className="text-muted-foreground rounded-xl border border-dashed border-border/60 px-3 py-6 text-center text-sm">
-            {t.task.workflowCardEmpty || 'Workflow nodes will appear here once the task loads.'}
-          </div>
-        )}
-
-        {currentTaskNode?.status === 'in_review' && (
-          <div className="border-amber-500/30 bg-amber-50/30 rounded-md border px-2 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-amber-700">
-                  {t.task.taskNodeReviewTitle || 'Task node review'}
-                </p>
-                <p className="text-muted-foreground truncate text-xs">{currentTaskNode.name}</p>
-              </div>
-              <Button size="sm" className="h-7 px-2 text-xs" onClick={onApproveCurrent}>
-                {t.task.confirmComplete || 'Confirm complete'}
-              </Button>
             </div>
           </div>
         )}

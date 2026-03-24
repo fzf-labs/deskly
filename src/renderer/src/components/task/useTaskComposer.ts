@@ -329,8 +329,8 @@ export function useTaskComposer({
           baseBranch: isGitProject ? selectedBaseBranch || undefined : undefined,
           worktreeBranchPrefix,
           worktreeRootPath,
-          cliToolId: taskMode === 'conversation' ? resolvedCliToolId : undefined,
-          agentToolConfigId: taskMode === 'conversation' ? resolvedCliConfigId : undefined,
+          cliToolId: resolvedCliToolId || undefined,
+          agentToolConfigId: resolvedCliConfigId || undefined,
           workflowDefinitionId: taskMode === 'workflow' ? selectedTemplateId : undefined
         })
 

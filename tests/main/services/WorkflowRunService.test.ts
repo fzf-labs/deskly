@@ -3,6 +3,65 @@ import { describe, expect, it, vi } from 'vitest'
 import { WorkflowRunService } from '../../../src/main/services/WorkflowRunService'
 
 describe('WorkflowRunService', () => {
+  it('allows conversation runtime snapshots to omit a template prompt', () => {
+    const createRunNodes = vi.fn(() => [])
+
+    const service = new WorkflowRunService(
+      {
+        getTask: vi.fn(() => ({
+          id: 'task-1',
+          prompt: 'Task level prompt'
+        }))
+      } as never,
+      {
+        getDefinition: vi.fn()
+      } as never,
+      {
+        getRunByTask: vi.fn(() => null),
+        createRun: vi.fn((input) => ({
+          id: 'run-1',
+          ...input,
+          created_at: '2026-03-22T00:00:00.000Z',
+          updated_at: '2026-03-22T00:00:00.000Z'
+        }))
+      } as never,
+      {
+        createRunNodes
+      } as never,
+      {} as never
+    )
+
+    expect(() =>
+      service.createRunForTask({
+        taskId: 'task-1',
+        definition: {
+          version: 1,
+          nodes: [
+            {
+              id: 'node-conversation',
+              key: 'conversation',
+              type: 'agent',
+              name: 'Conversation',
+              prompt: '',
+              requiresApprovalAfterRun: false
+            }
+          ],
+          edges: []
+        }
+      })
+    ).not.toThrow()
+
+    expect(createRunNodes).toHaveBeenCalledWith(
+      'run-1',
+      expect.arrayContaining([
+        expect.objectContaining({
+          definition_node_id: 'node-conversation',
+          prompt: 'Task level prompt'
+        })
+      ])
+    )
+  })
+
   it('composes task prompt into run node prompts when creating a run', () => {
     const createRunNodes = vi.fn(() => [])
 

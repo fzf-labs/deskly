@@ -42,6 +42,29 @@ const createTaskServiceDeps = () => {
       task_mode: 'workflow'
     })
   )
+  const getWorkflowDefinition = vi.fn(() => ({
+    id: 'definition-1',
+    scope: 'project',
+    project_id: 'project-1',
+    name: 'Workflow',
+    description: null,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    definition: {
+      version: 1,
+      nodes: [
+        {
+          id: 'node-1',
+          key: 'analyze',
+          type: 'agent' as const,
+          name: 'Analyze',
+          prompt: 'Inspect the task',
+          requiresApprovalAfterRun: false
+        }
+      ],
+      edges: []
+    }
+  }))
   const createWorkflowRunForTask = vi.fn((input) => ({
     id: 'run-1',
     task_id: input.taskId,
@@ -56,6 +79,7 @@ const createTaskServiceDeps = () => {
   }))
 
   const db = {
+    getWorkflowDefinition,
     getDefaultAgentToolConfig: vi.fn(() => ({ id: 'cfg-default' })),
     createTask,
     getTask,
@@ -97,7 +121,17 @@ describe('TaskService workflow runtime fallback', () => {
     expect(db.createTask).toHaveBeenCalledTimes(1)
     expect(createWorkflowRunForTask).toHaveBeenCalledWith({
       taskId: expect.any(String),
-      workflowDefinitionId: 'definition-1'
+      workflowDefinitionId: 'definition-1',
+      definition: expect.objectContaining({
+        version: 1,
+        nodes: [
+          expect.objectContaining({
+            key: 'analyze',
+            cliToolId: 'codex',
+            agentToolConfigId: 'cfg-default'
+          })
+        ]
+      })
     })
   })
 

@@ -102,6 +102,17 @@ export type WorkflowGraph = {
   edges: WorkflowGraphEdge[]
 }
 
+export type WorkflowSummary = {
+  total: number
+  completed: number
+  pending: number
+  inProgress: number
+  inReview: number
+  failed: number
+  currentNodeName: string | null
+  currentNodeStatus: PipelineDisplayStatus | null
+}
+
 export type CurrentNodeRuntime = {
   taskNodeId: string | null
   sessionId: string | null

@@ -72,7 +72,7 @@ export class WorkflowRunService {
         throw new Error(`Workflow definition not found: ${input.workflowDefinitionId}`)
       }
       workflowDefinitionId = storedDefinition.id
-      definition = storedDefinition.definition
+      definition = input.definition ?? storedDefinition.definition
     } else if (input.definition) {
       definition = input.definition
     }
@@ -81,7 +81,9 @@ export class WorkflowRunService {
       throw new Error('Workflow definition snapshot is required')
     }
 
-    validateWorkflowDefinitionDocument(definition)
+    validateWorkflowDefinitionDocument(definition, {
+      allowEmptyPromptForKeys: ['conversation']
+    })
 
     const run = this.runRepo.createRun({
       task_id: input.taskId,
