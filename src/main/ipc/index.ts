@@ -13,7 +13,6 @@ import { registerCliSessionIpc } from './cli-session.ipc'
 import { registerCliToolsIpc } from './agent-cli-tools.ipc'
 import { registerSystemCliToolsIpc } from './system-cli-tools.ipc'
 import { registerEditorIpc } from './editor.ipc'
-import { registerPipelineIpc } from './pipeline.ipc'
 import { registerPreviewConfigIpc } from './preview-config.ipc'
 import { registerPreviewIpc } from './preview.ipc'
 import { registerNotificationIpc } from './notification.ipc'
@@ -116,7 +115,6 @@ export const registerIpcHandlers = (deps: IpcDependencies): void => {
   registerCliToolsIpc(context)
   registerSystemCliToolsIpc(context)
   registerEditorIpc(context)
-  registerPipelineIpc(context)
   registerPreviewConfigIpc(context)
   registerPreviewIpc(context)
   registerNotificationIpc(context)

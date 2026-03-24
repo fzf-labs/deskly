@@ -11,7 +11,7 @@ describe('TaskService workflow runtime', () => {
         version: 1
         nodes: Array<{
           key: string
-          type: 'agent' | 'command'
+          type: 'agent'
           name: string
           prompt?: string | null
           cliToolId?: string | null

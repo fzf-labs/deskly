@@ -22,7 +22,6 @@ import {
   Save,
   Sparkles,
   Settings2,
-  TerminalSquare,
   Trash2,
   ScanSearch
 } from 'lucide-react'
@@ -50,10 +49,9 @@ import { useLanguage } from '@/providers/language-provider'
 export interface TaskNodeTemplateDraft {
   id: string
   key: string
-  type: 'agent' | 'command'
+  type: 'agent'
   name: string
   prompt: string
-  command: string
   cliToolId: string
   agentToolConfigId: string
   requiresApproval: boolean
@@ -109,7 +107,7 @@ const EDITOR_SELECT_TRIGGER_CLASS = 'rounded-[6px]'
 type WorkflowEditorNodeData = {
   title: string
   subtitle: string
-  nodeType: 'agent' | 'command'
+  nodeType: 'agent'
   indexLabel: string
   inboundCount: number
   outboundCount: number
@@ -146,7 +144,6 @@ const createDefaultNode = (index: number): TaskNodeTemplateDraft => ({
   type: 'agent',
   name: '',
   prompt: '',
-  command: '',
   cliToolId: '',
   agentToolConfigId: '',
   requiresApproval: index === 0,
@@ -206,7 +203,6 @@ const serializeDrafts = (values: WorkflowTemplateFormValues) =>
       type: node.type,
       name: node.name.trim(),
       prompt: node.prompt.trim(),
-      command: node.command.trim(),
       cliToolId: node.cliToolId || '',
       agentToolConfigId: node.agentToolConfigId || '',
       requiresApproval: Boolean(node.requiresApproval),
@@ -460,8 +456,6 @@ const WorkflowEditorNodeCard = memo(function WorkflowEditorNodeCard({
   selected,
   dragging
 }: NodeProps<WorkflowEditorNode>) {
-  const TypeIcon = data.nodeType === 'command' ? TerminalSquare : Bot
-
   return (
     <div
       className={cn(
@@ -492,11 +486,11 @@ const WorkflowEditorNodeCard = memo(function WorkflowEditorNodeCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-[6px] border border-slate-200/80 bg-slate-50 text-slate-700">
-            <TypeIcon className="size-[18px]" />
+            <Bot className="size-[18px]" />
           </div>
           <div className="min-w-0">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              {data.nodeType === 'agent' ? '智能体节点' : '命令节点'}
+              智能体节点
             </div>
             <div className="mt-1 truncate text-sm font-semibold text-slate-900">{data.title}</div>
           </div>
@@ -603,10 +597,7 @@ const buildEditorGraph = (
       position: normalizeDraftPosition(node.position, index),
       data: {
         title: node.name.trim() || `${workflowNodeLabel} ${index + 1}`,
-        subtitle:
-          node.type === 'agent'
-            ? node.prompt.trim() || '添加智能体提示词'
-            : node.command.trim() || '添加要执行的命令',
+        subtitle: node.prompt.trim() || '添加智能体提示词',
         nodeType: node.type,
         indexLabel: `${index + 1}`,
         inboundCount: node.dependsOnIds.length,
@@ -662,7 +653,6 @@ const mapGeneratedDefinitionToDrafts = (
       type: node.type,
       name: node.name,
       prompt: node.prompt ?? '',
-      command: node.command ?? '',
       cliToolId: node.cliToolId ?? '',
       agentToolConfigId: node.agentToolConfigId ?? '',
       requiresApproval: Boolean(node.requiresApprovalAfterRun),
@@ -1058,7 +1048,7 @@ export function WorkflowTemplateEditor({
   )
 
   useEffect(() => {
-    if (!active || !selectedNode || selectedNode.type !== 'agent') {
+    if (!active || !selectedNode) {
       return
     }
 
@@ -1094,12 +1084,7 @@ export function WorkflowTemplateEditor({
   }, [active, cliTools, selectedNode, updateNode])
 
   useEffect(() => {
-    if (
-      !active ||
-      !selectedNode ||
-      selectedNode.type !== 'agent' ||
-      !selectedNode.cliToolId
-    ) {
+    if (!active || !selectedNode || !selectedNode.cliToolId) {
       return
     }
 
@@ -1364,9 +1349,8 @@ export function WorkflowTemplateEditor({
         name: trimmedName || `${t.task.workflowNodeLabel} ${index + 1}`,
         key: node.key.trim() || generatedKey || `workflow-node-${index + 1}`,
         prompt: node.prompt.trim(),
-        command: node.command.trim(),
-        cliToolId: node.type === 'agent' ? node.cliToolId : '',
-        agentToolConfigId: node.type === 'agent' ? node.agentToolConfigId : '',
+        cliToolId: node.cliToolId,
+        agentToolConfigId: node.agentToolConfigId,
         dependsOnIds: Array.from(
           new Set((node.dependsOnIds ?? []).filter((dependencyId) => dependencyId !== node.id))
         ),
@@ -1379,12 +1363,9 @@ export function WorkflowTemplateEditor({
       return
     }
 
-    const invalidNode = nodes.find(
-      (node) =>
-        (node.type === 'agent' && !node.prompt) || (node.type === 'command' && !node.command)
-    )
+    const invalidNode = nodes.find((node) => !node.prompt)
     if (invalidNode) {
-      setError(t.task.workflowNodeContentRequired || '每个工作流节点都需要填写提示词或命令内容。')
+      setError(t.task.workflowNodeContentRequired || '每个工作流节点都需要填写提示词。')
       return
     }
 
@@ -1714,9 +1695,7 @@ export function WorkflowTemplateEditor({
                       {selectedNode.name.trim() ||
                         `${t.task.workflowNodeLabel} ${selectedNodeIndex + 1}`}
                     </div>
-                    <div className={EDITOR_BADGE_CLASS}>
-                      {selectedNode.type === 'agent' ? '智能体节点' : '命令节点'}
-                    </div>
+                    <div className={EDITOR_BADGE_CLASS}>智能体节点</div>
                   </>
                 ) : (
                   <div className={EDITOR_BADGE_CLASS}>未选择内容</div>
@@ -1848,9 +1827,7 @@ export function WorkflowTemplateEditor({
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 px-4 py-4 text-[11px] text-slate-500">
-                        <span className={EDITOR_BADGE_CLASS}>
-                          {selectedNode.type === 'agent' ? '智能体节点' : '命令节点'}
-                        </span>
+                        <span className={EDITOR_BADGE_CLASS}>智能体节点</span>
                         <span className={EDITOR_BADGE_CLASS}>
                           位置 {Math.round(selectedNode.position.x)},{' '}
                           {Math.round(selectedNode.position.y)}
@@ -1891,152 +1868,102 @@ export function WorkflowTemplateEditor({
                         </div>
 
                         <div>
-                          <label className="text-sm font-medium">{'节点类型'}</label>
-                          <div className="mt-1.5">
-                            <Select
-                              value={selectedNode.type}
-                              triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
-                              onValueChange={(value) => {
-                                updateNode(selectedNode.id, (current) => ({
-                                  ...current,
-                                  type: value as 'agent' | 'command',
-                                  cliToolId: value === 'agent' ? current.cliToolId : '',
-                                  agentToolConfigId:
-                                    value === 'agent' ? current.agentToolConfigId : ''
-                                }))
-                              }}
-                              options={[
-                                {
-                                  value: 'agent',
-                                  label: t.task.workflowNodeTypeAgent || '智能体'
-                                },
-                                {
-                                  value: 'command',
-                                  label: t.task.workflowNodeTypeCommand || '命令'
-                                }
-                              ]}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
                           <div className="flex items-center justify-between gap-3">
                             <label className="text-sm font-medium">
-                              {selectedNode.type === 'agent'
-                                ? t.task.workflowNodePromptLabel || '提示词'
-                                : t.task.workflowNodeCommandLabel || '命令'}
+                              {t.task.workflowNodePromptLabel || '提示词'}
                             </label>
-                            {selectedNode.type === 'agent' ? (
-                              <PromptOptimizeButton
-                                prompt={selectedNode.prompt}
-                                contextType="workflow-node"
-                                name={selectedNode.name || templateName || null}
-                                toolId={selectedNode.cliToolId || null}
-                                agentToolConfigId={selectedNode.agentToolConfigId || null}
-                                onApply={(optimizedPrompt) => {
-                                  updateNode(selectedNode.id, (current) =>
-                                    current.type === 'agent'
-                                      ? { ...current, prompt: optimizedPrompt }
-                                      : current
-                                  )
-                                  setError(null)
-                                }}
-                                onError={(message) => setError(message)}
-                              />
-                            ) : null}
+                            <PromptOptimizeButton
+                              prompt={selectedNode.prompt}
+                              contextType="workflow-node"
+                              name={selectedNode.name || templateName || null}
+                              toolId={selectedNode.cliToolId || null}
+                              agentToolConfigId={selectedNode.agentToolConfigId || null}
+                              onApply={(optimizedPrompt) => {
+                                updateNode(selectedNode.id, (current) => ({
+                                  ...current,
+                                  prompt: optimizedPrompt
+                                }))
+                                setError(null)
+                              }}
+                              onError={(message) => setError(message)}
+                            />
                           </div>
                           <textarea
-                            value={
-                              selectedNode.type === 'agent'
-                                ? selectedNode.prompt
-                                : selectedNode.command
-                            }
+                            value={selectedNode.prompt}
                             onChange={(event) => {
                               const value = event.target.value
-                              updateNode(selectedNode.id, (current) =>
-                                current.type === 'agent'
-                                  ? { ...current, prompt: value }
-                                  : { ...current, command: value }
-                              )
+                              updateNode(selectedNode.id, (current) => ({ ...current, prompt: value }))
                             }}
-                            placeholder={
-                              selectedNode.type === 'agent'
-                                ? t.task.createStagePromptPlaceholder
-                                : t.task.workflowNodeCommandPlaceholder || '要执行的命令'
-                            }
+                            placeholder={t.task.createStagePromptPlaceholder}
                             className={cn(EDITOR_TEXTAREA_CLASS, 'min-h-[136px]')}
                           />
                         </div>
                       </div>
                     </section>
 
-                    {selectedNode.type === 'agent' && (
-                      <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
-                        <div className="border-b border-slate-200/70 px-4 py-3">
-                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            运行
+                    <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
+                      <div className="border-b border-slate-200/70 px-4 py-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          运行
+                        </div>
+                      </div>
+                      <div className="grid gap-4 px-4 py-4">
+                        <div>
+                          <label className="text-sm font-medium">{t.task.createCliLabel}</label>
+                          <div className="mt-1.5">
+                            <Select
+                              value={selectedNode.cliToolId || ''}
+                              triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
+                              onValueChange={async (toolId) => {
+                                const defaultConfigId = toolId
+                                  ? await resolveDefaultCliConfigId(toolId)
+                                  : ''
+
+                                updateNode(selectedNode.id, (current) => ({
+                                  ...current,
+                                  cliToolId: toolId,
+                                  agentToolConfigId: defaultConfigId
+                                }))
+                              }}
+                              placeholder={t.task.createStageCliInherit}
+                              options={cliTools.map((tool) => ({
+                                value: tool.id,
+                                label: tool.displayName || tool.name || tool.id
+                              }))}
+                            />
                           </div>
                         </div>
-                        <div className="grid gap-4 px-4 py-4">
-                          <div>
-                            <label className="text-sm font-medium">{t.task.createCliLabel}</label>
-                            <div className="mt-1.5">
-                              <Select
-                                value={selectedNode.cliToolId || ''}
-                                triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
-                                onValueChange={async (toolId) => {
-                                  const defaultConfigId = toolId
-                                    ? await resolveDefaultCliConfigId(toolId)
-                                    : ''
 
-                                  updateNode(selectedNode.id, (current) => ({
-                                    ...current,
-                                    cliToolId: toolId,
-                                    agentToolConfigId: defaultConfigId
-                                  }))
-                                }}
-                                placeholder={t.task.createStageCliInherit}
-                                options={cliTools.map((tool) => ({
-                                  value: tool.id,
-                                  label: tool.displayName || tool.name || tool.id
-                                }))}
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="text-sm font-medium">
-                              {t.task.createCliConfigLabel}
-                            </label>
-                            <div className="mt-1.5">
-                              <Select
-                                value={selectedNode.agentToolConfigId || ''}
-                                triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
-                                disabled={!selectedNode.cliToolId}
-                                onValueChange={(configId) => {
-                                  updateNode(selectedNode.id, (current) => ({
-                                    ...current,
-                                    agentToolConfigId: configId
-                                  }))
-                                }}
-                                placeholder={
-                                  !selectedNode.cliToolId
-                                    ? t.task.createCliConfigSelectTool
-                                    : t.task.createStageConfigInherit
-                                }
-                                options={(selectedNode.cliToolId
-                                  ? cliConfigsByTool[selectedNode.cliToolId] || []
-                                  : []
-                                ).map((config) => ({
-                                  value: config.id,
-                                  label: config.name
-                                }))}
-                              />
-                            </div>
+                        <div>
+                          <label className="text-sm font-medium">{t.task.createCliConfigLabel}</label>
+                          <div className="mt-1.5">
+                            <Select
+                              value={selectedNode.agentToolConfigId || ''}
+                              triggerClassName={EDITOR_SELECT_TRIGGER_CLASS}
+                              disabled={!selectedNode.cliToolId}
+                              onValueChange={(configId) => {
+                                updateNode(selectedNode.id, (current) => ({
+                                  ...current,
+                                  agentToolConfigId: configId
+                                }))
+                              }}
+                              placeholder={
+                                !selectedNode.cliToolId
+                                  ? t.task.createCliConfigSelectTool
+                                  : t.task.createStageConfigInherit
+                              }
+                              options={(selectedNode.cliToolId
+                                ? cliConfigsByTool[selectedNode.cliToolId] || []
+                                : []
+                              ).map((config) => ({
+                                value: config.id,
+                                label: config.name
+                              }))}
+                            />
                           </div>
                         </div>
-                      </section>
-                    )}
+                      </div>
+                    </section>
 
                     <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                       <div className="border-b border-slate-200/70 px-4 py-3">

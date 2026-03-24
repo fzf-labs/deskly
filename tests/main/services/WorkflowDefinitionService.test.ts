@@ -19,7 +19,6 @@ const buildDefinition = () => ({
       type: 'agent' as const,
       name: 'Analyze',
       prompt: 'Inspect the task',
-      command: null,
       cliToolId: null,
       agentToolConfigId: null,
       requiresApprovalAfterRun: false,

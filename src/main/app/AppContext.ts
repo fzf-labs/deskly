@@ -7,7 +7,6 @@ import type { AgentCLIToolDetectorService } from '../services/AgentCLIToolDetect
 import type { AgentCLIToolConfigService } from '../services/AgentCLIToolConfigService'
 import type { SystemCliToolService } from '../services/SystemCliToolService'
 import type { EditorService } from '../services/EditorService'
-import type { PipelineService } from '../services/PipelineService'
 import type { PreviewConfigService } from '../services/PreviewConfigService'
 import type { PreviewService } from '../services/PreviewService'
 import type { NotificationService } from '../services/NotificationService'
@@ -33,7 +32,6 @@ export interface AppServices {
   cliToolConfigService: AgentCLIToolConfigService
   systemCliToolService: SystemCliToolService
   editorService: EditorService
-  pipelineService: PipelineService
   previewConfigService: PreviewConfigService
   previewService: PreviewService
   notificationService: NotificationService

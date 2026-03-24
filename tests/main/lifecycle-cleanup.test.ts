@@ -1,41 +1,10 @@
 import { EventEmitter } from 'events'
 import { describe, expect, it, vi } from 'vitest'
-import { PipelineService } from '../../src/main/services/PipelineService'
 import { PreviewService } from '../../src/main/services/PreviewService'
 import { registerCliSessionIpc } from '../../src/main/ipc/cli-session.ipc'
 import { v } from '../../src/main/utils/ipc-response'
 import { AppContext } from '../../src/main/app/AppContext'
 import { IPC_CHANNELS } from '../../src/main/ipc/channels'
-
-describe('pipeline cancellation', () => {
-  it('terminates running stage processes on cancel', () => {
-    const service = new PipelineService()
-    const kill = vi.fn()
-
-    const execution = {
-      id: 'exec-1',
-      pipelineId: 'pipe-1',
-      status: 'running',
-      stageExecutions: [
-        {
-          id: 'stage-1',
-          stageId: 'stage',
-          status: 'running',
-          process: { kill } as any
-        }
-      ],
-      startedAt: new Date()
-    }
-
-    ;(service as any).executions.set('exec-1', execution)
-
-    service.cancelExecution('exec-1')
-
-    expect(execution.status).toBe('cancelled')
-    expect(execution.stageExecutions[0].status).toBe('failed')
-    expect(kill).toHaveBeenCalledWith('SIGTERM')
-  })
-})
 
 describe('preview stop behavior', () => {
   it('waits for exit and escalates to SIGKILL after timeout', async () => {

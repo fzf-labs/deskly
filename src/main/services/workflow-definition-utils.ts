@@ -14,7 +14,6 @@ export const buildConversationWorkflowDefinition = (input?: {
       type: 'agent',
       name: input?.name?.trim() || 'Conversation',
       prompt: null,
-      command: null,
       cliToolId: input?.cliToolId ?? null,
       agentToolConfigId: input?.agentToolConfigId ?? null,
       requiresApprovalAfterRun: false,

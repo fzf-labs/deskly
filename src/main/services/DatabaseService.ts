@@ -818,7 +818,7 @@ export class DatabaseService {
       task_id: taskId,
       node_order: orderMap.get(node.definition_node_id) ?? Number.MAX_SAFE_INTEGER,
       name: node.name,
-      prompt: node.prompt ?? node.command ?? '',
+      prompt: node.prompt ?? '',
       cli_tool_id: node.cli_tool_id,
       agent_tool_config_id: node.agent_tool_config_id,
       requires_approval: node.requires_approval_after_run ? 1 : 0,

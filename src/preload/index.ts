@@ -263,15 +263,6 @@ const api = {
     openProject: (projectPath: string, editorCommand: string) =>
       invoke(IPC_CHANNELS.editor.openProject, projectPath, editorCommand)
   },
-  pipeline: {
-    execute: (pipelineId: string, stages: unknown[], workingDirectory?: string) =>
-      invoke(IPC_CHANNELS.pipeline.execute, pipelineId, stages, workingDirectory),
-    getExecution: (executionId: string) => invoke(IPC_CHANNELS.pipeline.getExecution, executionId),
-    getAllExecutions: () => invoke(IPC_CHANNELS.pipeline.getAllExecutions),
-    approveStage: (stageExecutionId: string, approvedBy: string) =>
-      invoke(IPC_CHANNELS.pipeline.approveStage, stageExecutionId, approvedBy),
-    cancel: (executionId: string) => invoke(IPC_CHANNELS.pipeline.cancel, executionId)
-  },
   previewConfig: {
     getAll: () => invoke(IPC_CHANNELS.previewConfig.getAll),
     getByProject: (projectId: string) => invoke(IPC_CHANNELS.previewConfig.getByProject, projectId),

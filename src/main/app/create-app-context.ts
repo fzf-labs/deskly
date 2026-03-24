@@ -6,7 +6,6 @@ import { AgentCLIToolDetectorService } from '../services/AgentCLIToolDetectorSer
 import { AgentCLIToolConfigService } from '../services/AgentCLIToolConfigService'
 import { SystemCliToolService } from '../services/SystemCliToolService'
 import { EditorService } from '../services/EditorService'
-import { PipelineService } from '../services/PipelineService'
 import { PreviewConfigService } from '../services/PreviewConfigService'
 import { PreviewService } from '../services/PreviewService'
 import { NotificationService } from '../services/NotificationService'
@@ -50,7 +49,6 @@ export const createAppContext = (): AppContext => {
   databaseService.setWorkflowSchedulerService(workflowSchedulerService)
   const terminalService = new TerminalService()
   const editorService = new EditorService()
-  const pipelineService = new PipelineService()
   const previewConfigService = new PreviewConfigService()
   const previewService = new PreviewService()
   const notificationService = new NotificationService()
@@ -70,7 +68,6 @@ export const createAppContext = (): AppContext => {
     cliToolConfigService,
     systemCliToolService,
     editorService,
-    pipelineService,
     previewConfigService,
     previewService,
     notificationService,
@@ -94,7 +91,6 @@ export const createAppContext = (): AppContext => {
     systemCliToolService,
     cliSessionService,
     editorService,
-    pipelineService,
     previewConfigService,
     previewService,
     notificationService,

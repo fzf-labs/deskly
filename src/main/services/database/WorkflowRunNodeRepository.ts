@@ -28,7 +28,6 @@ export class WorkflowRunNodeRepository {
           name,
           node_type,
           prompt,
-          command,
           cli_tool_id,
           agent_tool_config_id,
           requires_approval_after_run,
@@ -46,7 +45,7 @@ export class WorkflowRunNodeRepository {
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
 
@@ -60,7 +59,6 @@ export class WorkflowRunNodeRepository {
           node.name,
           node.node_type,
           node.prompt ?? null,
-          node.command ?? null,
           node.cli_tool_id ?? null,
           node.agent_tool_config_id ?? null,
           node.requires_approval_after_run ? 1 : 0,
@@ -400,7 +398,6 @@ export class WorkflowRunNodeRepository {
       name: row.name,
       node_type: row.node_type,
       prompt: row.prompt,
-      command: row.command,
       cli_tool_id: row.cli_tool_id,
       agent_tool_config_id: row.agent_tool_config_id,
       requires_approval_after_run: Boolean(row.requires_approval_after_run),

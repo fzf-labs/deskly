@@ -97,13 +97,6 @@ export const IPC_CHANNELS = {
     getAvailable: 'editor:getAvailable',
     openProject: 'editor:openProject'
   },
-  pipeline: {
-    execute: 'pipeline:execute',
-    getExecution: 'pipeline:getExecution',
-    getAllExecutions: 'pipeline:getAllExecutions',
-    approveStage: 'pipeline:approveStage',
-    cancel: 'pipeline:cancel'
-  },
   previewConfig: {
     getAll: 'previewConfig:getAll',
     getByProject: 'previewConfig:getByProject',
@@ -376,12 +369,6 @@ export interface IpcContracts {
 
   'editor:getAvailable': IpcContract<[], unknown[]>
   'editor:openProject': IpcContract<[string, string], unknown>
-
-  'pipeline:execute': IpcContract<[string, UnknownRecord[], string?], { executionId: string }>
-  'pipeline:getExecution': IpcContract<[string], unknown>
-  'pipeline:getAllExecutions': IpcContract<[], unknown[]>
-  'pipeline:approveStage': IpcContract<[string, string], unknown>
-  'pipeline:cancel': IpcContract<[string], unknown>
 
   'previewConfig:getAll': IpcContract<[], unknown[]>
   'previewConfig:getByProject': IpcContract<[string], unknown[]>

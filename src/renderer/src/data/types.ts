@@ -111,7 +111,6 @@ export interface WorkflowRunNode {
   name: string
   node_type: WorkflowDefinitionNodeType
   prompt: string | null
-  command: string | null
   cli_tool_id: string | null
   agent_tool_config_id: string | null
   requires_approval_after_run: boolean
@@ -131,7 +130,7 @@ export interface WorkflowRunNode {
 }
 
 export type WorkflowDefinitionScope = 'global' | 'project'
-export type WorkflowDefinitionNodeType = 'agent' | 'command'
+export type WorkflowDefinitionNodeType = 'agent'
 
 export interface WorkflowDefinitionNodePosition {
   x: number
@@ -144,7 +143,6 @@ export interface WorkflowDefinitionNode {
   type: WorkflowDefinitionNodeType
   name: string
   prompt?: string | null
-  command?: string | null
   cliToolId?: string | null
   agentToolConfigId?: string | null
   requiresApprovalAfterRun: boolean

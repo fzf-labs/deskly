@@ -26,7 +26,7 @@ describe('workflow runtime schema', () => {
     connection.initTables()
 
     const userVersion = Number(db.pragma('user_version', { simple: true }) ?? 0)
-    expect(userVersion).toBe(10)
+    expect(userVersion).toBe(12)
 
     const taskNodesTable = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='task_nodes'")
@@ -54,6 +54,11 @@ describe('workflow runtime schema', () => {
       workflowRunsColumns.find((column) => column.name === 'workflow_definition_id')?.notnull
     ).toBe(0)
 
+    const workflowRunNodeColumns = db
+      .prepare("PRAGMA table_info(workflow_run_nodes)")
+      .all() as Array<{ name?: string }>
+    expect(workflowRunNodeColumns.some((column) => column.name === 'command')).toBe(false)
+
     const automationTable = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='automations'")
       .get() as { name?: string } | undefined
@@ -79,7 +84,7 @@ describe('workflow runtime schema', () => {
         "SELECT name FROM sqlite_master WHERE type='index' AND name='uniq_workflow_run_nodes_single_running'"
       )
       .get() as { name?: string } | undefined
-    expect(workflowRunNodeIndex?.name).toBe('uniq_workflow_run_nodes_single_running')
+    expect(workflowRunNodeIndex?.name).toBeUndefined()
 
     const now = new Date().toISOString()
     db.prepare(
@@ -96,7 +101,7 @@ describe('workflow runtime schema', () => {
       'task-1',
       JSON.stringify({
         version: 1,
-        nodes: [{ id: 'def-node-1', key: 'conversation', type: 'agent', name: 'Conversation', prompt: null, command: null, cliToolId: null, agentToolConfigId: null, requiresApprovalAfterRun: false, position: null }],
+        nodes: [{ id: 'def-node-1', key: 'conversation', type: 'agent', name: 'Conversation', prompt: null, cliToolId: null, agentToolConfigId: null, requiresApprovalAfterRun: false, position: null }],
         edges: []
       }),
       now,
@@ -120,11 +125,11 @@ describe('workflow runtime schema', () => {
 
     db.prepare(
       `INSERT INTO workflow_run_nodes (
-         id, workflow_run_id, definition_node_id, node_key, name, node_type, prompt, command,
+         id, workflow_run_id, definition_node_id, node_key, name, node_type, prompt,
          cli_tool_id, agent_tool_config_id, requires_approval_after_run, status, failure_reason,
          session_id, resume_session_id, result_summary, error_message, cost, duration, attempt_count,
          started_at, completed_at, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?, NULL, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?, NULL, ?, ?)`
     ).run(
       'node-1',
       'run-1',
@@ -134,6 +139,28 @@ describe('workflow runtime schema', () => {
       'agent',
       'prompt',
       null,
+      null,
+      0,
+      now,
+      now,
+      now
+    )
+
+    db.prepare(
+      `INSERT INTO workflow_run_nodes (
+         id, workflow_run_id, definition_node_id, node_key, name, node_type, prompt,
+         cli_tool_id, agent_tool_config_id, requires_approval_after_run, status, failure_reason,
+         session_id, resume_session_id, result_summary, error_message, cost, duration, attempt_count,
+         started_at, completed_at, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?, NULL, ?, ?)`
+    ).run(
+      'node-2',
+      'run-1',
+      'def-node-2',
+      'validation',
+      'Validation',
+      'agent',
+      'Summarize the validation result',
       null,
       null,
       0,
@@ -150,6 +177,50 @@ describe('workflow runtime schema', () => {
     ).run('automation-run-1', 'automation-1', now, now, 'task-1', 'node-1', now, now)
 
     connection.close()
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  it('drops the legacy single-running workflow node index during migration', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'deskly-task-nodes-migrate-'))
+    const dbPath = join(tempDir, 'test.db')
+
+    const seedConnection = new DatabaseConnection(dbPath)
+    let seedDb
+    try {
+      seedDb = seedConnection.open()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes('NODE_MODULE_VERSION')) {
+        rmSync(tempDir, { recursive: true, force: true })
+        return
+      }
+      throw error
+    }
+
+    seedConnection.initTables()
+    seedDb.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_workflow_run_nodes_single_running
+        ON workflow_run_nodes(workflow_run_id)
+        WHERE status = 'running';
+    `)
+    seedDb.pragma('user_version = 11')
+    seedConnection.close()
+
+    const migratedConnection = new DatabaseConnection(dbPath)
+    const migratedDb = migratedConnection.open()
+    migratedConnection.initTables()
+
+    const userVersion = Number(migratedDb.pragma('user_version', { simple: true }) ?? 0)
+    expect(userVersion).toBe(12)
+
+    const workflowRunNodeIndex = migratedDb
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name='uniq_workflow_run_nodes_single_running'"
+      )
+      .get() as { name?: string } | undefined
+    expect(workflowRunNodeIndex?.name).toBeUndefined()
+
+    migratedConnection.close()
     rmSync(tempDir, { recursive: true, force: true })
   })
 })

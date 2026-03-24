@@ -36,10 +36,9 @@ describe('WorkflowRunService', () => {
               {
                 id: 'node-b',
                 key: 'node-b',
-                type: 'command',
+                type: 'agent',
                 name: 'Stage B',
-                command: 'echo ok',
-                prompt: null,
+                prompt: 'Verify the result',
                 requiresApprovalAfterRun: false
               }
             ],
@@ -76,7 +75,7 @@ describe('WorkflowRunService', () => {
         }),
         expect.objectContaining({
           definition_node_id: 'node-b',
-          prompt: 'Task level prompt'
+          prompt: 'Task level prompt\n\nVerify the result'
         })
       ])
     )

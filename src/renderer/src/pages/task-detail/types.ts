@@ -86,7 +86,6 @@ export type WorkflowGraphNode = {
   type: WorkflowDefinitionNodeType
   name: string
   prompt: string
-  command?: string | null
   requiresApproval: boolean
   position: WorkflowDefinitionNodePosition
   isCurrent: boolean

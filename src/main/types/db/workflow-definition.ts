@@ -1,6 +1,6 @@
 export type WorkflowDefinitionScope = 'global' | 'project'
 
-export type WorkflowNodeType = 'agent' | 'command'
+export type WorkflowNodeType = 'agent'
 
 export interface WorkflowDefinitionNodePosition {
   x: number
@@ -13,7 +13,6 @@ export interface WorkflowDefinitionNode {
   type: WorkflowNodeType
   name: string
   prompt?: string | null
-  command?: string | null
   cliToolId?: string | null
   agentToolConfigId?: string | null
   requiresApprovalAfterRun: boolean

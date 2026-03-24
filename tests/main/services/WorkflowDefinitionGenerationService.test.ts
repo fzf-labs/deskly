@@ -15,7 +15,6 @@ const buildGeneratedWorkflowResult = () => ({
         type: 'agent',
         name: 'Analyze',
         prompt: 'Inspect the request',
-        command: null,
         cliToolId: null,
         agentToolConfigId: null,
         requiresApprovalAfterRun: false,
@@ -27,7 +26,6 @@ const buildGeneratedWorkflowResult = () => ({
         type: 'agent',
         name: 'Ship',
         prompt: 'Complete the work',
-        command: null,
         cliToolId: null,
         agentToolConfigId: null,
         requiresApprovalAfterRun: true,
@@ -68,7 +66,7 @@ describe('WorkflowDefinitionGenerationService', () => {
     )
   })
 
-  it('detects command nodes from command-like prompts', async () => {
+  it('keeps command-like instructions as agent prompts in rules mode', async () => {
     const service = new WorkflowDefinitionGenerationService()
 
     const result = await service.generateDefinition({
@@ -79,8 +77,8 @@ describe('WorkflowDefinitionGenerationService', () => {
     expect(result.definition.nodes).toHaveLength(3)
     expect(result.definition.nodes[1]).toEqual(
       expect.objectContaining({
-        type: 'command',
-        command: 'npm test'
+        type: 'agent',
+        prompt: 'run `npm test`'
       })
     )
   })
@@ -294,7 +292,6 @@ describe('workflow-generation-prompt schema', () => {
       'type',
       'name',
       'prompt',
-      'command',
       'cliToolId',
       'agentToolConfigId',
       'requiresApprovalAfterRun',

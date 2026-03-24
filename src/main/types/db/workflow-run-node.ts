@@ -12,7 +12,6 @@ export interface DbWorkflowRunNode {
   name: string
   node_type: WorkflowNodeType
   prompt: string | null
-  command: string | null
   cli_tool_id: string | null
   agent_tool_config_id: string | null
   requires_approval_after_run: number
@@ -38,7 +37,6 @@ export interface CreateWorkflowRunNodeInput {
   name: string
   node_type: WorkflowNodeType
   prompt?: string | null
-  command?: string | null
   cli_tool_id?: string | null
   agent_tool_config_id?: string | null
   requires_approval_after_run?: boolean

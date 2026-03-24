@@ -1712,7 +1712,11 @@ export function useTaskDetail({
     if (task?.task_mode !== 'workflow') return 'session' as const
     if (!executionTaskNodeId || !executionLogTaskNodeId) return 'session' as const
     return executionLogTaskNodeId === executionTaskNodeId ? ('session' as const) : ('file' as const)
-  }, [executionLogTaskNodeId, executionTaskNodeId, task?.task_mode])
+  }, [
+    executionLogTaskNodeId,
+    executionTaskNodeId,
+    task?.task_mode
+  ])
 
   const executionSessionId = useMemo(() => {
     if (task?.task_mode !== 'workflow') {
@@ -1779,6 +1783,24 @@ export function useTaskDetail({
     executionLogToolId,
     task?.task_mode,
     useCliSession
+  ])
+
+  const showExecutionLogPanel = useMemo(() => {
+    if (task?.task_mode !== 'workflow') {
+      return useCliSessionPanel
+    }
+
+    if (executionLogSource === 'file') {
+      return Boolean(executionLogTaskNodeId || executionTaskNodeId)
+    }
+
+    return useCliSessionPanel
+  }, [
+    executionLogSource,
+    executionLogTaskNodeId,
+    executionTaskNodeId,
+    task?.task_mode,
+    useCliSessionPanel
   ])
 
   const isTaskDone = task?.status === 'done'
@@ -2086,6 +2108,7 @@ export function useTaskDetail({
     isLoading,
     useCliSession,
     useCliSessionPanel,
+    showExecutionLogPanel,
     agentToolConfigId,
 
     // CLI Tools

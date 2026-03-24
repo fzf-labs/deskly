@@ -85,17 +85,17 @@ export class WorkflowDefinitionService {
       if (!node.key?.trim()) {
         throw new Error(`Workflow node key is required: ${node.id}`)
       }
+      if (node.type !== 'agent') {
+        throw new Error(`Unsupported workflow node type: ${node.id}`)
+      }
       if (nodeIds.has(node.id)) {
         throw new Error(`Duplicate workflow node id: ${node.id}`)
       }
       if (nodeKeys.has(node.key)) {
         throw new Error(`Duplicate workflow node key: ${node.key}`)
       }
-      if (node.type === 'agent' && !node.prompt?.trim()) {
+      if (!node.prompt?.trim()) {
         throw new Error(`Agent node requires prompt: ${node.id}`)
-      }
-      if (node.type === 'command' && !node.command?.trim()) {
-        throw new Error(`Command node requires command: ${node.id}`)
       }
 
       nodeIds.add(node.id)

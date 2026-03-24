@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { normalizeCliToolConfig } from '../../../shared/agent-cli-config-spec'
 
-const TARGET_SCHEMA_VERSION = 10
+const TARGET_SCHEMA_VERSION = 12
 
 export class DatabaseConnection {
   private dbPath: string
@@ -209,9 +209,8 @@ export class DatabaseConnection {
         definition_node_id TEXT NOT NULL,
         node_key TEXT NOT NULL,
         name TEXT NOT NULL,
-        node_type TEXT NOT NULL CHECK (node_type IN ('agent', 'command')),
+        node_type TEXT NOT NULL CHECK (node_type IN ('agent')),
         prompt TEXT,
-        command TEXT,
         cli_tool_id TEXT
           CHECK (cli_tool_id IS NULL OR cli_tool_id IN (
             'claude-code', 'cursor-agent', 'gemini-cli', 'codex', 'codex-cli', 'opencode'
@@ -321,9 +320,6 @@ export class DatabaseConnection {
           ON workflow_run_nodes(workflow_run_id, status, updated_at DESC);
         CREATE INDEX IF NOT EXISTS idx_workflow_run_nodes_session_id
           ON workflow_run_nodes(session_id);
-        CREATE UNIQUE INDEX IF NOT EXISTS uniq_workflow_run_nodes_single_running
-          ON workflow_run_nodes(workflow_run_id)
-          WHERE status = 'running';
       `)
     }
 
@@ -654,6 +650,47 @@ export class DatabaseConnection {
         migrateToV10()
         currentVersion = 10
         console.log('[DatabaseService] Migrated schema to v10')
+      } finally {
+        db.pragma('foreign_keys = ON')
+      }
+    }
+
+    if (currentVersion < 11) {
+      const migrateToV11 = db.transaction(() => {
+        db.exec(`
+          DROP INDEX IF EXISTS uniq_workflow_run_nodes_single_running;
+        `)
+
+        this.createRuntimeIndexes(db)
+        db.pragma('user_version = 11')
+      })
+
+      migrateToV11()
+      currentVersion = 11
+      console.log('[DatabaseService] Migrated schema to v11')
+    }
+
+    if (currentVersion < 12) {
+      db.pragma('foreign_keys = OFF')
+      const migrateToV12 = db.transaction(() => {
+        db.exec(`
+          DROP TABLE IF EXISTS workflow_run_reviews;
+          DROP TABLE IF EXISTS workflow_run_nodes;
+          DROP TABLE IF EXISTS workflow_runs;
+          DROP TABLE IF EXISTS automation_runs;
+        `)
+
+        this.createBaseTables(db)
+        this.createBaseIndexes(db)
+        this.createRuntimeTables(db)
+        this.createRuntimeIndexes(db)
+        db.pragma('user_version = 12')
+      })
+
+      try {
+        migrateToV12()
+        currentVersion = 12
+        console.log('[DatabaseService] Migrated schema to v12')
       } finally {
         db.pragma('foreign_keys = ON')
       }

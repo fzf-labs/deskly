@@ -208,14 +208,6 @@ interface EditorAPI {
   openProject: (projectPath: string, editorCommand: string) => Promise<unknown>
 }
 
-interface PipelineAPI {
-  execute: (pipelineId: string, stages: unknown[], workingDirectory?: string) => Promise<unknown>
-  getExecution: (executionId: string) => Promise<unknown>
-  getAllExecutions: () => Promise<unknown[]>
-  approveStage: (stageExecutionId: string, approvedBy: string) => Promise<unknown>
-  cancel: (executionId: string) => Promise<unknown>
-}
-
 interface PreviewConfigAPI {
   getAll: () => Promise<unknown[]>
   getByProject: (projectId: string) => Promise<unknown[]>
@@ -532,7 +524,6 @@ interface API {
   cliToolConfig: CLIToolConfigAPI
   systemCliTools: SystemCLIToolsAPI
   editor: EditorAPI
-  pipeline: PipelineAPI
   previewConfig: PreviewConfigAPI
   preview: PreviewAPI
   notification: NotificationAPI

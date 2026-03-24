@@ -19,9 +19,8 @@ import type {
 
 type DraftWorkflowStep = {
   name: string
-  type: 'agent' | 'command'
+  type: 'agent'
   prompt?: string | null
-  command?: string | null
   requiresApprovalAfterRun: boolean
 }
 
@@ -111,22 +110,6 @@ const guessNodeName = (step: string, index: number): string => {
   return cleaned.length > 48 ? `${cleaned.slice(0, 45).trimEnd()}...` : cleaned
 }
 
-const detectCommand = (step: string): string | null => {
-  const quotedCommand = step.match(/`([^`]+)`/)
-  if (quotedCommand?.[1]?.trim()) {
-    return quotedCommand[1].trim()
-  }
-
-  const explicitCommand = step.match(
-    /(?:^|\b)(?:run|execute|command|shell|执行|运行命令)\s*[:：]?\s+(.+)$/i
-  )
-  if (explicitCommand?.[1]?.trim()) {
-    return explicitCommand[1].trim()
-  }
-
-  return null
-}
-
 const shouldRequireReview = (step: string, index: number, total: number): boolean => {
   if (index === total - 1) {
     return true
@@ -142,14 +125,10 @@ const buildDraftSteps = (input: GenerateWorkflowDefinitionInput): DraftWorkflowS
   }
 
   return extractedSteps.map((step, index) => {
-    const command = detectCommand(step)
-    const type = command ? 'command' : 'agent'
-
     return {
       name: guessNodeName(step, index),
-      type,
-      prompt: type === 'agent' ? step : `Complete this step: ${step}`,
-      command: type === 'command' ? command : null,
+      type: 'agent',
+      prompt: step,
       requiresApprovalAfterRun: shouldRequireReview(step, index, extractedSteps.length)
     }
   })
@@ -160,8 +139,7 @@ const buildRuleNode = (step: DraftWorkflowStep, index: number): WorkflowDefiniti
   key: `generated-node-${index + 1}`,
   type: step.type,
   name: step.name,
-  prompt: step.type === 'agent' ? (step.prompt ?? '') : null,
-  command: step.type === 'command' ? (step.command ?? '') : null,
+  prompt: step.prompt ?? '',
   cliToolId: null,
   agentToolConfigId: null,
   requiresApprovalAfterRun: step.requiresApprovalAfterRun,
@@ -245,17 +223,7 @@ const normalizeDefinitionDocument = (value: unknown): WorkflowDefinitionDocument
       throw new Error('WORKFLOW_AI_GENERATION_INVALID_DOCUMENT')
     }
 
-    let type: WorkflowDefinitionNode['type'] =
-      getString(rawNode.type) === 'command' ? 'command' : 'agent'
-    let prompt = getNullableString(rawNode.prompt) ?? null
-    let command = getNullableString(rawNode.command) ?? null
-
-    if (type === 'command' && !command && prompt) {
-      type = 'agent'
-    }
-    if (type === 'agent' && !prompt && command) {
-      type = 'command'
-    }
+    const prompt = getNullableString(rawNode.prompt) ?? null
 
     const name = getString(rawNode.name) ?? `步骤 ${index + 1}`
     const key =
@@ -264,10 +232,9 @@ const normalizeDefinitionDocument = (value: unknown): WorkflowDefinitionDocument
     return {
       id: getString(rawNode.id) ?? newUlid(),
       key,
-      type,
+      type: 'agent',
       name,
-      prompt: type === 'agent' ? (prompt ?? `完成步骤：${name}`) : null,
-      command: type === 'command' ? command : null,
+      prompt: prompt ?? `完成步骤：${name}`,
       cliToolId: null,
       agentToolConfigId: null,
       requiresApprovalAfterRun: Boolean(rawNode.requiresApprovalAfterRun),

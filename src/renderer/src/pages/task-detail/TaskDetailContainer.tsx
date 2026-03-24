@@ -137,7 +137,7 @@ export function TaskDetailContainer() {
               t={t}
               isLoading={detail.isLoading}
               pipelineBanner={detail.pipelineBanner}
-              useCliSession={detail.useCliSessionPanel}
+              useCliSession={detail.showExecutionLogPanel}
               cliStatusInfo={detail.cliStatusInfo}
               cliToolLabel={detail.cliToolLabel}
               messages={messages}

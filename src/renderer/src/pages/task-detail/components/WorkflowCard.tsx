@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, CheckCircle2, Clock3, ListChecks, TerminalSquare } from 'lucide-react'
+import { AlertTriangle, Bot, CheckCircle2, Clock3, ListChecks } from 'lucide-react'
 import { useMemo } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -167,14 +167,13 @@ export function WorkflowCard({
               </svg>
 
               {layout.nodes.map((node) => {
-                const TypeIcon = node.type === 'command' ? TerminalSquare : Bot
                 const isSelected = selectedNodeId === node.id
 
                 return (
                   <button
                     key={node.id}
                     type="button"
-                    title={node.prompt || node.command || ''}
+                    title={node.prompt || ''}
                     className={cn(
                       'absolute rounded-xl border px-3 py-2.5 text-left',
                       'hover:border-primary/35',
@@ -192,11 +191,11 @@ export function WorkflowCard({
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-1.5">
-                          <TypeIcon className="size-3.5" />
+                          <Bot className="size-3.5" />
                           <span className="truncate text-[13px] font-semibold">{node.name}</span>
                         </div>
                         <p className="text-muted-foreground line-clamp-2 text-[10px] leading-4">
-                          {node.prompt || node.command || ' '}
+                          {node.prompt || ' '}
                         </p>
                       </div>
                       <div className="pt-0.5">{getStatusIcon(node.status)}</div>

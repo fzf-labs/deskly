@@ -66,9 +66,7 @@ export function buildWorkflowGraph({
       const prompt =
         taskNode?.prompt ||
         runNode?.prompt ||
-        runNode?.command ||
         definitionNode.prompt ||
-        definitionNode.command ||
         ''
 
       return {
@@ -80,7 +78,6 @@ export function buildWorkflowGraph({
         name:
           taskNode?.name || runNode?.name || definitionNode.name || `${stageLabel} ${index + 1}`,
         prompt,
-        command: runNode?.command ?? definitionNode.command ?? null,
         requiresApproval: runNode
           ? Boolean(runNode.requires_approval_after_run)
           : Boolean(definitionNode.requiresApprovalAfterRun),
@@ -117,7 +114,6 @@ export function buildWorkflowGraph({
     type: 'agent',
     name: node.name || `${stageLabel} ${index + 1}`,
     prompt: node.prompt || '',
-    command: null,
     requiresApproval: false,
     position: getFallbackPosition(index),
     isCurrent: Boolean(currentNodeId && node.id === currentNodeId)

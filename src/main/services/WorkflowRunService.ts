@@ -97,7 +97,6 @@ export class WorkflowRunService {
         name: node.name,
         node_type: node.type,
         prompt: composeWorkflowNodePrompt(task.prompt, node.prompt),
-        command: node.command ?? null,
         cli_tool_id: node.cliToolId ?? null,
         agent_tool_config_id: node.agentToolConfigId ?? null,
         requires_approval_after_run: node.requiresApprovalAfterRun,

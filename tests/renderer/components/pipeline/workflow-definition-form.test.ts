@@ -6,7 +6,7 @@ import {
 } from '../../../../src/renderer/src/components/pipeline/workflow-definition-form'
 
 describe('workflow-definition-form', () => {
-  it('builds a DAG workflow definition from form values', () => {
+  it('builds an agent-only DAG workflow definition from form values', () => {
     const definition = buildWorkflowDefinitionFromForm({
       name: 'Code review',
       description: 'branching flow',
@@ -17,23 +17,23 @@ describe('workflow-definition-form', () => {
           type: 'agent',
           name: 'Analyze',
           prompt: 'Check the diff',
-          command: '',
           cliToolId: 'codex',
           agentToolConfigId: 'cfg-1',
           requiresApproval: false,
-          dependsOnIds: []
+          dependsOnIds: [],
+          position: { x: 0, y: 0 }
         },
         {
           id: 'node-b',
           key: 'test',
-          type: 'command',
+          type: 'agent',
           name: 'Run tests',
-          prompt: '',
-          command: 'npm test',
+          prompt: 'Run the project tests and collect failures.',
           cliToolId: '',
           agentToolConfigId: '',
           requiresApproval: false,
-          dependsOnIds: ['node-a']
+          dependsOnIds: ['node-a'],
+          position: { x: 280, y: 0 }
         },
         {
           id: 'node-c',
@@ -41,11 +41,11 @@ describe('workflow-definition-form', () => {
           type: 'agent',
           name: 'Review result',
           prompt: 'Summarize the outcome',
-          command: '',
           cliToolId: '',
           agentToolConfigId: '',
           requiresApproval: true,
-          dependsOnIds: ['node-a', 'node-b']
+          dependsOnIds: ['node-a', 'node-b'],
+          position: { x: 560, y: 0 }
         }
       ]
     })
@@ -56,10 +56,9 @@ describe('workflow-definition-form', () => {
       expect.objectContaining({
         id: 'node-b',
         key: 'test',
-        type: 'command',
+        type: 'agent',
         name: 'Run tests',
-        prompt: null,
-        command: 'npm test',
+        prompt: 'Run the project tests and collect failures.',
         cliToolId: null,
         agentToolConfigId: null
       })
@@ -71,7 +70,7 @@ describe('workflow-definition-form', () => {
     ])
   })
 
-  it('round-trips a DAG workflow definition back into dialog form values', () => {
+  it('round-trips an agent-only DAG workflow definition back into dialog form values', () => {
     const result = workflowDefinitionToFormValues({
       id: 'definition-1',
       scope: 'project',
@@ -95,9 +94,9 @@ describe('workflow-definition-form', () => {
           {
             id: 'node-b',
             key: 'test',
-            type: 'command',
+            type: 'agent',
             name: 'Run tests',
-            command: 'npm test',
+            prompt: 'Run the test suite',
             requiresApprovalAfterRun: false,
             position: null
           },
@@ -129,7 +128,6 @@ describe('workflow-definition-form', () => {
           type: 'agent',
           name: 'Analyze',
           prompt: 'Inspect task',
-          command: '',
           cliToolId: '',
           agentToolConfigId: '',
           requiresApproval: false,
@@ -142,10 +140,9 @@ describe('workflow-definition-form', () => {
         {
           id: 'node-b',
           key: 'test',
-          type: 'command',
+          type: 'agent',
           name: 'Run tests',
-          prompt: '',
-          command: 'npm test',
+          prompt: 'Run the test suite',
           cliToolId: '',
           agentToolConfigId: '',
           requiresApproval: false,
@@ -161,7 +158,6 @@ describe('workflow-definition-form', () => {
           type: 'agent',
           name: 'Review',
           prompt: 'Review outcome',
-          command: '',
           cliToolId: '',
           agentToolConfigId: '',
           requiresApproval: true,
