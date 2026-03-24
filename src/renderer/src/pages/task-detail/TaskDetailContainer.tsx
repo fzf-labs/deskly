@@ -165,7 +165,7 @@ export function TaskDetailContainer() {
 
               <aside
                 className={cn(
-                  'border-border/70 bg-background/94 min-w-0 shrink-0 overflow-hidden border-l backdrop-blur-xl',
+                  'border-border/70 bg-background/94 flex h-full min-h-0 min-w-0 shrink-0 overflow-hidden border-l backdrop-blur-xl',
                   'transition-[width,opacity,transform,border-color] duration-300',
                   detail.isPreviewVisible
                     ? 'translate-x-0 opacity-100'

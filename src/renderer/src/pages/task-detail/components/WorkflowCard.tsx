@@ -34,11 +34,19 @@ interface WorkflowCardProps {
   onApproveCurrent: () => void
 }
 
-const NODE_WIDTH = 196
-const NODE_HEIGHT = 74
-const NODE_RADIUS = 14
-const CANVAS_PADDING_X = 32
-const CANVAS_PADDING_Y = 22
+const NODE_WIDTH = 168
+const NODE_HEIGHT = 60
+const NODE_RADIUS = 12
+const CANVAS_PADDING_X = 20
+const CANVAS_PADDING_Y = 16
+const LAYOUT_SCALE = 0.8
+
+const abbreviatePrompt = (prompt: string) => {
+  const normalized = prompt.replace(/\s+/g, ' ').trim()
+  if (!normalized) return ''
+  if (normalized.length <= 42) return normalized
+  return `${normalized.slice(0, 42).trimEnd()}...`
+}
 
 const getNodeTone = (status: PipelineDisplayStatus, isCurrent: boolean, selected: boolean) =>
   cn(
@@ -94,6 +102,7 @@ const getConnectorTone = (status: PipelineDisplayStatus) => {
 type NormalizedNode = WorkflowGraphNode & {
   left: number
   top: number
+  promptPreview: string
 }
 
 function buildEdgePath(source: NormalizedNode, target: NormalizedNode) {
@@ -101,7 +110,7 @@ function buildEdgePath(source: NormalizedNode, target: NormalizedNode) {
   const startY = source.top + NODE_HEIGHT / 2
   const endX = target.left
   const endY = target.top + NODE_HEIGHT / 2
-  const delta = Math.max(48, Math.abs(endX - startX) * 0.45)
+  const delta = Math.max(32, Math.abs(endX - startX) * 0.35)
 
   return `M ${startX} ${startY} C ${startX + delta} ${startY}, ${endX - delta} ${endY}, ${endX} ${endY}`
 }
@@ -130,8 +139,9 @@ export function WorkflowCard({
     const minY = Math.min(...graph.nodes.map((node) => node.position.y))
     const nodes = graph.nodes.map<NormalizedNode>((node) => ({
       ...node,
-      left: node.position.x - minX + CANVAS_PADDING_X,
-      top: node.position.y - minY + CANVAS_PADDING_Y
+      left: (node.position.x - minX) * LAYOUT_SCALE + CANVAS_PADDING_X,
+      top: (node.position.y - minY) * LAYOUT_SCALE + CANVAS_PADDING_Y,
+      promptPreview: abbreviatePrompt(node.prompt)
     }))
     const width = Math.max(...nodes.map((node) => node.left + NODE_WIDTH)) + CANVAS_PADDING_X
     const height = Math.max(...nodes.map((node) => node.top + NODE_HEIGHT)) + CANVAS_PADDING_Y
@@ -182,10 +192,10 @@ export function WorkflowCard({
         </div>
       </div>
 
-      <div className="space-y-3 px-3 py-3">
+      <div className="space-y-2.5 px-3 py-3">
         {summary && summary.total > 0 ? (
-          <div className="from-background via-muted/10 to-background min-w-0 rounded-2xl border border-border/60 bg-linear-to-r px-3 py-3">
-            <div className="-mx-1 -my-1 flex items-center overflow-x-auto overflow-y-visible px-1 py-1.5">
+          <div className="from-background via-muted/10 to-background min-w-0 rounded-xl border border-border/60 bg-linear-to-r px-2.5 py-2.5">
+            <div className="-mx-1 -my-1 flex items-center overflow-x-auto overflow-y-visible px-1 py-1">
               {compactNodes.map((node, index) => {
                 const isSelected = selectedNodeId === node.id
 
@@ -194,7 +204,7 @@ export function WorkflowCard({
                     {index > 0 && (
                       <div
                         className={cn(
-                          'mx-1 h-px w-6 shrink-0 sm:w-8',
+                          'mx-1 h-px w-4 shrink-0 sm:w-5',
                           getConnectorTone(compactNodes[index - 1]!.status)
                         )}
                       />
@@ -237,15 +247,15 @@ export function WorkflowCard({
         {expanded && layout.nodes.length > 0 && (
           <div className="from-background via-background/96 to-muted/35 overflow-auto rounded-xl border border-border/50 bg-linear-to-br">
             <div
-              className="relative min-h-[220px]"
+              className="relative min-h-[180px]"
               style={{
-                width: Math.max(layout.width, 620),
-                height: Math.max(layout.height, 220)
+                width: Math.max(layout.width, 480),
+                height: Math.max(layout.height, 180)
               }}
             >
               <svg
-                width={Math.max(layout.width, 620)}
-                height={Math.max(layout.height, 220)}
+                width={Math.max(layout.width, 480)}
+                height={Math.max(layout.height, 180)}
                 className="pointer-events-none absolute inset-0"
               >
                 <defs>
@@ -291,7 +301,7 @@ export function WorkflowCard({
                     type="button"
                     title={node.prompt || ''}
                     className={cn(
-                      'absolute rounded-xl border px-3 py-2.5 text-left',
+                      'absolute rounded-xl border px-2.5 py-2 text-left',
                       'hover:border-primary/35',
                       getNodeTone(node.status, node.isCurrent, isSelected)
                     )}
@@ -304,17 +314,17 @@ export function WorkflowCard({
                     }}
                     onClick={() => onSelectNode?.(node.id)}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 space-y-0.5">
                         <div className="flex items-center gap-1.5">
-                          <Bot className="size-3.5" />
-                          <span className="truncate text-[13px] font-semibold">{node.name}</span>
+                          <Bot className="size-3" />
+                          <span className="truncate text-xs font-semibold">{node.name}</span>
                         </div>
-                        <p className="text-muted-foreground line-clamp-2 text-[10px] leading-4">
-                          {node.prompt || ' '}
+                        <p className="text-muted-foreground truncate text-[10px] leading-4">
+                          {node.promptPreview || ' '}
                         </p>
                       </div>
-                      <div className="pt-0.5">{getStatusIcon(node.status)}</div>
+                      <div className="shrink-0 pt-0.5">{getStatusIcon(node.status)}</div>
                     </div>
                   </button>
                 )

@@ -184,6 +184,9 @@ export function buildTerminalEnv(params: {
 }): Record<string, string> {
   const baseEnv = buildSafeEnv(process.env)
   const locale = resolveLocale(process.env)
+  const isZsh = params.shell.includes('zsh')
+  const isBash = params.shell.includes('bash')
+  const prompt = '%~ %# '
 
   return {
     ...baseEnv,
@@ -193,6 +196,8 @@ export function buildTerminalEnv(params: {
     TERM_PROGRAM_VERSION: process.env.npm_package_version || '1.0.0',
     COLORTERM: 'truecolor',
     LANG: locale,
+    ...(isZsh ? { PROMPT: prompt, PS1: prompt, RPROMPT: '' } : {}),
+    ...(isBash ? { PS1: '\\w$ ' } : {}),
     DESKLY_PANE_ID: params.paneId,
     DESKLY_WORKSPACE_ID: params.workspaceId || ''
   }

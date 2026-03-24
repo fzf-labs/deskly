@@ -1,43 +1,10 @@
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { WebglAddon } from '@xterm/addon-webgl'
-import { CanvasAddon } from '@xterm/addon-canvas'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 
 export interface TerminalInstance {
   xterm: Terminal
   fitAddon: FitAddon
-  cleanup: () => void
-}
-
-function loadRenderer(xterm: Terminal): { dispose: () => void } {
-  let renderer: WebglAddon | CanvasAddon | null = null
-
-  try {
-    const webglAddon = new WebglAddon()
-    webglAddon.onContextLoss(() => {
-      webglAddon.dispose()
-      try {
-        renderer = new CanvasAddon()
-        xterm.loadAddon(renderer)
-      } catch {
-        renderer = null
-      }
-    })
-    xterm.loadAddon(webglAddon)
-    renderer = webglAddon
-  } catch {
-    try {
-      renderer = new CanvasAddon()
-      xterm.loadAddon(renderer)
-    } catch {
-      renderer = null
-    }
-  }
-
-  return {
-    dispose: () => renderer?.dispose()
-  }
 }
 
 export function createTerminalInstance(
@@ -60,8 +27,6 @@ export function createTerminalInstance(
   const fitAddon = new FitAddon()
   xterm.loadAddon(fitAddon)
 
-  const renderer = loadRenderer(xterm)
-
   if (options?.onUrlClick) {
     const webLinksAddon = new WebLinksAddon((event, uri) => {
       if (event.metaKey || event.ctrlKey) {
@@ -71,17 +36,8 @@ export function createTerminalInstance(
     xterm.loadAddon(webLinksAddon)
   }
 
-  try {
-    fitAddon.fit()
-  } catch {
-    // ignore fit errors
-  }
-
   return {
     xterm,
-    fitAddon,
-    cleanup: () => {
-      renderer.dispose()
-    }
+    fitAddon
   }
 }

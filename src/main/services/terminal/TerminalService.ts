@@ -10,6 +10,13 @@ export class TerminalService extends EventEmitter {
     const existing = this.sessions.get(paneId)
 
     if (existing?.isAlive) {
+      console.info('[TerminalService] attach existing session', {
+        paneId,
+        shell: existing.shell,
+        cwd: existing.cwd,
+        cols,
+        rows
+      })
       existing.lastActive = Date.now()
       if (cols && rows) {
         this.resize({ paneId, cols, rows })
@@ -26,13 +33,27 @@ export class TerminalService extends EventEmitter {
       throw error
     }
     this.sessions.set(paneId, session)
+    console.info('[TerminalService] created session', {
+      paneId,
+      shell: session.shell,
+      cwd: session.cwd,
+      cols: session.cols,
+      rows: session.rows,
+      workspaceId: session.workspaceId
+    })
 
+    let hasLoggedFirstData = false
     session.pty.onData((data) => {
+      if (!hasLoggedFirstData) {
+        hasLoggedFirstData = true
+        console.info('[TerminalService] first data', { paneId, bytes: data.length })
+      }
       this.emit('data', { paneId, data })
     })
 
     session.pty.onExit(({ exitCode, signal }) => {
       session.isAlive = false
+      console.info('[TerminalService] session exit', { paneId, exitCode, signal })
       this.emit('exit', { paneId, exitCode, signal })
       this.sessions.delete(paneId)
     })
@@ -55,10 +76,12 @@ export class TerminalService extends EventEmitter {
       throw new Error(`Terminal session ${params.paneId} not found or not alive`)
     }
     try {
+      console.info('[TerminalService] write', { paneId: params.paneId, bytes: params.data.length })
       session.pty.write(params.data)
       session.lastActive = Date.now()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      console.error('[TerminalService] write error', { paneId: params.paneId, error: message })
       this.emit('error', { paneId: params.paneId, error: message })
     }
   }

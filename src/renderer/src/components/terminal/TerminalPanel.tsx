@@ -141,7 +141,7 @@ export function TerminalPanel({ taskId, workingDir, isActive, openRequestId }: T
   const hasWorkingDir = Boolean(workingDir)
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="border-b py-2 pr-3">
         <div className="flex items-center gap-2">
           <div className="flex min-w-0 flex-1 gap-0 overflow-x-auto">
@@ -205,7 +205,7 @@ export function TerminalPanel({ taskId, workingDir, isActive, openRequestId }: T
         )}
       </div>
 
-      <div className="relative flex-1 overflow-hidden bg-[#0b0b0d]">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-[#0b0b0d]">
         {activeTerminal ? (
           terminals.map((terminal) => (
             <TerminalView

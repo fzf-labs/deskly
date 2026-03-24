@@ -9,7 +9,9 @@ const DEFAULT_COLS = 80
 const DEFAULT_ROWS = 24
 
 function getShellArgs(shell: string): string[] {
-  if (shell.includes('zsh')) return ['-l']
+  // Prefer a clean interactive zsh. User prompt/bootstrap plugins can hang or
+  // suppress output under node-pty, which leaves the embedded terminal blank.
+  if (shell.includes('zsh')) return ['-f', '-i']
   if (shell.includes('bash')) return []
   return []
 }

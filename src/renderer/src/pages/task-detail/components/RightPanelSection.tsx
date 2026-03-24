@@ -34,7 +34,7 @@ export function RightPanelSection({
   if (!isVisible) return null
 
   return (
-    <div className="bg-muted/10 flex min-w-0 flex-1 flex-col overflow-hidden">
+    <div className="bg-muted/10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <RightPanel
         taskId={taskId}
         workingDir={workingDir}
