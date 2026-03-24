@@ -103,7 +103,6 @@ interface UseTaskDetailInput {
 export function useTaskDetail({
   taskId,
   initialPrompt,
-  initialSessionId,
   navigate,
   activeTaskId,
   messages,
@@ -115,6 +114,71 @@ export function useTaskDetail({
   sessionFolder,
   t
 }: UseTaskDetailInput) {
+  const TASK_LOAD_RETRY_ATTEMPTS = 8
+  const WORKFLOW_RUNTIME_RETRY_ATTEMPTS = 10
+  const LOAD_RETRY_DELAY_MS = 120
+
+  const waitForTaskRecord = useCallback(
+    async (currentTaskId: string): Promise<Task | null> => {
+      for (let attempt = 0; attempt < TASK_LOAD_RETRY_ATTEMPTS; attempt += 1) {
+        const existingTask = await loadTask(currentTaskId)
+        if (existingTask) {
+          return existingTask
+        }
+
+        if (attempt < TASK_LOAD_RETRY_ATTEMPTS - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, LOAD_RETRY_DELAY_MS))
+        }
+      }
+
+      return null
+    },
+    [loadTask]
+  )
+
+  const waitForWorkflowRuntime = useCallback(
+    async (
+      currentTaskId: string,
+      taskMode?: Task['task_mode'] | null
+    ): Promise<{
+      workflowRun: WorkflowRun | null
+      runNodes: WorkflowRunNode[]
+    }> => {
+      if (taskMode !== 'workflow') {
+        return {
+          workflowRun: null,
+          runNodes: []
+        }
+      }
+
+      for (let attempt = 0; attempt < WORKFLOW_RUNTIME_RETRY_ATTEMPTS; attempt += 1) {
+        const workflowRun = await db.getWorkflowRunByTask(currentTaskId)
+        const runNodes = workflowRun
+          ? await db.listWorkflowRunNodes(workflowRun.id)
+          : []
+
+        if (workflowRun && Array.isArray(runNodes) && runNodes.length > 0) {
+          return {
+            workflowRun,
+            runNodes
+          }
+        }
+
+        if (attempt < WORKFLOW_RUNTIME_RETRY_ATTEMPTS - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, LOAD_RETRY_DELAY_MS))
+        }
+      }
+
+      const workflowRun = await db.getWorkflowRunByTask(currentTaskId)
+      const runNodes = workflowRun ? await db.listWorkflowRunNodes(workflowRun.id) : []
+      return {
+        workflowRun,
+        runNodes: Array.isArray(runNodes) ? runNodes : []
+      }
+    },
+    []
+  )
+
   // ===========================================================================
   // Section 1: Init State
   // ===========================================================================
@@ -129,7 +193,6 @@ export function useTaskDetail({
     agentToolConfigId: null
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [hasStarted, setHasStarted] = useState(false)
 
   const isInitializingRef = useRef(false)
   const initializedTaskIdRef = useRef<string | null>(null)
@@ -148,7 +211,6 @@ export function useTaskDetail({
           cliToolId: null,
           agentToolConfigId: null
         })
-        setHasStarted(false)
         isInitializingRef.current = false
         initializedTaskIdRef.current = null
       }
@@ -257,18 +319,16 @@ export function useTaskDetail({
     try {
       const refreshedTask = await db.getTask(taskId)
       if (refreshedTask) setTask(refreshedTask as Task)
-      const workflowRun = await db.getWorkflowRunByTask(taskId)
+      const { workflowRun, runNodes } = await waitForWorkflowRuntime(
+        taskId,
+        refreshedTask?.task_mode ?? null
+      )
       setBackendWorkflowRun(workflowRun)
-      if (workflowRun) {
-        const runNodes = await db.listWorkflowRunNodes(workflowRun.id)
-        setWorkflowRunNodes(Array.isArray(runNodes) ? runNodes : [])
-      } else {
-        setWorkflowRunNodes([])
-      }
+      setWorkflowRunNodes(runNodes)
     } catch {
       /* ignore */
     }
-  }, [taskId])
+  }, [taskId, waitForWorkflowRuntime])
 
   useEffect(() => {
     async function initialize() {
@@ -282,47 +342,19 @@ export function useTaskDetail({
 
       try {
         setIsLoading(true)
-        const existingTask = await loadTask(taskId)
+        const existingTask = await waitForTaskRecord(taskId)
 
         if (existingTask) {
           setTask(existingTask)
-          const workflowRun = await db.getWorkflowRunByTask(taskId)
+          const { workflowRun, runNodes } = await waitForWorkflowRuntime(
+            taskId,
+            existingTask.task_mode
+          )
           setBackendWorkflowRun(workflowRun)
-          if (workflowRun) {
-            const runNodes = await db.listWorkflowRunNodes(workflowRun.id)
-            setWorkflowRunNodes(Array.isArray(runNodes) ? runNodes : [])
-          } else {
-            setWorkflowRunNodes([])
-          }
+          setWorkflowRunNodes(runNodes)
           await ensureConversationRuntime(existingTask)
           await loadMessages(taskId)
-          setHasStarted(true)
           setIsLoading(false)
-        } else if (initialPrompt && !hasStarted) {
-          setHasStarted(true)
-          setIsLoading(false)
-          setMessages([])
-
-          const sessionId = initialSessionId || null
-          try {
-            const settings = getSettings()
-            const defaultCliToolId = getEnabledDefaultCliToolId(settings)
-            const createdTask = await db.createTask({
-              id: taskId,
-              title: initialPrompt,
-              prompt: initialPrompt
-            })
-            setTask(createdTask)
-            await db.updateCurrentTaskNodeRuntime(taskId, {
-              session_id: sessionId ?? null,
-              cli_tool_id: defaultCliToolId || null
-            })
-            await ensureConversationRuntime(createdTask, sessionId ?? null)
-          } catch (error) {
-            console.error('[TaskDetail] Failed to initialize task:', error)
-            const newTask = await loadTask(taskId)
-            setTask(newTask)
-          }
         } else {
           setIsLoading(false)
         }
@@ -337,11 +369,8 @@ export function useTaskDetail({
     ensureConversationRuntime,
     loadCurrentNodeRuntime,
     loadMessages,
-    loadTask,
-    initialPrompt,
-    initialSessionId,
-    hasStarted,
-    setMessages
+    waitForTaskRecord,
+    waitForWorkflowRuntime
   ])
 
   const useCliSession = Boolean(currentNodeRuntime.cliToolId)
@@ -1558,12 +1587,11 @@ export function useTaskDetail({
 
   const showWorkflowCard = useMemo(
     () =>
-      task?.task_mode === 'workflow' &&
-      (Boolean(
+      Boolean(
+        task?.task_mode === 'workflow' ||
         workflowNodes.length ||
         pipelineTemplate?.nodes?.length ||
-        backendWorkflowRun?.definition_snapshot.nodes.length
-      ) ||
+        backendWorkflowRun?.definition_snapshot.nodes.length ||
         currentTaskNode?.status === 'in_review'),
     [
       backendWorkflowRun?.definition_snapshot.nodes.length,

@@ -133,4 +133,64 @@ describe('WorkflowDefinitionService', () => {
       connection.close()
     }
   })
+
+  it('filters legacy invalid definitions from reads', () => {
+    const setup = setupService()
+    if (!setup) {
+      return
+    }
+
+    const { connection, service } = setup
+
+    try {
+      const valid = service.createDefinition({
+        scope: 'project',
+        project_id: 'project-1',
+        name: 'Valid workflow',
+        description: null,
+        definition: buildDefinition()
+      })
+
+      const db = (connection as unknown as { open: () => unknown }).open()
+      ;(db as { prepare: (sql: string) => { run: (...args: unknown[]) => unknown } })
+        .prepare(
+          `
+            INSERT INTO workflow_definitions (
+              id, scope, project_id, name, description, definition_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `
+        )
+        .run(
+          'legacy-invalid',
+          'project',
+          'project-1',
+          'Legacy invalid',
+          null,
+          JSON.stringify({
+            version: 1,
+            nodes: [
+              {
+                id: 'legacy-command',
+                key: 'legacy-command',
+                type: 'command',
+                name: 'Command',
+                prompt: 'legacy',
+                requiresApprovalAfterRun: false,
+                position: null
+              }
+            ],
+            edges: []
+          }),
+          '2026-03-24T00:00:00.000Z',
+          '2026-03-24T00:00:00.000Z'
+        )
+
+      const listed = service.listDefinitions({ scope: 'project', projectId: 'project-1' })
+
+      expect(listed.map((definition) => definition.id)).toEqual([valid.id])
+      expect(service.getDefinition('legacy-invalid')).toBeNull()
+    } finally {
+      connection.close()
+    }
+  })
 })

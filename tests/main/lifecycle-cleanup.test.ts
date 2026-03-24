@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { describe, expect, it, vi } from 'vitest'
 import { PreviewService } from '../../src/main/services/PreviewService'
 import { registerCliSessionIpc } from '../../src/main/ipc/cli-session.ipc'
+import { registerTaskIpc } from '../../src/main/ipc/task.ipc'
 import { v } from '../../src/main/utils/ipc-response'
 import { AppContext } from '../../src/main/app/AppContext'
 import { IPC_CHANNELS } from '../../src/main/ipc/channels'
@@ -70,6 +71,42 @@ describe('log stream subscription cleanup', () => {
     webContents.emit('destroyed')
 
     expect(unsubscribe).toHaveBeenCalled()
+  })
+})
+
+describe('task create IPC payload', () => {
+  it('returns the created task object directly for preload unwrapping', async () => {
+    const handlers: Record<string, (event: any, ...args: any[]) => any> = {}
+    const createdTask = {
+      id: 'task-1',
+      title: 'Workflow task',
+      prompt: 'Ship it',
+      taskMode: 'workflow'
+    }
+
+    registerTaskIpc({
+      services: {
+        taskService: {
+          createTask: vi.fn(async () => createdTask)
+        }
+      } as any,
+      handle: (channel, _validators, handler) => {
+        handlers[channel] = handler
+      },
+      v,
+      taskStatusValues: ['todo', 'in_progress', 'in_review', 'done', 'failed']
+    } as any)
+
+    const result = await handlers[IPC_CHANNELS.task.create](
+      {},
+      {
+        title: 'Workflow task',
+        prompt: 'Ship it',
+        taskMode: 'workflow'
+      }
+    )
+
+    expect(result).toEqual(createdTask)
   })
 })
 

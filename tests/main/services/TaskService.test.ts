@@ -23,6 +23,30 @@ describe('TaskService workflow runtime', () => {
     }> = []
 
     const db = {
+      getWorkflowDefinition: vi.fn(() => ({
+        id: 'definition-1',
+        scope: 'project',
+        project_id: 'project-1',
+        name: 'Workflow',
+        description: null,
+        created_at: '2026-03-22T00:00:00.000Z',
+        updated_at: '2026-03-22T00:00:00.000Z',
+        definition: {
+          version: 1,
+          nodes: [
+            {
+              id: 'node-1',
+              key: 'analyze',
+              type: 'agent',
+              name: 'Analyze',
+              prompt: 'Inspect the task',
+              requiresApprovalAfterRun: false,
+              position: { x: 0, y: 0 }
+            }
+          ],
+          edges: []
+        }
+      })),
       getDefaultAgentToolConfig: vi.fn(() => null),
       createTask: vi.fn((input) => ({
         ...input,
@@ -119,6 +143,30 @@ describe('TaskService workflow runtime', () => {
   it('creates workflow runs from workflow definitions without legacy template bridging', async () => {
     const createdRuns: Array<{ taskId: string; workflowDefinitionId?: string | null }> = []
     const db = {
+      getWorkflowDefinition: vi.fn(() => ({
+        id: 'definition-1',
+        scope: 'project',
+        project_id: 'project-1',
+        name: 'Workflow',
+        description: null,
+        created_at: '2026-03-22T00:00:00.000Z',
+        updated_at: '2026-03-22T00:00:00.000Z',
+        definition: {
+          version: 1,
+          nodes: [
+            {
+              id: 'node-1',
+              key: 'analyze',
+              type: 'agent',
+              name: 'Analyze',
+              prompt: 'Inspect the task',
+              requiresApprovalAfterRun: false,
+              position: { x: 0, y: 0 }
+            }
+          ],
+          edges: []
+        }
+      })),
       getDefaultAgentToolConfig: vi.fn(() => null),
       createTask: vi.fn((input) => ({
         ...input,
@@ -187,5 +235,43 @@ describe('TaskService workflow runtime', () => {
     })
 
     expect(createdRuns).toEqual([{ taskId: expect.any(String), workflowDefinitionId: 'definition-1' }])
+  })
+
+  it('rejects invalid or legacy workflow definitions before creating the task record', async () => {
+    const db = {
+      getWorkflowDefinition: vi.fn(() => null),
+      getDefaultAgentToolConfig: vi.fn(() => null),
+      createTask: vi.fn(),
+      getTask: vi.fn(),
+      createWorkflowRunForTask: vi.fn()
+    }
+
+    const git = { addWorktree: vi.fn() }
+    const settings = {
+      getSettings: vi.fn(() => ({
+        enabledCliTools: {
+          'claude-code': true,
+          codex: true,
+          'cursor-agent': true,
+          'gemini-cli': true,
+          opencode: true
+        }
+      }))
+    }
+    const service = new TaskService(db as never, git as never, settings as never)
+
+    await expect(
+      service.createTask({
+        title: 'Workflow task',
+        prompt: 'Solve the issue',
+        taskMode: 'workflow',
+        projectId: 'project-1',
+        projectPath: '/tmp/project',
+        workflowDefinitionId: 'legacy-definition'
+      })
+    ).rejects.toThrow('Workflow definition not found: legacy-definition')
+
+    expect(db.createTask).not.toHaveBeenCalled()
+    expect(db.createWorkflowRunForTask).not.toHaveBeenCalled()
   })
 })

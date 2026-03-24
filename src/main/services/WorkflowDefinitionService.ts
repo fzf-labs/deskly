@@ -12,6 +12,97 @@ type WorkflowDefinitionFilter = {
   projectId?: string | null
 }
 
+export const validateWorkflowDefinitionDocument = (document: WorkflowDefinitionDocument): void => {
+  if (document.version !== 1) {
+    throw new Error('Workflow definition version must be 1')
+  }
+
+  if (!Array.isArray(document.nodes) || document.nodes.length === 0) {
+    throw new Error('Workflow definition must contain at least one node')
+  }
+
+  if (!Array.isArray(document.edges)) {
+    throw new Error('Workflow definition edges must be an array')
+  }
+
+  const nodeIds = new Set<string>()
+  const nodeKeys = new Set<string>()
+  const nodesById = new Map<string, WorkflowDefinitionNode>()
+
+  document.nodes.forEach((node) => {
+    if (!node.id?.trim()) {
+      throw new Error('Workflow node id is required')
+    }
+    if (!node.key?.trim()) {
+      throw new Error(`Workflow node key is required: ${node.id}`)
+    }
+    if (node.type !== 'agent') {
+      throw new Error(`Unsupported workflow node type: ${node.id}`)
+    }
+    if (nodeIds.has(node.id)) {
+      throw new Error(`Duplicate workflow node id: ${node.id}`)
+    }
+    if (nodeKeys.has(node.key)) {
+      throw new Error(`Duplicate workflow node key: ${node.key}`)
+    }
+    if (!node.prompt?.trim()) {
+      throw new Error(`Agent node requires prompt: ${node.id}`)
+    }
+
+    nodeIds.add(node.id)
+    nodeKeys.add(node.key)
+    nodesById.set(node.id, node)
+  })
+
+  const edgeKeys = new Set<string>()
+  const indegree = new Map<string, number>()
+  const outgoing = new Map<string, string[]>()
+  document.nodes.forEach((node) => {
+    indegree.set(node.id, 0)
+    outgoing.set(node.id, [])
+  })
+
+  document.edges.forEach((edge) => {
+    if (!nodesById.has(edge.from) || !nodesById.has(edge.to)) {
+      throw new Error(`Workflow edge references unknown node: ${edge.from} -> ${edge.to}`)
+    }
+    if (edge.from === edge.to) {
+      throw new Error(`Workflow edge cannot self-reference: ${edge.from}`)
+    }
+
+    const edgeKey = `${edge.from}::${edge.to}`
+    if (edgeKeys.has(edgeKey)) {
+      throw new Error(`Duplicate workflow edge: ${edge.from} -> ${edge.to}`)
+    }
+
+    edgeKeys.add(edgeKey)
+    indegree.set(edge.to, (indegree.get(edge.to) ?? 0) + 1)
+    outgoing.get(edge.from)!.push(edge.to)
+  })
+
+  const queue = [
+    ...document.nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0).map((node) => node.id)
+  ]
+  let visited = 0
+
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!
+    visited += 1
+
+    for (const nextId of outgoing.get(nodeId) ?? []) {
+      const nextIndegree = (indegree.get(nextId) ?? 0) - 1
+      indegree.set(nextId, nextIndegree)
+      if (nextIndegree === 0) {
+        queue.push(nextId)
+      }
+    }
+  }
+
+  if (visited !== document.nodes.length) {
+    throw new Error('Workflow definition must be a DAG')
+  }
+}
+
 export class WorkflowDefinitionService {
   private repo: WorkflowDefinitionRepository
 
@@ -20,14 +111,39 @@ export class WorkflowDefinitionService {
   }
 
   listDefinitions(filter: WorkflowDefinitionFilter = {}): WorkflowDefinition[] {
-    return this.repo.listDefinitions({
-      scope: filter.scope,
-      projectId: filter.projectId
-    })
+    return this.repo
+      .listDefinitions({
+        scope: filter.scope,
+        projectId: filter.projectId
+      })
+      .filter((definition) => {
+        try {
+          validateWorkflowDefinitionDocument(definition.definition)
+          return true
+        } catch (error) {
+          console.warn('[WorkflowDefinitionService] Skipping invalid legacy workflow definition:', {
+            id: definition.id,
+            error: error instanceof Error ? error.message : String(error)
+          })
+          return false
+        }
+      })
   }
 
   getDefinition(id: string): WorkflowDefinition | null {
-    return this.repo.getDefinition(id)
+    const definition = this.repo.getDefinition(id)
+    if (!definition) return null
+
+    try {
+      validateWorkflowDefinitionDocument(definition.definition)
+      return definition
+    } catch (error) {
+      console.warn('[WorkflowDefinitionService] Ignoring invalid legacy workflow definition:', {
+        id: definition.id,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return null
+    }
   }
 
   createDefinition(input: CreateWorkflowDefinitionInput): WorkflowDefinition {
@@ -62,93 +178,6 @@ export class WorkflowDefinitionService {
   }
 
   validateDefinitionDocument(document: WorkflowDefinitionDocument): void {
-    if (document.version !== 1) {
-      throw new Error('Workflow definition version must be 1')
-    }
-
-    if (!Array.isArray(document.nodes) || document.nodes.length === 0) {
-      throw new Error('Workflow definition must contain at least one node')
-    }
-
-    if (!Array.isArray(document.edges)) {
-      throw new Error('Workflow definition edges must be an array')
-    }
-
-    const nodeIds = new Set<string>()
-    const nodeKeys = new Set<string>()
-    const nodesById = new Map<string, WorkflowDefinitionNode>()
-
-    document.nodes.forEach((node) => {
-      if (!node.id?.trim()) {
-        throw new Error('Workflow node id is required')
-      }
-      if (!node.key?.trim()) {
-        throw new Error(`Workflow node key is required: ${node.id}`)
-      }
-      if (node.type !== 'agent') {
-        throw new Error(`Unsupported workflow node type: ${node.id}`)
-      }
-      if (nodeIds.has(node.id)) {
-        throw new Error(`Duplicate workflow node id: ${node.id}`)
-      }
-      if (nodeKeys.has(node.key)) {
-        throw new Error(`Duplicate workflow node key: ${node.key}`)
-      }
-      if (!node.prompt?.trim()) {
-        throw new Error(`Agent node requires prompt: ${node.id}`)
-      }
-
-      nodeIds.add(node.id)
-      nodeKeys.add(node.key)
-      nodesById.set(node.id, node)
-    })
-
-    const edgeKeys = new Set<string>()
-    const indegree = new Map<string, number>()
-    const outgoing = new Map<string, string[]>()
-    document.nodes.forEach((node) => {
-      indegree.set(node.id, 0)
-      outgoing.set(node.id, [])
-    })
-
-    document.edges.forEach((edge) => {
-      if (!nodesById.has(edge.from) || !nodesById.has(edge.to)) {
-        throw new Error(`Workflow edge references unknown node: ${edge.from} -> ${edge.to}`)
-      }
-      if (edge.from === edge.to) {
-        throw new Error(`Workflow edge cannot self-reference: ${edge.from}`)
-      }
-
-      const edgeKey = `${edge.from}::${edge.to}`
-      if (edgeKeys.has(edgeKey)) {
-        throw new Error(`Duplicate workflow edge: ${edge.from} -> ${edge.to}`)
-      }
-
-      edgeKeys.add(edgeKey)
-      indegree.set(edge.to, (indegree.get(edge.to) ?? 0) + 1)
-      outgoing.get(edge.from)!.push(edge.to)
-    })
-
-    const queue = [
-      ...document.nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0).map((node) => node.id)
-    ]
-    let visited = 0
-
-    while (queue.length > 0) {
-      const nodeId = queue.shift()!
-      visited += 1
-
-      for (const nextId of outgoing.get(nodeId) ?? []) {
-        const nextIndegree = (indegree.get(nextId) ?? 0) - 1
-        indegree.set(nextId, nextIndegree)
-        if (nextIndegree === 0) {
-          queue.push(nextId)
-        }
-      }
-    }
-
-    if (visited !== document.nodes.length) {
-      throw new Error('Workflow definition must be a DAG')
-    }
+    validateWorkflowDefinitionDocument(document)
   }
 }

@@ -11,6 +11,7 @@ import type {
   WorkflowRunStatus
 } from '../types/workflow-run'
 import type { WorkflowDefinitionDocument } from '../types/workflow-definition'
+import { validateWorkflowDefinitionDocument } from './WorkflowDefinitionService'
 
 const composeWorkflowNodePrompt = (
   taskPrompt: string | null | undefined,
@@ -79,6 +80,8 @@ export class WorkflowRunService {
     if (!definition) {
       throw new Error('Workflow definition snapshot is required')
     }
+
+    validateWorkflowDefinitionDocument(definition)
 
     const run = this.runRepo.createRun({
       task_id: input.taskId,

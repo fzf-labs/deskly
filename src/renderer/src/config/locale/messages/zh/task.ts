@@ -36,6 +36,7 @@ export default {
   detailCollapse: '收起详情',
   taskCardTitle: '任务',
   workflowCardTitle: '工作流',
+  workflowCardEmpty: '工作流节点会在任务加载后显示在这里。',
   executionCardTitle: '执行',
   replyCardTitle: '回复',
   cliStatusIdle: '空闲',

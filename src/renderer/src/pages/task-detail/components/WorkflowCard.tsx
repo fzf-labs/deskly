@@ -207,6 +207,12 @@ export function WorkflowCard({
           </div>
         )}
 
+        {layout.nodes.length === 0 && (
+          <div className="text-muted-foreground rounded-xl border border-dashed border-border/60 px-3 py-6 text-center text-sm">
+            {t.task.workflowCardEmpty || 'Workflow nodes will appear here once the task loads.'}
+          </div>
+        )}
+
         {currentTaskNode?.status === 'in_review' && (
           <div className="border-amber-500/30 bg-amber-50/30 rounded-md border px-2 py-2">
             <div className="flex items-center justify-between gap-2">

@@ -24,14 +24,8 @@ export const registerTaskIpc = ({ handle, v, services, taskStatusValues }: IpcMo
         workflowDefinitionId: v.optional(v.string())
       })
     ],
-    async (_, options) => {
-      try {
-        const task = await taskService.createTask(options as Parameters<TaskService['createTask']>[0])
-        return { success: true, data: task }
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
-      }
-    }
+    async (_, options) =>
+      await taskService.createTask(options as Parameters<TaskService['createTask']>[0])
   )
 
   handle(IPC_CHANNELS.task.get, [v.string()], (_, id) => taskService.getTask(id))

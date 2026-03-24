@@ -135,6 +135,13 @@ export class TaskService {
       throw new Error('Workflow definition is required for workflow tasks')
     }
 
+    if (options.taskMode === 'workflow' && options.workflowDefinitionId) {
+      const workflowDefinition = this.db.getWorkflowDefinition(options.workflowDefinitionId)
+      if (!workflowDefinition) {
+        throw new Error(`Workflow definition not found: ${options.workflowDefinitionId}`)
+      }
+    }
+
     let agentToolConfigId = options.agentToolConfigId
     if (!agentToolConfigId && options.cliToolId) {
       const defaultConfig = this.db.getDefaultAgentToolConfig(options.cliToolId)

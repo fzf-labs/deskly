@@ -36,6 +36,7 @@ export default {
   detailCollapse: 'Hide details',
   taskCardTitle: 'Task',
   workflowCardTitle: 'Workflow',
+  workflowCardEmpty: 'Workflow nodes will appear here once the task loads.',
   executionCardTitle: 'Execution',
   replyCardTitle: 'Reply',
   cliStatusIdle: 'Idle',
