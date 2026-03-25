@@ -1,10 +1,24 @@
 import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliAdapter } from './ProcessCliAdapter'
-import { failureSignal, parseJsonLine, successSignal } from './completion'
+import { failureSignal, parseJsonLine } from './completion'
 import { asBoolean, asStringArray, pushFlag, pushFlagWithValue, pushRepeatableFlag } from './config-utils'
 import { ProcessCommandSpec } from '../ProcessCliSession'
 
 type RecordLike = Record<string, unknown>
+
+export function detectGeminiCompletion(line: string) {
+  const msg = parseJsonLine(line)
+  if (!msg) return null
+
+  if (Object.prototype.hasOwnProperty.call(msg, 'Done')) {
+    return null
+  }
+  if (Object.prototype.hasOwnProperty.call(msg, 'Error')) {
+    return failureSignal('acp-error')
+  }
+  if (msg.type === 'error') return failureSignal('error')
+  return null
+}
 
 export class GeminiCliAdapter implements CliAdapter {
   id = 'gemini-cli'
@@ -17,19 +31,7 @@ export class GeminiCliAdapter implements CliAdapter {
       {
         id: this.id,
         buildCommand: (options: CliStartOptions) => this.buildCommandSpec(options),
-        detectCompletion: (line) => {
-          const msg = parseJsonLine(line)
-          if (!msg) return null
-
-          if (Object.prototype.hasOwnProperty.call(msg, 'Done')) {
-            return successSignal('acp-done')
-          }
-          if (Object.prototype.hasOwnProperty.call(msg, 'Error')) {
-            return failureSignal('acp-error')
-          }
-          if (msg.type === 'error') return failureSignal('error')
-          return null
-        }
+        detectCompletion: detectGeminiCompletion
       }
     )
   }

@@ -8,10 +8,8 @@ import type { TerminalSession } from './types'
 const DEFAULT_COLS = 80
 const DEFAULT_ROWS = 24
 
-function getShellArgs(shell: string): string[] {
-  // Prefer a clean interactive zsh. User prompt/bootstrap plugins can hang or
-  // suppress output under node-pty, which leaves the embedded terminal blank.
-  if (shell.includes('zsh')) return ['-f', '-i']
+function getShellArgs(shell: string, useCleanShellConfig: boolean): string[] {
+  if (shell.includes('zsh')) return useCleanShellConfig ? ['-f', '-i'] : ['-i']
   if (shell.includes('bash')) return []
   return []
 }
@@ -62,10 +60,11 @@ function spawnPty(params: {
   rows: number
   cwd: string
   env: Record<string, string>
+  useCleanShellConfig: boolean
 }): pty.IPty {
-  const { shell, cols, rows, cwd, env } = params
+  const { shell, cols, rows, cwd, env, useCleanShellConfig } = params
   const resolvedShell = resolveShellPath(shell)
-  const shellArgs = getShellArgs(resolvedShell)
+  const shellArgs = getShellArgs(resolvedShell, useCleanShellConfig)
 
   try {
     return pty.spawn(resolvedShell, shellArgs, {
@@ -94,20 +93,23 @@ export function createSession(params: {
   cols?: number
   rows?: number
   useFallbackShell?: boolean
+  useCleanShellConfig?: boolean
 }): TerminalSession {
-  const { paneId, workspaceId, cwd, cols, rows, useFallbackShell } = params
+  const { paneId, workspaceId, cwd, cols, rows, useFallbackShell, useCleanShellConfig = false } =
+    params
   const shell = useFallbackShell ? FALLBACK_SHELL : getDefaultShell()
   const workingDir = validateAndResolveCwd(cwd || os.homedir())
   const terminalCols = cols || DEFAULT_COLS
   const terminalRows = rows || DEFAULT_ROWS
-  const env = buildTerminalEnv({ paneId, workspaceId, shell })
+  const env = buildTerminalEnv({ paneId, workspaceId, shell, useCleanShellConfig })
 
   const ptyProcess = spawnPty({
     shell,
     cols: terminalCols,
     rows: terminalRows,
     cwd: workingDir,
-    env
+    env,
+    useCleanShellConfig
   })
 
   return {

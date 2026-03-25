@@ -3,7 +3,7 @@ import * as path from 'path'
 import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliSession, InitSequenceStep } from '../ProcessCliSession'
 import { AgentCLIToolConfigService } from '../../AgentCLIToolConfigService'
-import { failureSignal, parseJsonLine, successSignal } from './completion'
+import { failureSignal, parseJsonLine } from './completion'
 import {
   asBoolean,
   asString,
@@ -14,7 +14,7 @@ import {
 } from './config-utils'
 import { ProcessCommandSpec } from '../ProcessCliSession'
 
-function detectClaudeCompletion(line: string) {
+export function detectClaudeCompletion(line: string) {
   const msg = parseJsonLine(line)
   if (!msg) return null
   if (msg.type === 'error') return failureSignal('error')
@@ -22,9 +22,8 @@ function detectClaudeCompletion(line: string) {
 
   const subtype = msg.subtype as string | undefined
   const isError = msg.is_error as boolean | undefined
-  if (subtype === 'success' || isError === false) return successSignal('result')
   if (subtype === 'error' || isError === true) return failureSignal('result')
-  return successSignal('result')
+  return null
 }
 
 export class ClaudeCodeAdapter implements CliAdapter {

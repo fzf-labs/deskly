@@ -203,8 +203,13 @@ export function WorkspaceSidebarContent() {
             <div className="border-sidebar-border/70 border-t" />
           </div>
 
-          <div className={cn('flex items-center justify-between', APP_SHELL_SIDEBAR_SECTION_HEADER_CLASS)}>
-            <div className="text-sidebar-foreground/66 text-[13px] font-medium tracking-wide">
+          <div
+            className={cn(
+              'flex items-center justify-between',
+              APP_SHELL_SIDEBAR_SECTION_HEADER_CLASS
+            )}
+          >
+            <div className="text-sidebar-foreground/66 pl-2 text-[13px] font-medium">
               {t.nav.threads}
             </div>
             <div className="flex items-center gap-1">

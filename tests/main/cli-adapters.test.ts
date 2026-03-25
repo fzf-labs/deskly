@@ -3,14 +3,26 @@ import { readFile, stat } from 'fs/promises'
 import { describe, expect, it } from 'vitest'
 import { afterEach, vi } from 'vitest'
 
-import { ClaudeCodeAdapter } from '../../src/main/services/cli/adapters/ClaudeCodeAdapter'
+import {
+  ClaudeCodeAdapter,
+  detectClaudeCompletion
+} from '../../src/main/services/cli/adapters/ClaudeCodeAdapter'
 import {
   CodexCliAdapter,
   detectCodexCompletion
 } from '../../src/main/services/cli/adapters/CodexCliAdapter'
-import { CursorAgentAdapter } from '../../src/main/services/cli/adapters/CursorAgentAdapter'
-import { GeminiCliAdapter } from '../../src/main/services/cli/adapters/GeminiCliAdapter'
-import { OpencodeAdapter } from '../../src/main/services/cli/adapters/OpencodeAdapter'
+import {
+  CursorAgentAdapter,
+  detectCursorCompletion
+} from '../../src/main/services/cli/adapters/CursorAgentAdapter'
+import {
+  GeminiCliAdapter,
+  detectGeminiCompletion
+} from '../../src/main/services/cli/adapters/GeminiCliAdapter'
+import {
+  OpencodeAdapter,
+  detectOpencodeCompletion
+} from '../../src/main/services/cli/adapters/OpencodeAdapter'
 import { ProcessCliAdapter } from '../../src/main/services/cli/adapters/ProcessCliAdapter'
 
 const baseOptions = {
@@ -125,6 +137,7 @@ describe('CLI adapter argv builders', () => {
         disable_features: ['beta'],
         image_paths: ['/tmp/image.png'],
         ask_for_approval: 'never',
+        sandbox: 'danger-full-access',
         full_auto: true,
         dangerously_bypass_approvals_and_sandbox: true,
         local_provider: 'ollama',
@@ -147,23 +160,23 @@ describe('CLI adapter argv builders', () => {
         'reasoning.effort="high"',
         '-c',
         'model="gpt-5"',
+        '--ask-for-approval',
+        'never',
+        'exec',
         '--enable',
         'alpha',
         '--disable',
         'beta',
         '-i',
         '/tmp/image.png',
-        '--ask-for-approval',
-        'never',
+        '--sandbox',
+        'danger-full-access',
         '--full-auto',
         '--dangerously-bypass-approvals-and-sandbox',
         '--local-provider',
         'ollama',
-        '--search',
         '--add-dir',
         '/tmp/extra',
-        '--no-alt-screen',
-        'exec',
         'resume',
         '--skip-git-repo-check',
         '--ephemeral',
@@ -178,15 +191,52 @@ describe('CLI adapter argv builders', () => {
         '-m',
         'gpt-5',
         'thread-123',
-        '-'
+        '-',
+        '--search',
+        '--no-alt-screen'
       ])
     )
+
+    expect(spec.args.indexOf('--ask-for-approval')).toBeLessThan(spec.args.indexOf('exec'))
+    expect(spec.args.indexOf('--sandbox')).toBeGreaterThan(spec.args.indexOf('exec'))
   })
 
-  it('detects codex completed events as successful completion', () => {
-    expect(detectCodexCompletion('{"type":"turn.completed"}')).toEqual({
-      status: 'success',
-      reason: 'turn.completed'
+  it('does not treat codex turn completion events as session completion', () => {
+    expect(detectCodexCompletion('{"type":"turn.completed"}')).toBeNull()
+    expect(detectCodexCompletion('{"type":"item.completed"}')).toBeNull()
+  })
+
+  it('does not treat claude result events as session completion', () => {
+    expect(detectClaudeCompletion('{"type":"result","subtype":"success"}')).toBeNull()
+    expect(detectClaudeCompletion('{"type":"result","is_error":false}')).toBeNull()
+    expect(detectClaudeCompletion('{"type":"result","subtype":"error"}')).toEqual({
+      status: 'failure',
+      reason: 'result'
+    })
+  })
+
+  it('does not treat cursor result events as session completion', () => {
+    expect(detectCursorCompletion('{"type":"result","subtype":"success"}')).toBeNull()
+    expect(detectCursorCompletion('{"type":"result","is_error":false}')).toBeNull()
+    expect(detectCursorCompletion('{"type":"result","subtype":"error"}')).toEqual({
+      status: 'failure',
+      reason: 'result'
+    })
+  })
+
+  it('does not treat gemini Done events as session completion', () => {
+    expect(detectGeminiCompletion('{"Done":{}}')).toBeNull()
+    expect(detectGeminiCompletion('{"Error":{}}')).toEqual({
+      status: 'failure',
+      reason: 'acp-error'
+    })
+  })
+
+  it('does not treat opencode done events as session completion', () => {
+    expect(detectOpencodeCompletion('{"type":"done"}')).toBeNull()
+    expect(detectOpencodeCompletion('{"type":"error"}')).toEqual({
+      status: 'failure',
+      reason: 'error'
     })
   })
 

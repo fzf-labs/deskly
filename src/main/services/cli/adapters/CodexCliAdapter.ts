@@ -4,7 +4,7 @@ import * as path from 'path'
 
 import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliAdapter } from './ProcessCliAdapter'
-import { failureSignal, parseJsonLine, successSignal } from './completion'
+import { parseJsonLine } from './completion'
 import {
   asBoolean,
   asString,
@@ -21,14 +21,12 @@ export function detectCodexCompletion(line: string) {
   const msg = parseJsonLine(line)
   if (!msg) return null
 
-  const event = (msg.event || msg.method || msg.type) as string | undefined
-  if (event) {
-    const lowered = event.toLowerCase()
-    if (lowered.includes('failed') || lowered.includes('error')) return failureSignal(event)
-    if (lowered.includes('completed')) return successSignal(event)
-    if (lowered.includes('finished')) return successSignal(event)
-  }
-
+  // Codex emits per-turn lifecycle events such as `turn.completed` while the
+  // `codex exec` process is still actively working. Treating those as terminal
+  // session signals makes Deskly mark the session stopped before the process
+  // actually exits, which can prematurely flip workflow/task status in the UI.
+  // For Codex we therefore rely on the child-process `close` event as the only
+  // source of truth for session completion.
   return null
 }
 
@@ -82,36 +80,37 @@ export class CodexCliAdapter implements CliAdapter {
     const resumeThreadId = this.getResumeThreadId(options)
     const hasPrompt = typeof prompt === 'string' && prompt.trim().length > 0
     const args: string[] = []
+    const execArgs: string[] = []
 
     if (reasoningEffort) {
       args.push('-c', `reasoning.effort=${JSON.stringify(reasoningEffort)}`)
     }
     pushRepeatableFlag(args, '-c', (toolConfig as Record<string, unknown>).config_overrides)
-    pushRepeatableFlag(args, '--enable', (toolConfig as Record<string, unknown>).enable_features)
-    pushRepeatableFlag(args, '--disable', (toolConfig as Record<string, unknown>).disable_features)
-    pushRepeatableFlag(args, '-i', (toolConfig as Record<string, unknown>).image_paths)
-    pushFlagWithValue(args, '--profile', (toolConfig as Record<string, unknown>).profile)
-    pushFlagWithValue(args, '--sandbox', (toolConfig as Record<string, unknown>).sandbox)
+    pushRepeatableFlag(execArgs, '--enable', (toolConfig as Record<string, unknown>).enable_features)
+    pushRepeatableFlag(execArgs, '--disable', (toolConfig as Record<string, unknown>).disable_features)
+    pushRepeatableFlag(execArgs, '-i', (toolConfig as Record<string, unknown>).image_paths)
+    pushFlagWithValue(execArgs, '--profile', (toolConfig as Record<string, unknown>).profile)
     pushFlagWithValue(
       args,
       '--ask-for-approval',
       (toolConfig as Record<string, unknown>).ask_for_approval
     )
-    pushFlag(args, '--full-auto', asBoolean((toolConfig as Record<string, unknown>).full_auto))
+    pushFlagWithValue(execArgs, '--sandbox', (toolConfig as Record<string, unknown>).sandbox)
+    pushFlag(execArgs, '--full-auto', asBoolean((toolConfig as Record<string, unknown>).full_auto))
     pushFlag(
-      args,
+      execArgs,
       '--dangerously-bypass-approvals-and-sandbox',
       asBoolean((toolConfig as Record<string, unknown>).dangerously_bypass_approvals_and_sandbox)
     )
-    pushFlag(args, '--oss', asBoolean((toolConfig as Record<string, unknown>).oss))
+    pushFlag(execArgs, '--oss', asBoolean((toolConfig as Record<string, unknown>).oss))
     pushFlagWithValue(
-      args,
+      execArgs,
       '--local-provider',
       (toolConfig as Record<string, unknown>).local_provider
     )
     pushFlag(args, '--search', asBoolean((toolConfig as Record<string, unknown>).search))
-    pushRepeatableFlag(args, '--add-dir', (toolConfig as Record<string, unknown>).add_dir)
-    pushFlagWithValue(args, '--cd', (toolConfig as Record<string, unknown>).cd)
+    pushRepeatableFlag(execArgs, '--add-dir', (toolConfig as Record<string, unknown>).add_dir)
+    pushFlagWithValue(execArgs, '--cd', (toolConfig as Record<string, unknown>).cd)
     pushFlag(
       args,
       '--no-alt-screen',
@@ -124,6 +123,7 @@ export class CodexCliAdapter implements CliAdapter {
     }
 
     args.push('exec')
+    args.push(...execArgs)
     if (resumeThreadId) {
       args.push('resume')
     }

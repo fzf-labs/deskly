@@ -1,6 +1,6 @@
 import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliAdapter } from './ProcessCliAdapter'
-import { failureSignal, parseJsonLine, successSignal } from './completion'
+import { failureSignal, parseJsonLine } from './completion'
 import { asBoolean, asStringArray, pushFlag, pushFlagWithValue, pushRepeatableFlag } from './config-utils'
 import { ProcessCommandSpec } from '../ProcessCliSession'
 
@@ -15,6 +15,19 @@ const AUTH_REQUIRED_PATTERNS = [
 
 function isAuthRequired(line: string): boolean {
   return AUTH_REQUIRED_PATTERNS.some((pattern) => pattern.test(line))
+}
+
+export function detectCursorCompletion(line: string) {
+  const msg = parseJsonLine(line)
+  if (!msg) return null
+  if (msg.type === 'result') {
+    const subtype = msg.subtype as string | undefined
+    const isError = msg.is_error as boolean | undefined
+    if (subtype === 'error' || isError === true) return failureSignal('result')
+    return null
+  }
+  if (msg.type === 'error') return failureSignal('error')
+  return null
 }
 
 export class CursorAgentAdapter implements CliAdapter {
@@ -53,18 +66,7 @@ export class CursorAgentAdapter implements CliAdapter {
     this.adapter = new ProcessCliAdapter({
       id: this.id,
       buildCommand: (options: CliStartOptions) => this.buildCommandSpec(options),
-      detectCompletion: (line) => {
-        const msg = parseJsonLine(line)
-        if (!msg) return null
-        if (msg.type === 'result') {
-          const subtype = msg.subtype as string | undefined
-          const isError = msg.is_error as boolean | undefined
-          if (subtype === 'error' || isError === true) return failureSignal('result')
-          return successSignal('result')
-        }
-        if (msg.type === 'error') return failureSignal('error')
-        return null
-      },
+      detectCompletion: detectCursorCompletion,
       detectStderrCompletion: (line) => {
         if (isAuthRequired(line)) {
           return failureSignal('auth-required')

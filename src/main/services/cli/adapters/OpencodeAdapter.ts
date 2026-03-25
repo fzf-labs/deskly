@@ -1,10 +1,26 @@
 import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliAdapter } from './ProcessCliAdapter'
-import { failureSignal, parseJsonLine, successSignal } from './completion'
+import { failureSignal, parseJsonLine } from './completion'
 import { asBoolean, asStringArray, pushFlag, pushFlagWithValue, pushRepeatableFlag } from './config-utils'
 import { ProcessCommandSpec } from '../ProcessCliSession'
 
 type RecordLike = Record<string, unknown>
+
+export function detectOpencodeCompletion(line: string) {
+  const msg = parseJsonLine(line)
+  if (!msg) return null
+
+  if (msg.type === 'done') return null
+  if (msg.type === 'error') return failureSignal('error')
+
+  if (msg.type === 'sdk_event') {
+    const event = msg.event as Record<string, unknown> | undefined
+    const eventType = event?.type as string | undefined
+    if (eventType === 'session.error') return failureSignal('session.error')
+  }
+
+  return null
+}
 
 export class OpencodeAdapter implements CliAdapter {
   id = 'opencode'
@@ -17,21 +33,7 @@ export class OpencodeAdapter implements CliAdapter {
       {
         id: this.id,
         buildCommand: (options: CliStartOptions) => this.buildCommandSpec(options),
-        detectCompletion: (line) => {
-          const msg = parseJsonLine(line)
-          if (!msg) return null
-
-          if (msg.type === 'done') return successSignal('done')
-          if (msg.type === 'error') return failureSignal('error')
-
-          if (msg.type === 'sdk_event') {
-            const event = msg.event as Record<string, unknown> | undefined
-            const eventType = event?.type as string | undefined
-            if (eventType === 'session.error') return failureSignal('session.error')
-          }
-
-          return null
-        }
+        detectCompletion: detectOpencodeCompletion
       }
     )
   }

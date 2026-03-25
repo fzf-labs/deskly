@@ -65,8 +65,13 @@ export class TerminalService extends EventEmitter {
     try {
       return createSession(params)
     } catch (error) {
-      console.error('[TerminalService] Failed to create session, retrying fallback shell:', error)
-      return createSession({ ...params, useFallbackShell: true })
+      console.error('[TerminalService] Failed to create session with user shell config, retrying clean shell config:', error)
+      try {
+        return createSession({ ...params, useCleanShellConfig: true })
+      } catch (cleanShellError) {
+        console.error('[TerminalService] Failed to create session with clean shell config, retrying fallback shell:', cleanShellError)
+        return createSession({ ...params, useFallbackShell: true })
+      }
     }
   }
 
