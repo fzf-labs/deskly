@@ -10,7 +10,7 @@ export default {
   newTask: '新建任务',
   newThread: '新对话',
   allTasks: '所有任务',
-  threads: '对话',
+  threads: '项目',
   addProject: '添加项目',
   sortThreads: '排序对话',
   sortByRecent: '按最近活动排序',
