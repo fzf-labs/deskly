@@ -12,32 +12,23 @@ Provides:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from .paths import (
+    FILE_TASK_JSON,
     get_repo_root,
     get_developer,
     get_tasks_dir,
 )
-from .tasks import iter_active_tasks
 
 
-# =============================================================================
-# Internal helper
-# =============================================================================
-
-def _task_to_dict(t) -> dict:
-    """Convert TaskInfo to the dict format callers expect."""
-    return {
-        "priority": t.priority,
-        "id": t.raw.get("id", ""),
-        "title": t.title,
-        "status": t.status,
-        "assignee": t.assignee or "-",
-        "dir": t.dir_name,
-        "children": list(t.children),
-        "parent": t.parent,
-    }
+def _read_json_file(path: Path) -> dict | None:
+    """Read and parse a JSON file."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
 
 
 # =============================================================================
@@ -63,10 +54,41 @@ def list_tasks_by_status(
     tasks_dir = get_tasks_dir(repo_root)
     results = []
 
-    for t in iter_active_tasks(tasks_dir):
-        if filter_status and t.status != filter_status:
+    if not tasks_dir.is_dir():
+        return results
+
+    for d in tasks_dir.iterdir():
+        if not d.is_dir() or d.name == "archive":
             continue
-        results.append(_task_to_dict(t))
+
+        task_json = d / FILE_TASK_JSON
+        if not task_json.is_file():
+            continue
+
+        data = _read_json_file(task_json)
+        if not data:
+            continue
+
+        task_id = data.get("id", "")
+        title = data.get("title") or data.get("name", "")
+        priority = data.get("priority", "P2")
+        status = data.get("status", "planning")
+        assignee = data.get("assignee", "-")
+
+        # Apply filter
+        if filter_status and status != filter_status:
+            continue
+
+        results.append({
+            "priority": priority,
+            "id": task_id,
+            "title": title,
+            "status": status,
+            "assignee": assignee,
+            "dir": d.name,
+            "children": data.get("children", []),
+            "parent": data.get("parent"),
+        })
 
     return results
 
@@ -104,12 +126,46 @@ def list_tasks_by_assignee(
     tasks_dir = get_tasks_dir(repo_root)
     results = []
 
-    for t in iter_active_tasks(tasks_dir):
-        if (t.assignee or "-") != assignee:
+    if not tasks_dir.is_dir():
+        return results
+
+    for d in tasks_dir.iterdir():
+        if not d.is_dir() or d.name == "archive":
             continue
-        if filter_status and t.status != filter_status:
+
+        task_json = d / FILE_TASK_JSON
+        if not task_json.is_file():
             continue
-        results.append(_task_to_dict(t))
+
+        data = _read_json_file(task_json)
+        if not data:
+            continue
+
+        task_assignee = data.get("assignee", "-")
+
+        # Apply assignee filter
+        if task_assignee != assignee:
+            continue
+
+        task_id = data.get("id", "")
+        title = data.get("title") or data.get("name", "")
+        priority = data.get("priority", "P2")
+        status = data.get("status", "planning")
+
+        # Apply status filter
+        if filter_status and status != filter_status:
+            continue
+
+        results.append({
+            "priority": priority,
+            "id": task_id,
+            "title": title,
+            "status": status,
+            "assignee": task_assignee,
+            "dir": d.name,
+            "children": data.get("children", []),
+            "parent": data.get("parent"),
+        })
 
     return results
 
@@ -155,9 +211,24 @@ def get_task_stats(repo_root: Path | None = None) -> dict[str, int]:
     tasks_dir = get_tasks_dir(repo_root)
     stats = {"P0": 0, "P1": 0, "P2": 0, "P3": 0, "Total": 0}
 
-    for t in iter_active_tasks(tasks_dir):
-        if t.priority in stats:
-            stats[t.priority] += 1
+    if not tasks_dir.is_dir():
+        return stats
+
+    for d in tasks_dir.iterdir():
+        if not d.is_dir() or d.name == "archive":
+            continue
+
+        task_json = d / FILE_TASK_JSON
+        if not task_json.is_file():
+            continue
+
+        data = _read_json_file(task_json)
+        if not data:
+            continue
+
+        priority = data.get("priority", "P2")
+        if priority in stats:
+            stats[priority] += 1
         stats["Total"] += 1
 
     return stats

@@ -1,7 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
-{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Renderer WorkflowRun typing must stay defensive across IPC boundary"}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Workflow snapshot data crosses main->renderer->component boundaries"}
-{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "useTaskDetail will derive DAG view model and load snapshot-backed workflow data"}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Workflow DAG card is a page-local UI component in task detail"}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend DAG replacement must pass lint/typecheck and manual verification expectations"}

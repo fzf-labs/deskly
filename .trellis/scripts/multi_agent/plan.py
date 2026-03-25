@@ -24,12 +24,36 @@ import subprocess
 import sys
 from pathlib import Path
 
-import _bootstrap  # noqa: F401 — adds parent scripts/ dir to sys.path
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from common.cli_adapter import get_cli_adapter
-from common.log import Colors, log_info, log_success, log_error
 from common.paths import get_repo_root
 from common.developer import ensure_developer
+
+
+# =============================================================================
+# Colors
+# =============================================================================
+
+class Colors:
+    RED = "\033[0;31m"
+    GREEN = "\033[0;32m"
+    YELLOW = "\033[1;33m"
+    BLUE = "\033[0;34m"
+    NC = "\033[0m"
+
+
+def log_info(msg: str) -> None:
+    print(f"{Colors.BLUE}[INFO]{Colors.NC} {msg}")
+
+
+def log_success(msg: str) -> None:
+    print(f"{Colors.GREEN}[SUCCESS]{Colors.NC} {msg}")
+
+
+def log_error(msg: str) -> None:
+    print(f"{Colors.RED}[ERROR]{Colors.NC} {msg}")
 
 
 # =============================================================================
@@ -53,7 +77,7 @@ def main() -> int:
     parser.add_argument("--requirement", "-r", required=True, help="Requirement description")
     parser.add_argument(
         "--platform", "-p",
-        choices=["claude", "cursor", "iflow", "opencode", "codex", "qoder"],
+        choices=["claude", "cursor", "iflow", "opencode", "qoder"],
         default=DEFAULT_PLATFORM,
         help="Platform to use (default: claude)"
     )
@@ -76,12 +100,11 @@ def main() -> int:
     project_root = get_repo_root()
 
     # Check plan agent exists (path varies by platform)
-    if adapter.requires_agent_definition_file:
-        plan_md = adapter.get_agent_path("plan", project_root)
-        if not plan_md.is_file():
-            log_error(f"Agent definition not found at {plan_md}")
-            log_info(f"Platform: {platform}")
-            return 1
+    plan_md = adapter.get_agent_path("plan", project_root)
+    if not plan_md.is_file():
+        log_error(f"plan agent not found at {plan_md}")
+        log_info(f"Platform: {platform}")
+        return 1
 
     ensure_developer(project_root)
 

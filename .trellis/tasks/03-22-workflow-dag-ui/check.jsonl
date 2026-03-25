@@ -1,6 +1,0 @@
-{"file": ".claude/commands/trellis/finish-work.md", "reason": "Finish work checklist"}
-{"file": ".claude/commands/trellis/check.md", "reason": "Code quality check spec"}
-{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "Review useTaskDetail state derivation and effect cleanup"}
-{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Review IPC-backed workflow snapshot typing and narrowing"}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Review task-detail DAG component structure and accessibility"}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Review lint/typecheck/manual verification bar for renderer changes"}

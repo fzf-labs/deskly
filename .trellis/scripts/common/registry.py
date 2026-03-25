@@ -16,35 +16,29 @@ Provides:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 
-from .io import read_json, write_json
 from .paths import get_repo_root
 from .worktree import get_agents_dir
 
 
-# =============================================================================
-# Internal Helpers
-# =============================================================================
+def _read_json_file(path: Path) -> dict | None:
+    """Read and parse a JSON file."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
 
-def _load_registry(
-    repo_root: Path | None = None,
-) -> tuple[Path | None, dict | None]:
-    """Load registry file and data in one step.
 
-    Returns:
-        (registry_file_path, data_dict) — either may be None.
-    """
-    if repo_root is None:
-        repo_root = get_repo_root()
-
-    registry_file = registry_get_file(repo_root)
-    if not registry_file or not registry_file.is_file():
-        return registry_file, None
-
-    data = read_json(registry_file)
-    return registry_file, data
+def _write_json_file(path: Path, data: dict) -> bool:
+    """Write dict to JSON file."""
+    try:
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        return True
+    except (OSError, IOError):
+        return False
 
 
 # =============================================================================
@@ -91,7 +85,7 @@ def _ensure_registry(repo_root: Path | None = None) -> Path | None:
         agents_dir.mkdir(parents=True, exist_ok=True)
 
         if not registry_file.exists():
-            write_json(registry_file, {"agents": []})
+            _write_json_file(registry_file, {"agents": []})
 
         return registry_file
     except (OSError, IOError):
@@ -115,7 +109,14 @@ def registry_get_agent_by_id(
     Returns:
         Agent dict, or None if not found.
     """
-    _, data = _load_registry(repo_root)
+    if repo_root is None:
+        repo_root = get_repo_root()
+
+    registry_file = registry_get_file(repo_root)
+    if not registry_file or not registry_file.is_file():
+        return None
+
+    data = _read_json_file(registry_file)
     if not data:
         return None
 
@@ -139,7 +140,14 @@ def registry_get_agent_by_worktree(
     Returns:
         Agent dict, or None if not found.
     """
-    _, data = _load_registry(repo_root)
+    if repo_root is None:
+        repo_root = get_repo_root()
+
+    registry_file = registry_get_file(repo_root)
+    if not registry_file or not registry_file.is_file():
+        return None
+
+    data = _read_json_file(registry_file)
     if not data:
         return None
 
@@ -163,7 +171,14 @@ def registry_search_agent(
     Returns:
         First matching agent dict, or None if not found.
     """
-    _, data = _load_registry(repo_root)
+    if repo_root is None:
+        repo_root = get_repo_root()
+
+    registry_file = registry_get_file(repo_root)
+    if not registry_file or not registry_file.is_file():
+        return None
+
+    data = _read_json_file(registry_file)
     if not data:
         return None
 
@@ -192,14 +207,9 @@ def registry_get_task_dir(
     Returns:
         Task directory path, or None if not found.
     """
-    _, data = _load_registry(repo_root)
-    if not data:
-        return None
-
-    for agent in data.get("agents", []):
-        if agent.get("worktree_path") == worktree_path:
-            return agent.get("task_dir")
-
+    agent = registry_get_agent_by_worktree(worktree_path, repo_root)
+    if agent:
+        return agent.get("task_dir")
     return None
 
 
@@ -217,14 +227,21 @@ def registry_remove_by_id(agent_id: str, repo_root: Path | None = None) -> bool:
     Returns:
         True on success.
     """
-    registry_file, data = _load_registry(repo_root)
-    if not registry_file or not data:
+    if repo_root is None:
+        repo_root = get_repo_root()
+
+    registry_file = registry_get_file(repo_root)
+    if not registry_file or not registry_file.is_file():
         return True  # Nothing to remove
+
+    data = _read_json_file(registry_file)
+    if not data:
+        return True
 
     agents = data.get("agents", [])
     data["agents"] = [a for a in agents if a.get("id") != agent_id]
 
-    return write_json(registry_file, data)
+    return _write_json_file(registry_file, data)
 
 
 def registry_remove_by_worktree(
@@ -240,14 +257,21 @@ def registry_remove_by_worktree(
     Returns:
         True on success.
     """
-    registry_file, data = _load_registry(repo_root)
-    if not registry_file or not data:
+    if repo_root is None:
+        repo_root = get_repo_root()
+
+    registry_file = registry_get_file(repo_root)
+    if not registry_file or not registry_file.is_file():
         return True  # Nothing to remove
+
+    data = _read_json_file(registry_file)
+    if not data:
+        return True
 
     agents = data.get("agents", [])
     data["agents"] = [a for a in agents if a.get("worktree_path") != worktree_path]
 
-    return write_json(registry_file, data)
+    return _write_json_file(registry_file, data)
 
 
 def registry_add_agent(
@@ -278,7 +302,7 @@ def registry_add_agent(
     if not registry_file:
         return False
 
-    data = read_json(registry_file)
+    data = _read_json_file(registry_file)
     if not data:
         data = {"agents": []}
 
@@ -300,7 +324,7 @@ def registry_add_agent(
     agents.append(new_agent)
     data["agents"] = agents
 
-    return write_json(registry_file, data)
+    return _write_json_file(registry_file, data)
 
 
 def registry_list_agents(repo_root: Path | None = None) -> list[dict]:
@@ -312,7 +336,14 @@ def registry_list_agents(repo_root: Path | None = None) -> list[dict]:
     Returns:
         List of agent dicts.
     """
-    _, data = _load_registry(repo_root)
+    if repo_root is None:
+        repo_root = get_repo_root()
+
+    registry_file = registry_get_file(repo_root)
+    if not registry_file or not registry_file.is_file():
+        return []
+
+    data = _read_json_file(registry_file)
     if not data:
         return []
 

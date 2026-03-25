@@ -58,30 +58,35 @@ git status && git log --oneline -10              # Git state
 **CRITICAL**: Read guidelines before writing any code:
 
 ```bash
-# Discover available packages and spec layers
-python3 ./.trellis/scripts/get_context.py --mode packages
+# Read frontend guidelines index (if applicable)
+cat .trellis/spec/frontend/index.md
 
-# Read the spec index for each relevant module
-cat .trellis/spec/<package>/<layer>/index.md
-
-# Always read shared guides
-cat .trellis/spec/guides/index.md
+# Read backend guidelines index (if applicable)
+cat .trellis/spec/backend/index.md
 ```
 
-**Why this matters?**
-- Understand which spec layers apply to your task
-- Know coding standards for the packages you'll modify
+**Why read both?**
+- Understand the full project architecture
+- Know coding standards for the entire codebase
+- See how frontend and backend interact
 - Learn the overall code quality requirements
 
 ### Step 3: Before Coding - Read Specific Guidelines (Required)
 
-Based on your task, read the **detailed** guideline files listed in each spec index's **Pre-Development Checklist**:
+Based on your task, read the **detailed** guidelines:
 
+**Frontend Task**:
 ```bash
-# The index points to specific files — read those, not just the index
-cat .trellis/spec/<package>/<layer>/error-handling.md
-cat .trellis/spec/<package>/<layer>/conventions.md
-# etc. — based on what the Pre-Development Checklist lists
+cat .trellis/spec/frontend/hook-guidelines.md      # For hooks
+cat .trellis/spec/frontend/component-guidelines.md # For components
+cat .trellis/spec/frontend/type-safety.md          # For types
+```
+
+**Backend Task**:
+```bash
+cat .trellis/spec/backend/database-guidelines.md   # For DB operations
+cat .trellis/spec/backend/type-safety.md           # For types
+cat .trellis/spec/backend/logging-guidelines.md    # For logging
 ```
 
 ---
@@ -163,14 +168,21 @@ python3 ./.trellis/scripts/get_context.py --json
 
 Based on what you'll develop, read the corresponding guidelines:
 
+**Frontend Development** (if applicable):
 ```bash
-# Discover available packages and spec layers
-python3 ./.trellis/scripts/get_context.py --mode packages
+# Read index first, then specific docs based on task
+cat .trellis/spec/frontend/index.md
+```
 
-# Read spec indexes for relevant modules
-cat .trellis/spec/<package>/<layer>/index.md
+**Backend Development** (if applicable):
+```bash
+# Read index first, then specific docs based on task
+cat .trellis/spec/backend/index.md
+```
 
-# For cross-layer features
+**Cross-Layer Features**:
+```bash
+# For features spanning multiple layers
 cat .trellis/spec/guides/cross-layer-thinking-guide.md
 ```
 
@@ -221,7 +233,8 @@ python3 ./.trellis/scripts/task.py create "<title>" --slug <task-name>
 - [OK] Manual feature testing passes
 
 **Project-specific checks**:
-- See `.trellis/spec/<package>/<layer>/quality-guidelines.md` for package-specific checks
+- See `.trellis/spec/frontend/quality-guidelines.md` for frontend
+- See `.trellis/spec/backend/quality-guidelines.md` for backend
 
 ---
 

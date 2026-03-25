@@ -1,6 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
-{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "Async renderer orchestration and state updates must follow existing hook/data loading patterns."}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse existing CLI runtime and workflow validation instead of creating duplicate process or graph logic."}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "The feature spans renderer adapter, IPC contracts, main services, and CLI runtime output parsing."}
