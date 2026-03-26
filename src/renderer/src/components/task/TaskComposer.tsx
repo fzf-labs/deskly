@@ -3,6 +3,8 @@ import { PromptOptimizeButton } from '@/components/shared/PromptOptimizeButton'
 import { ChatInput } from '@/components/shared/ChatInput'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
 
+import type { GeneratedWorkflowReviewRequest } from './task-create-utils'
+
 import { TaskCreateMenu } from './TaskCreateMenu'
 import { useTaskComposer } from './useTaskComposer'
 
@@ -10,6 +12,7 @@ interface TaskComposerProps {
   active?: boolean
   resetOnActivate?: boolean
   projectId?: string
+  projectName?: string
   projectPath?: string
   projectType?: 'normal' | 'git'
   titleRequired?: boolean
@@ -17,9 +20,17 @@ interface TaskComposerProps {
   promptPlaceholder?: string
   autoFocus?: boolean
   className?: string
+  onOpenGeneratedWorkflowReview?: (
+    request: GeneratedWorkflowReviewRequest
+  ) => void | Promise<void>
   onCreated?: (
     task: unknown,
-    context: { prompt: string; attachments?: MessageAttachment[] }
+    context: {
+      prompt: string
+      attachments?: MessageAttachment[]
+      navigateToTaskDetail?: boolean
+      startError?: string
+    }
   ) => void | Promise<void>
 }
 
@@ -27,6 +38,7 @@ export function TaskComposer({
   active = true,
   resetOnActivate = false,
   projectId,
+  projectName,
   projectPath,
   projectType = 'normal',
   titleRequired = false,
@@ -34,12 +46,14 @@ export function TaskComposer({
   promptPlaceholder = '提示词',
   autoFocus = false,
   className,
+  onOpenGeneratedWorkflowReview,
   onCreated
 }: TaskComposerProps) {
   const composer = useTaskComposer({
     active,
     resetOnActivate,
     projectId,
+    projectName,
     projectPath,
     projectType,
     titleRequired
@@ -59,6 +73,11 @@ export function TaskComposer({
         onSubmit={async (text, attachments) => {
           const result = await composer.createTask(text, attachments)
           if (!result) return
+          if (result.reviewRequest) {
+            await onOpenGeneratedWorkflowReview?.(result.reviewRequest)
+            return
+          }
+          if (!result.task || !result.context) return
           await onCreated?.(result.task, result.context)
         }}
         className={className}
@@ -66,9 +85,9 @@ export function TaskComposer({
         disabled={composer.loading}
         operationBar={
           <TaskCreateMenu
-            taskMode={composer.taskMode}
-            onTaskModeChange={composer.setTaskMode}
-            canUseWorkflowMode={Boolean(projectId)}
+            createMode={composer.createMode}
+            onCreateModeChange={composer.setCreateMode}
+            canUseProjectWorkflowModes={Boolean(projectId)}
             cliTools={composer.cliTools}
             selectedCliToolId={composer.selectedCliToolId}
             onSelectCliToolId={composer.setSelectedCliToolId}

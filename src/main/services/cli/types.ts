@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { MsgStoreService } from '../MsgStoreService'
 
 export type CliSessionStatus = 'running' | 'stopped' | 'error'
+export type CliUserInputLogMode = 'native' | 'inject-normalized'
 
 export interface CliSessionClosePayload {
   sessionId: string
@@ -48,5 +49,6 @@ export interface CliSessionHandle extends EventEmitter {
 
 export interface CliAdapter {
   id: string
+  userInputLogMode?: CliUserInputLogMode
   startSession: (options: CliStartOptions) => Promise<CliSessionHandle>
 }

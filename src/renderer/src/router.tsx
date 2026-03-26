@@ -12,7 +12,8 @@ import {
   WorkflowTemplateEditorPage,
   SettingsPage,
   TasksPage,
-  AutomationsPage
+  AutomationsPage,
+  GeneratedWorkflowReviewPage
 } from '@/pages'
 
 import { SetupGuard } from '@/components/shared/SetupGuard'
@@ -54,6 +55,10 @@ export const router = createHashRouter([
       {
         path: 'pipeline-templates/editor',
         element: <WorkflowTemplateEditorPage />
+      },
+      {
+        path: 'generated-workflow-review',
+        element: <GeneratedWorkflowReviewPage />
       },
       {
         path: 'skills',

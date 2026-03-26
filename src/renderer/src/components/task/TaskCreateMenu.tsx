@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 
-export type TaskMode = 'conversation' | 'workflow'
+import type { TaskCreateMode } from './task-create-utils'
 
 export interface TaskMenuCliToolInfo {
   id: string
@@ -25,9 +25,9 @@ export interface TaskMenuWorkflowTemplate {
 }
 
 interface TaskCreateMenuProps {
-  taskMode: TaskMode
-  onTaskModeChange: (mode: TaskMode) => void
-  canUseWorkflowMode: boolean
+  createMode: TaskCreateMode
+  onCreateModeChange: (mode: TaskCreateMode) => void
+  canUseProjectWorkflowModes: boolean
 
   cliTools: TaskMenuCliToolInfo[]
   selectedCliToolId: string
@@ -48,9 +48,9 @@ interface TaskCreateMenuProps {
 }
 
 export function TaskCreateMenu({
-  taskMode,
-  onTaskModeChange,
-  canUseWorkflowMode,
+  createMode,
+  onCreateModeChange,
+  canUseProjectWorkflowModes,
   cliTools,
   selectedCliToolId,
   onSelectCliToolId,
@@ -96,9 +96,9 @@ export function TaskCreateMenu({
       <div className="border-border bg-background inline-flex overflow-hidden rounded-full border">
         <button
           type="button"
-          onClick={() => onTaskModeChange('conversation')}
+          onClick={() => onCreateModeChange('conversation')}
           className={
-            taskMode === 'conversation'
+            createMode === 'conversation'
               ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-sm'
               : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs'
           }
@@ -107,19 +107,31 @@ export function TaskCreateMenu({
         </button>
         <button
           type="button"
-          onClick={() => onTaskModeChange('workflow')}
-          disabled={!canUseWorkflowMode}
+          onClick={() => onCreateModeChange('workflow')}
+          disabled={!canUseProjectWorkflowModes}
           className={
-            taskMode === 'workflow'
+            createMode === 'workflow'
               ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-sm disabled:opacity-50'
               : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50'
           }
         >
           {t.task.createModeWorkflow}
         </button>
+        <button
+          type="button"
+          onClick={() => onCreateModeChange('generated-workflow')}
+          disabled={!canUseProjectWorkflowModes}
+          className={
+            createMode === 'generated-workflow'
+              ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-sm disabled:opacity-50'
+              : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50'
+          }
+        >
+          {t.task.createModeGeneratedWorkflow}
+        </button>
       </div>
 
-      {taskMode === 'conversation' && (
+      {(createMode === 'conversation' || createMode === 'generated-workflow') && (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors">
             <Wrench className="size-3.5" />
@@ -143,7 +155,7 @@ export function TaskCreateMenu({
         </DropdownMenu>
       )}
 
-      {taskMode === 'conversation' && (
+      {(createMode === 'conversation' || createMode === 'generated-workflow') && (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger
             disabled={!selectedCliToolId || cliConfigs.length === 0}
@@ -170,7 +182,7 @@ export function TaskCreateMenu({
         </DropdownMenu>
       )}
 
-      {taskMode === 'workflow' && (
+      {createMode === 'workflow' && (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger
             disabled={workflowTemplates.length === 0}

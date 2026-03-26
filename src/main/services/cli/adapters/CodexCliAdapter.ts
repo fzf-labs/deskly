@@ -32,6 +32,7 @@ export function detectCodexCompletion(line: string) {
 
 export class CodexCliAdapter implements CliAdapter {
   id = 'codex'
+  userInputLogMode = 'inject-normalized' as const
   private adapter: ProcessCliAdapter
   private threadIds = new Map<string, string>()
   private stdoutBuffers = new Map<string, string>()

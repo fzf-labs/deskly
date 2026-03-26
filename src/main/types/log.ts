@@ -71,6 +71,8 @@ export interface NormalizedEntryMetadata {
   filePath?: string
   status?: ToolStatus
   toolUseId?: string
+  syntheticSource?: 'deskly_user_input'
+  userInputPhase?: 'start' | 'followup'
 }
 
 // 标准化日志条目

@@ -136,4 +136,48 @@ describe('MsgStoreService', () => {
     const otherNodeHistory = MsgStoreService.loadFromFile('task-c', 'node-2', 'project')
     expect(otherNodeHistory.length).toBe(0)
   })
+
+  it('round-trips normalized user messages through the task node jsonl file', async () => {
+    const { MsgStoreService, sessionRoot } = await setupMsgStore({
+      DESKLY_LOG_BATCH_MAX_BYTES: '1000000',
+      DESKLY_LOG_FLUSH_INTERVAL_MS: '10',
+      DESKLY_LOG_MAX_BYTES: '1000000',
+      DESKLY_LOG_MAX_FILES: '1'
+    })
+
+    const store = new MsgStoreService(undefined, 'task-d', 'session-d', 'project', 'node-user')
+    const nodeLogPath = join(sessionRoot, 'task-d', 'node-user.jsonl')
+
+    store.push({
+      type: 'normalized',
+      timestamp: 1710000000000,
+      entry: {
+        id: 'entry-user-1',
+        type: 'user_message',
+        timestamp: 1710000000000,
+        content: 'Synthetic user message',
+        metadata: {
+          syntheticSource: 'deskly_user_input',
+          userInputPhase: 'start'
+        }
+      }
+    } as any)
+
+    await waitFor(() => existsSync(nodeLogPath), 1000)
+
+    const fileContent = readFileSync(nodeLogPath, 'utf-8')
+    expect(fileContent).toContain('"type":"normalized"')
+    expect(fileContent).toContain('"syntheticSource":"deskly_user_input"')
+
+    const history = MsgStoreService.loadFromFile('task-d', 'node-user', 'project') as Array<{
+      type?: string
+      entry?: { type?: string; content?: string; metadata?: { userInputPhase?: string } }
+    }>
+
+    expect(history).toHaveLength(1)
+    expect(history[0]?.type).toBe('normalized')
+    expect(history[0]?.entry?.type).toBe('user_message')
+    expect(history[0]?.entry?.content).toBe('Synthetic user message')
+    expect(history[0]?.entry?.metadata?.userInputPhase).toBe('start')
+  })
 })

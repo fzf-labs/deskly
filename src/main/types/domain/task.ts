@@ -11,6 +11,7 @@ export interface CreateTaskOptions {
   cliToolId?: string
   agentToolConfigId?: string
   workflowDefinitionId?: string
+  workflowDefinition?: import('../workflow-definition').WorkflowDefinitionDocument
 }
 
 export interface TaskWithWorktree {

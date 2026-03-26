@@ -442,6 +442,7 @@ interface TaskAPI {
     cliToolId?: string
     agentToolConfigId?: string
     workflowDefinitionId?: string
+    workflowDefinition?: import('../main/types/workflow-definition').WorkflowDefinitionDocument
   }) => Promise<TaskWithWorktree>
   get: (id: string) => Promise<TaskWithWorktree | null>
   getAll: () => Promise<TaskWithWorktree[]>

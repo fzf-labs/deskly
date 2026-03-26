@@ -8,8 +8,10 @@ import type {
   CliAdapter,
   CliSessionClosePayload,
   CliSessionHandle,
-  CliStartOptions
+  CliStartOptions,
+  CliUserInputLogMode
 } from '../../src/main/services/cli/types'
+import type { MsgStoreService } from '../../src/main/services/MsgStoreService'
 
 const tempRoots: string[] = []
 
@@ -17,17 +19,15 @@ class ImmediateCloseHandle extends EventEmitter implements CliSessionHandle {
   sessionId: string
   toolId: string
   status = 'stopped' as const
-  msgStore = {
-    getHistory: () => [],
-    subscribe: () => () => undefined
-  } as never
+  msgStore: MsgStoreService
   lastClosePayload: CliSessionClosePayload
   lastErrorPayload = null
 
-  constructor(sessionId: string, toolId: string) {
+  constructor(sessionId: string, toolId: string, msgStore: MsgStoreService) {
     super()
     this.sessionId = sessionId
     this.toolId = toolId
+    this.msgStore = msgStore
     this.lastClosePayload = {
       sessionId,
       code: 0
@@ -39,13 +39,62 @@ class ImmediateCloseHandle extends EventEmitter implements CliSessionHandle {
 
 class ImmediateCloseCodexAdapter implements CliAdapter {
   id = 'codex'
+  userInputLogMode = 'inject-normalized' as const
 
   async startSession(options: CliStartOptions): Promise<CliSessionHandle> {
-    return new ImmediateCloseHandle(options.sessionId, options.toolId)
+    return new ImmediateCloseHandle(options.sessionId, options.toolId, options.msgStore as MsgStoreService)
   }
 }
 
-const setupServices = async () => {
+class InteractiveHandle extends EventEmitter implements CliSessionHandle {
+  sessionId: string
+  toolId: string
+  status = 'running' as const
+  msgStore: MsgStoreService
+  lastClosePayload = null
+  lastErrorPayload = null
+  inputs: string[] = []
+
+  constructor(sessionId: string, toolId: string, msgStore: MsgStoreService) {
+    super()
+    this.sessionId = sessionId
+    this.toolId = toolId
+    this.msgStore = msgStore
+  }
+
+  stop(): void {}
+
+  sendInput(input: string): void {
+    this.inputs.push(input)
+  }
+}
+
+class RecordingAdapter implements CliAdapter {
+  id = 'codex'
+  userInputLogMode?: CliUserInputLogMode
+  startCalls: CliStartOptions[] = []
+  handles: InteractiveHandle[] = []
+
+  constructor(userInputLogMode: CliUserInputLogMode = 'inject-normalized') {
+    this.userInputLogMode = userInputLogMode
+  }
+
+  async startSession(options: CliStartOptions): Promise<CliSessionHandle> {
+    this.startCalls.push(options)
+    const handle = new InteractiveHandle(
+      options.sessionId,
+      options.toolId,
+      options.msgStore as MsgStoreService
+    )
+    this.handles.push(handle)
+    return handle
+  }
+}
+
+const setupServices = async (options?: {
+  adapter?: CliAdapter
+  config?: Record<string, unknown>
+}) => {
   const rootDir = mkdtempSync(join(tmpdir(), 'deskly-cli-session-db-'))
   const dataDir = join(rootDir, 'data')
   const worktreesDir = join(rootDir, 'worktrees')
@@ -104,7 +153,7 @@ const setupServices = async () => {
   )
   const cliSessionService = new CliSessionService(
     {
-      getConfig: () => ({}),
+      getConfig: () => options?.config ?? {},
       saveConfig: vi.fn()
     } as never,
     db,
@@ -120,7 +169,7 @@ const setupServices = async () => {
       })
     } as never
   )
-  cliSessionService.registerAdapter(new ImmediateCloseCodexAdapter())
+  cliSessionService.registerAdapter(options?.adapter ?? new ImmediateCloseCodexAdapter())
 
   return { db, taskService, cliSessionService }
 }
@@ -172,6 +221,129 @@ describe('CliSessionService', () => {
       expect(updatedNode?.session_id).toBe('session-immediate-close')
       expect(cliSessionService.getSession('session-immediate-close')).toBeNull()
     } finally {
+      cliSessionService.dispose()
+      db.close()
+    }
+  })
+
+  it('injects synthetic user logs for codex start and followup input without leaking appended prompt', async () => {
+    const adapter = new RecordingAdapter('inject-normalized')
+    const setup = await setupServices({
+      adapter,
+      config: {
+        append_prompt: 'SYSTEM APPENDED'
+      }
+    })
+    if (!setup) {
+      return
+    }
+    const { db, taskService, cliSessionService } = setup
+
+    try {
+      const task = await taskService.createTask({
+        title: 'Synthetic user log task',
+        prompt: 'Summarize the result',
+        taskMode: 'conversation',
+        cliToolId: 'codex'
+      })
+
+      const runningNode = db.startTaskExecution(task.id)
+      expect(runningNode?.status).toBe('in_progress')
+
+      await cliSessionService.startSession(
+        'session-synthetic-user-log',
+        'codex',
+        rootDirForTask(task),
+        'Original user prompt',
+        undefined,
+        undefined,
+        task.project_id,
+        task.id,
+        runningNode?.agent_tool_config_id ?? null,
+        runningNode?.id
+      )
+
+      expect(adapter.startCalls[0]?.prompt).toBe('Original user prompt\n\nSYSTEM APPENDED')
+
+      const historyAfterStart = cliSessionService.getSessionLogHistory(
+        'session-synthetic-user-log',
+        task.id,
+        runningNode?.id ?? null
+      )
+      const normalizedStartLogs = historyAfterStart.filter((msg) => msg.type === 'normalized')
+      expect(normalizedStartLogs).toHaveLength(1)
+      expect(normalizedStartLogs[0]?.entry.type).toBe('user_message')
+      expect(normalizedStartLogs[0]?.entry.content).toBe('Original user prompt')
+      expect(normalizedStartLogs[0]?.entry.metadata?.syntheticSource).toBe('deskly_user_input')
+      expect(normalizedStartLogs[0]?.entry.metadata?.userInputPhase).toBe('start')
+
+      cliSessionService.sendInput('session-synthetic-user-log', 'Follow-up question')
+      cliSessionService.sendInput('session-synthetic-user-log', '   ')
+
+      const historyAfterFollowup = cliSessionService.getSessionLogHistory(
+        'session-synthetic-user-log',
+        task.id,
+        runningNode?.id ?? null
+      )
+      const normalizedUserLogs = historyAfterFollowup.filter(
+        (msg) => msg.type === 'normalized' && msg.entry.type === 'user_message'
+      )
+      expect(normalizedUserLogs).toHaveLength(2)
+      expect(normalizedUserLogs[1]?.entry.content).toBe('Follow-up question')
+      expect(normalizedUserLogs[1]?.entry.metadata?.userInputPhase).toBe('followup')
+      expect(adapter.handles[0]?.inputs).toEqual(['Follow-up question', '   '])
+    } finally {
+      cliSessionService.dispose()
+      db.close()
+    }
+  })
+
+  it('does not inject synthetic user logs for native adapters', async () => {
+    const adapter = new RecordingAdapter('native')
+    const setup = await setupServices({ adapter })
+    if (!setup) {
+      return
+    }
+    const { db, taskService, cliSessionService } = setup
+
+    try {
+      const task = await taskService.createTask({
+        title: 'Native user log task',
+        prompt: 'Summarize the result',
+        taskMode: 'conversation',
+        cliToolId: 'codex'
+      })
+
+      const runningNode = db.startTaskExecution(task.id)
+      expect(runningNode?.status).toBe('in_progress')
+
+      await cliSessionService.startSession(
+        'session-native-user-log',
+        'codex',
+        rootDirForTask(task),
+        'Original user prompt',
+        undefined,
+        undefined,
+        task.project_id,
+        task.id,
+        runningNode?.agent_tool_config_id ?? null,
+        runningNode?.id
+      )
+
+      cliSessionService.sendInput('session-native-user-log', 'Follow-up question')
+
+      const history = cliSessionService.getSessionLogHistory(
+        'session-native-user-log',
+        task.id,
+        runningNode?.id ?? null
+      )
+      const normalizedUserLogs = history.filter(
+        (msg) => msg.type === 'normalized' && msg.entry.type === 'user_message'
+      )
+      expect(normalizedUserLogs).toHaveLength(0)
+      expect(adapter.handles[0]?.inputs).toEqual(['Follow-up question'])
+    } finally {
+      cliSessionService.dispose()
       db.close()
     }
   })

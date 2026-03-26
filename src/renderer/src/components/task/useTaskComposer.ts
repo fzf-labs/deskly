@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { db, type AgentToolConfig } from '@/data'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
@@ -8,12 +8,19 @@ import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools'
 import { notifyTasksChanged } from '@/lib/task-events'
 import { useLanguage } from '@/providers/language-provider'
 
-import type { TaskMode } from './TaskCreateMenu'
+import {
+  buildTaskCreatePayload,
+  deriveTaskTitle,
+  type GeneratedWorkflowReviewRequest,
+  isProjectWorkflowTaskCreateMode,
+  type TaskCreateMode
+} from './task-create-utils'
 
 interface UseTaskComposerOptions {
   active?: boolean
   resetOnActivate?: boolean
   projectId?: string
+  projectName?: string
   projectPath?: string
   projectType?: 'normal' | 'git'
   titleRequired?: boolean
@@ -22,12 +29,21 @@ interface UseTaskComposerOptions {
 interface CreatedTaskContext {
   prompt: string
   attachments?: MessageAttachment[]
+  navigateToTaskDetail?: boolean
+  startError?: string
+}
+
+interface TaskComposerSubmitResult {
+  task?: unknown
+  context?: CreatedTaskContext
+  reviewRequest?: GeneratedWorkflowReviewRequest
 }
 
 export function useTaskComposer({
   active = true,
   resetOnActivate = false,
   projectId,
+  projectName,
   projectPath,
   projectType = 'normal',
   titleRequired = false
@@ -46,7 +62,7 @@ export function useTaskComposer({
     []
   )
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
-  const [taskMode, setTaskMode] = useState<TaskMode>('conversation')
+  const [createMode, setCreateMode] = useState<TaskCreateMode>('conversation')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -58,7 +74,7 @@ export function useTaskComposer({
     setError(null)
     setTitle('')
     setPrompt('')
-    setTaskMode('conversation')
+    setCreateMode('conversation')
     setSelectedCliToolId('')
     setSelectedCliConfigId('')
     setSelectedTemplateId('')
@@ -131,7 +147,8 @@ export function useTaskComposer({
         if (!mounted) return
 
         setCliConfigs(list)
-        const hasSelectedConfig = selectedCliConfigId && list.some((cfg) => cfg.id === selectedCliConfigId)
+        const hasSelectedConfig =
+          selectedCliConfigId && list.some((cfg) => cfg.id === selectedCliConfigId)
         if (!hasSelectedConfig) {
           const defaultConfig = list.find((cfg) => cfg.is_default)
           setSelectedCliConfigId(defaultConfig?.id || '')
@@ -198,7 +215,7 @@ export function useTaskComposer({
   }, [active, projectId, selectedTemplateId])
 
   useEffect(() => {
-    if (taskMode !== 'workflow') return
+    if (createMode !== 'workflow') return
     if (workflowDefinitions.length === 0) {
       if (selectedTemplateId) setSelectedTemplateId('')
       return
@@ -207,7 +224,13 @@ export function useTaskComposer({
     if (!exists) {
       setSelectedTemplateId(workflowDefinitions[0]!.id)
     }
-  }, [selectedTemplateId, taskMode, workflowDefinitions])
+  }, [createMode, selectedTemplateId, workflowDefinitions])
+
+  useEffect(() => {
+    if (!projectId && isProjectWorkflowTaskCreateMode(createMode)) {
+      setCreateMode('conversation')
+    }
+  }, [createMode, projectId])
 
   useEffect(() => {
     if (!active || !isGitProject || !projectPath) {
@@ -258,8 +281,18 @@ export function useTaskComposer({
     }
   }, [active, isGitProject, projectPath])
 
+  const resolvedTaskCliToolId = useMemo(() => {
+    const settings = getSettings()
+    return selectedCliToolId || getEnabledDefaultCliToolId(settings) || ''
+  }, [selectedCliToolId])
+
+  const resolvedTaskCliConfigId = useMemo(
+    () => selectedCliConfigId || cliConfigs.find((config) => config.is_default)?.id || '',
+    [cliConfigs, selectedCliConfigId]
+  )
+
   const createTask = useCallback(
-    async (text: string, attachments?: MessageAttachment[]) => {
+    async (text: string, attachments?: MessageAttachment[]): Promise<TaskComposerSubmitResult | null> => {
       const trimmedPrompt = text.trim()
       const trimmedTitle = title.trim()
 
@@ -273,31 +306,25 @@ export function useTaskComposer({
         return null
       }
 
-      const settings = getSettings()
-      const resolvedCliToolId = selectedCliToolId || getEnabledDefaultCliToolId(settings) || ''
-      const resolvedCliConfigId =
-        selectedCliConfigId || cliConfigs.find((config) => config.is_default)?.id || ''
-
-      if (taskMode === 'conversation') {
-        if (!resolvedCliToolId) {
+      if (createMode === 'conversation' || createMode === 'generated-workflow') {
+        if (!resolvedTaskCliToolId) {
           setError(t.task.createCliRequired)
           return null
         }
-        if (!resolvedCliConfigId) {
+        if (!resolvedTaskCliConfigId) {
           setError(t.task.createCliConfigRequired)
           return null
         }
       }
 
-      if (taskMode === 'workflow') {
-        if (!projectId) {
-          setError(t.task.createPipelineProjectRequired)
-          return null
-        }
-        if (!selectedTemplateId) {
-          setError(t.task.createWorkflowRequired)
-          return null
-        }
+      if (isProjectWorkflowTaskCreateMode(createMode) && !projectId) {
+        setError(t.task.createPipelineProjectRequired)
+        return null
+      }
+
+      if (createMode === 'workflow' && !selectedTemplateId) {
+        setError(t.task.createWorkflowRequired)
+        return null
       }
 
       if (isGitProject && !selectedBaseBranch) {
@@ -305,34 +332,51 @@ export function useTaskComposer({
         return null
       }
 
+      const resolvedTitle = titleRequired ? trimmedTitle : deriveTaskTitle(trimmedPrompt)
+      const resolvedProjectId = projectId ?? ''
+
+      if (createMode === 'generated-workflow') {
+        setError(null)
+        return {
+          reviewRequest: {
+            title: resolvedTitle,
+            prompt: trimmedPrompt,
+            attachments,
+            projectId: resolvedProjectId,
+            projectName,
+            projectPath,
+            projectType,
+            baseBranch: isGitProject ? selectedBaseBranch || undefined : undefined,
+            cliToolId: resolvedTaskCliToolId,
+            agentToolConfigId: resolvedTaskCliConfigId
+          }
+        }
+      }
+
       setLoading(true)
       setError(null)
 
-      const derivedTitle =
-        trimmedPrompt
-          .split('\n')
-          .map((line) => line.trim())
-          .find(Boolean)
-          ?.slice(0, 80) || 'New thread'
-
       try {
+        const settings = getSettings()
         const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'WT-'
         const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
 
-        const createdTask = await window.api.task.create({
-          title: titleRequired ? trimmedTitle : derivedTitle,
-          prompt: trimmedPrompt,
-          taskMode,
-          projectId,
-          projectPath,
-          createWorktree: Boolean(isGitProject && projectPath),
-          baseBranch: isGitProject ? selectedBaseBranch || undefined : undefined,
-          worktreeBranchPrefix,
-          worktreeRootPath,
-          cliToolId: resolvedCliToolId || undefined,
-          agentToolConfigId: resolvedCliConfigId || undefined,
-          workflowDefinitionId: taskMode === 'workflow' ? selectedTemplateId : undefined
-        })
+        const createdTask = await window.api.task.create(
+          buildTaskCreatePayload({
+            createMode,
+            title: resolvedTitle,
+            prompt: trimmedPrompt,
+            projectId,
+            projectPath,
+            createWorktree: Boolean(isGitProject && projectPath),
+            baseBranch: isGitProject ? selectedBaseBranch || undefined : undefined,
+            worktreeBranchPrefix,
+            worktreeRootPath,
+            cliToolId: resolvedTaskCliToolId || undefined,
+            agentToolConfigId: resolvedTaskCliConfigId || undefined,
+            workflowDefinitionId: createMode === 'workflow' ? selectedTemplateId : undefined
+          })
+        )
 
         notifyTasksChanged()
 
@@ -352,14 +396,16 @@ export function useTaskComposer({
       }
     },
     [
-      cliConfigs,
+      createMode,
       isGitProject,
       projectId,
+      projectName,
       projectPath,
+      resolvedTaskCliConfigId,
+      resolvedTaskCliToolId,
       selectedBaseBranch,
-      selectedCliConfigId,
-      selectedCliToolId,
       selectedTemplateId,
+      projectType,
       t.task.createBaseBranchRequired,
       t.task.createCliConfigRequired,
       t.task.createCliRequired,
@@ -368,7 +414,6 @@ export function useTaskComposer({
       t.task.createTaskFailed,
       t.task.createTitleRequired,
       t.task.createWorkflowRequired,
-      taskMode,
       title,
       titleRequired
     ]
@@ -391,8 +436,8 @@ export function useTaskComposer({
     workflowDefinitions,
     selectedTemplateId,
     setSelectedTemplateId,
-    taskMode,
-    setTaskMode,
+    createMode,
+    setCreateMode,
     loading,
     error,
     setError,

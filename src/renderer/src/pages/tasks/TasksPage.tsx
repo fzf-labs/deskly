@@ -5,6 +5,7 @@ import { Select } from '@/components/ui/select'
 import { TaskComposer } from '@/components/task'
 import { useProjects } from '@/hooks/useProjects'
 import { useLanguage } from '@/providers/language-provider'
+import { GENERATED_WORKFLOW_REVIEW_ROUTE } from '@/components/task/task-create-utils'
 
 export function TasksPage() {
   const navigate = useNavigate()
@@ -59,14 +60,27 @@ export function TasksPage() {
           <div className="w-full max-w-3xl">
             <TaskComposer
               projectId={currentProject?.id}
+              projectName={currentProject?.name}
               projectPath={currentProject?.path}
               projectType={currentProject?.projectType}
               promptPlaceholder={t.home.inputPlaceholder}
               className="w-full"
               autoFocus
+              onOpenGeneratedWorkflowReview={async (request) => {
+                navigate(GENERATED_WORKFLOW_REVIEW_ROUTE, {
+                  state: {
+                    ...request,
+                    returnTo: '/tasks'
+                  }
+                })
+              }}
               onCreated={async (task, context) => {
                 navigate(`/task/${(task as { id: string }).id}`, {
-                  state: { prompt: context.prompt, attachments: context.attachments }
+                  state: {
+                    prompt: context.prompt,
+                    attachments: context.attachments,
+                    startError: context.startError
+                  }
                 })
               }}
             />

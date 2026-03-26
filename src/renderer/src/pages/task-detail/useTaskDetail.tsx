@@ -86,6 +86,7 @@ interface UseTaskDetailInput {
   taskId?: string
   initialPrompt: string
   initialSessionId?: string
+  initialStartError?: string
   navigate: NavigateFunction
   activeTaskId: string | null
   messages: AgentMessage[]
@@ -105,6 +106,7 @@ interface UseTaskDetailInput {
 export function useTaskDetail({
   taskId,
   initialPrompt,
+  initialStartError,
   navigate,
   activeTaskId,
   messages,
@@ -186,6 +188,7 @@ export function useTaskDetail({
   const [backendWorkflowRun, setBackendWorkflowRun] = useState<WorkflowRun | null>(null)
   const [workflowRunNodes, setWorkflowRunNodes] = useState<WorkflowRunNode[]>([])
   const [workflowGraph, setWorkflowGraph] = useState<WorkflowGraph>({ nodes: [], edges: [] })
+  const [startupError, setStartupError] = useState<string | null>(initialStartError ?? null)
   const [currentNodeRuntime, setCurrentNodeRuntime] = useState<CurrentNodeRuntime>({
     taskNodeId: null,
     sessionId: null,
@@ -205,6 +208,7 @@ export function useTaskDetail({
         setBackendWorkflowRun(null)
         setWorkflowRunNodes([])
         setWorkflowGraph({ nodes: [], edges: [] })
+        setStartupError(initialStartError ?? null)
         setCurrentNodeRuntime({
           taskNodeId: null,
           sessionId: null,
@@ -216,7 +220,7 @@ export function useTaskDetail({
       }
       prevTaskIdRef.current = taskId
     }
-  }, [taskId])
+  }, [initialStartError, taskId])
 
   const loadCurrentNodeRuntime = useCallback(async () => {
     const emptyRuntime: CurrentNodeRuntime = {
@@ -1254,6 +1258,7 @@ export function useTaskDetail({
   ])
 
   const pipelineBanner = useMemo(() => {
+    if (startupError) return startupError
     if (!pipelineTemplate) return null
     const stage = pipelineTemplate.nodes?.[pipelineStageIndex]
     const stageName = stage?.name || `${t.task.stageLabel} ${pipelineStageIndex + 1}`
@@ -1266,6 +1271,7 @@ export function useTaskDetail({
     pipelineStageIndex,
     pipelineStatus,
     pipelineTemplate,
+    startupError,
     t.task.pipelineCompleted,
     t.task.pipelineStageCompleted,
     t.task.pipelineStageFailed,
@@ -2030,6 +2036,7 @@ export function useTaskDetail({
       return
     }
 
+    setStartupError(null)
     markStartedOnce()
 
     let latestRuntime = currentNodeRuntime

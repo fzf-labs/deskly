@@ -15,6 +15,7 @@ import {
   applyWorkflowDefinitionRuntimeDefaults,
   buildConversationWorkflowDefinition
 } from './workflow-definition-utils'
+import { validateWorkflowDefinitionDocument } from './WorkflowDefinitionService'
 
 const TASK_STATUS_VALUES = ['todo', 'in_progress', 'in_review', 'done', 'failed'] as const
 type TaskStatusValue = (typeof TASK_STATUS_VALUES)[number]
@@ -131,11 +132,17 @@ export class TaskService {
       throw new Error('CLI tool is disabled in Settings -> Agent CLI')
     }
 
-    if (
-      options.taskMode === 'workflow' &&
-      !options.workflowDefinitionId
-    ) {
-      throw new Error('Workflow definition is required for workflow tasks')
+    const hasWorkflowDefinitionId = Boolean(options.workflowDefinitionId)
+    const hasInlineWorkflowDefinition = Boolean(options.workflowDefinition)
+
+    if (options.taskMode === 'workflow') {
+      if (hasWorkflowDefinitionId === hasInlineWorkflowDefinition) {
+        throw new Error(
+          hasWorkflowDefinitionId
+            ? 'Workflow tasks require exactly one of workflowDefinitionId or workflowDefinition'
+            : 'Workflow definition is required for workflow tasks'
+        )
+      }
     }
 
     let workflowDefinition: WorkflowDefinition | null = null
@@ -144,6 +151,10 @@ export class TaskService {
       if (!workflowDefinition) {
         throw new Error(`Workflow definition not found: ${options.workflowDefinitionId}`)
       }
+    }
+
+    if (options.taskMode === 'workflow' && options.workflowDefinition) {
+      validateWorkflowDefinitionDocument(options.workflowDefinition)
     }
 
     let agentToolConfigId = options.agentToolConfigId
@@ -184,6 +195,14 @@ export class TaskService {
               agentToolConfigId: agentToolConfigId ?? null
             })
           : undefined
+      })
+    } else if (options.workflowDefinition) {
+      this.db.createWorkflowRunForTask({
+        taskId,
+        definition: applyWorkflowDefinitionRuntimeDefaults(options.workflowDefinition, {
+          cliToolId: options.cliToolId ?? null,
+          agentToolConfigId: agentToolConfigId ?? null
+        })
       })
     }
 

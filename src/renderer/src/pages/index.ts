@@ -10,5 +10,6 @@ export { SkillsPage } from './skills/SkillsPage'
 export { McpPage } from './mcp/McpPage'
 export { ProjectsPage } from './projects/ProjectsPage'
 export { AutomationsPage } from './automations/AutomationsPage'
+export { GeneratedWorkflowReviewPage } from './generated-workflow-review/GeneratedWorkflowReviewPage'
 
 export { TasksPage } from './tasks/TasksPage'

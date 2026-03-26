@@ -7,10 +7,10 @@ export { CreateTaskDialog } from './CreateTaskDialog';
 export { TaskComposer } from './TaskComposer';
 export { TaskCreateMenu } from './TaskCreateMenu';
 export type {
-  TaskMode,
   TaskMenuCliToolInfo,
   TaskMenuWorkflowTemplate,
 } from './TaskCreateMenu';
+export type { TaskCreateMode } from './task-create-utils';
 export { TaskMetadataPanel } from './TaskMetadataPanel';
 export { RightPanel } from './RightPanel';
 export { WorkflowProgressBar } from './WorkflowProgressBar';

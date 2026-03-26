@@ -92,6 +92,7 @@ export default {
   createPipelineLabel: 'Pipeline Template',
   createModeConversation: 'Conversation',
   createModeWorkflow: 'Workflow',
+  createModeGeneratedWorkflow: 'Auto Workflow',
   createPipelineNone: 'No pipeline (single step)',
   createPipelineProjectRequired: 'Select a project to choose templates.',
   createWorkflowRequired: 'Please select a workflow template.',
@@ -168,6 +169,18 @@ export default {
   createTemplateNameConflict:
     'A workflow with the same name already exists in this scope. Please choose a different name.',
   createTaskFailed: 'Failed to create task.',
+  createTaskAutoStartFailed:
+    'The task was created, but automatic start failed. Please start it manually from the task detail page.',
+  generatedWorkflowBackButton: 'Back to request',
+  generatedWorkflowConfirmButton: 'Confirm and start',
+  generatedWorkflowConfirmLoading: 'Creating and starting...',
+  generatedWorkflowReviewBadge: 'Needs confirmation',
+  generatedWorkflowReviewPageTitle: 'Review generated workflow',
+  generatedWorkflowReviewPageSubtitle:
+    'Inspect the generated workflow, fine-tune it, then start the task.',
+  generatedWorkflowReviewMissingDraftTitle: 'No generated workflow draft found',
+  generatedWorkflowReviewMissingDraft:
+    'There is no generated workflow draft to review right now. Please go back and generate one again.',
   pipelineTemplatePageTitle: 'Task Pipeline Templates',
   pipelineTemplatePageDescription: 'Manage templates for project "{project}".',
   pipelineTemplateNoProjectTitle: 'No project selected',

@@ -210,6 +210,7 @@ export function BoardPage() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         projectId={currentProject?.id}
+        projectName={currentProject?.name}
         projectPath={currentProject?.path}
         projectType={currentProject?.projectType}
         onTaskCreated={handleTaskCreated}

@@ -21,6 +21,7 @@ export type LocationState = {
   prompt?: string
   sessionId?: string
   attachments?: MessageAttachment[]
+  startError?: string
 }
 
 export type TaskNodeTemplate = {

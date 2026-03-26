@@ -24,6 +24,7 @@ export function TaskDetailContainer() {
   const state = location.state as LocationState | null
   const initialPrompt = state?.prompt || ''
   const initialSessionId = state?.sessionId
+  const initialStartError = state?.startError
 
   const {
     taskId: activeTaskId,
@@ -47,6 +48,7 @@ export function TaskDetailContainer() {
     taskId,
     initialPrompt,
     initialSessionId,
+    initialStartError,
     navigate,
     activeTaskId,
     messages,

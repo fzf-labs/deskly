@@ -3,6 +3,7 @@ import {
   File,
   FilePen,
   FilePlus,
+  Info,
   Lightbulb,
   MessageSquare,
   SquareTerminal
@@ -77,6 +78,7 @@ function processIcon(kind: CodexProcessBlock['kind']): React.ReactNode {
   if (kind === 'file_read_collapsible') return <File className="h-[14px] w-[14px] shrink-0" />
   if (kind === 'file_edit_collapsible') return <FilePen className="h-[14px] w-[14px] shrink-0" />
   if (kind === 'file_create_collapsible') return <FilePlus className="h-[14px] w-[14px] shrink-0" />
+  if (kind === 'system_status') return <Info className="h-[14px] w-[14px] shrink-0" />
   return <MessageSquare className="h-[14px] w-[14px] shrink-0" />
 }
 
@@ -151,28 +153,15 @@ export function CodexProcessRow({
 
   if (!isCollapsible) {
     return (
-      <div className="w-full">
-        <div
-          className={cn(
-            'relative flex w-full items-center overflow-hidden rounded-[4px] border border-l-[4px] px-2.5 py-1 text-[13px]',
-            tone.border
-          )}
-        >
-          <div
-            className={cn(
-              'pointer-events-none absolute inset-y-0 left-0 w-full rounded-r-[4px] bg-gradient-to-r opacity-35',
-              tone.gradient
-            )}
-          />
-          <div className="relative z-10 flex min-w-0 items-center overflow-hidden">
-            <span className={tone.icon}>{processIcon(item.kind)}</span>
-            <div className="ml-1 text-foreground">{item.title}</div>
-            {item.summary ? (
-              <span className="ml-1 flex-1 overflow-hidden text-muted-foreground">
-                <div className="truncate">{item.summary}</div>
-              </span>
-            ) : null}
-          </div>
+      <div className="w-full px-0.5 py-0.5">
+        <div className="flex min-w-0 items-center overflow-hidden text-[12px] text-muted-foreground">
+          <span className={cn('shrink-0', tone.icon)}>{processIcon(item.kind)}</span>
+          <div className="ml-1 shrink-0">{item.title}</div>
+          {item.summary ? (
+            <span className="ml-1 flex-1 overflow-hidden">
+              <div className="truncate">{item.summary}</div>
+            </span>
+          ) : null}
         </div>
       </div>
     )

@@ -9,11 +9,11 @@ import { MsgStoreService } from '../MsgStoreService'
 import { AgentCLIToolConfigService } from '../AgentCLIToolConfigService'
 import { DatabaseService } from '../DatabaseService'
 import { SettingsService } from '../SettingsService'
-import { LogMsg } from '../../types/log'
+import { LogMsg, NormalizedEntry } from '../../types/log'
 import { normalizeCliToolConfig } from '../../../shared/agent-cli-config-spec'
 import { isCliToolEnabled } from '../../../shared/agent-cli-tool-enablement'
 import { newUlid } from '../../utils/ids'
-import { CliSessionClosePayload, CliSessionErrorPayload } from './types'
+import { CliSessionClosePayload, CliSessionErrorPayload, CliUserInputLogMode } from './types'
 
 interface SessionRecord {
   handle: CliSessionHandle
@@ -43,6 +43,8 @@ interface CliOneShotRunResult {
   stderr: string
   logs: LogMsg[]
 }
+
+type SyntheticUserInputPhase = 'start' | 'followup'
 
 export class CliSessionService extends EventEmitter {
   private sessions: Map<string, SessionRecord> = new Map()
@@ -88,6 +90,43 @@ export class CliSessionService extends EventEmitter {
     if (!isCliToolEnabled(toolId, this.settingsService.getSettings().enabledCliTools)) {
       throw new Error('CLI tool is disabled in Settings -> Agent CLI')
     }
+  }
+
+  private shouldInjectSyntheticUserLog(adapter: CliAdapter): boolean {
+    const mode: CliUserInputLogMode = adapter.userInputLogMode ?? 'native'
+    return mode === 'inject-normalized'
+  }
+
+  private appendSyntheticUserLog(
+    adapter: CliAdapter,
+    msgStore: MsgStoreService,
+    input: string | undefined,
+    phase: SyntheticUserInputPhase
+  ): void {
+    if (!this.shouldInjectSyntheticUserLog(adapter)) {
+      return
+    }
+    if (typeof input !== 'string' || !input.trim()) {
+      return
+    }
+
+    const timestamp = Date.now()
+    const entry: NormalizedEntry = {
+      id: newUlid(),
+      type: 'user_message',
+      timestamp,
+      content: input,
+      metadata: {
+        syntheticSource: 'deskly_user_input',
+        userInputPhase: phase
+      }
+    }
+
+    msgStore.push({
+      type: 'normalized',
+      timestamp,
+      entry
+    })
   }
 
   async startSession(
@@ -242,6 +281,8 @@ export class CliSessionService extends EventEmitter {
       pendingMsgStore ??
       new MsgStoreService(undefined, resolvedTaskId, sessionId, projectId, resolvedTaskNodeId)
 
+    this.appendSyntheticUserLog(adapter, msgStore, prompt, 'start')
+
     const handleResumeIdCaptured = (resumeId: string): void => {
       if (!resolvedTaskNodeId) return
       const normalized = resumeId.trim()
@@ -362,9 +403,14 @@ export class CliSessionService extends EventEmitter {
     if (!session) {
       throw new Error(`Session ${sessionId} not found`)
     }
+    const adapter = this.adapters.get(session.toolId)
+    if (!adapter) {
+      throw new Error(`Unsupported CLI tool: ${session.toolId}`)
+    }
     if (!session.handle.sendInput) {
       throw new Error(`Session ${sessionId} does not support input`)
     }
+    this.appendSyntheticUserLog(adapter, session.handle.msgStore, input, 'followup')
     session.handle.sendInput(input)
   }
 

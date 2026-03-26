@@ -563,6 +563,7 @@ export interface IpcContracts {
         cliToolId?: string
         agentToolConfigId?: string
         workflowDefinitionId?: string
+        workflowDefinition?: import('../types/workflow-definition').WorkflowDefinitionDocument
       }
     ],
     unknown

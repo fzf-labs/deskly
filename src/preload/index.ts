@@ -450,6 +450,7 @@ const api = {
       cliToolId?: string
       agentToolConfigId?: string
       workflowDefinitionId?: string
+      workflowDefinition?: import('../main/types/workflow-definition').WorkflowDefinitionDocument
     }) => invoke(IPC_CHANNELS.task.create, options),
     get: (id: string) => invoke(IPC_CHANNELS.task.get, id),
     getAll: () => invoke(IPC_CHANNELS.task.getAll),

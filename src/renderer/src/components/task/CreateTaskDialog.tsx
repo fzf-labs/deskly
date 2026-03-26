@@ -1,13 +1,16 @@
 import { Sparkles } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 import { TaskComposer } from './TaskComposer'
+import { GENERATED_WORKFLOW_REVIEW_ROUTE } from './task-create-utils'
 
 interface CreateTaskDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   projectId?: string
+  projectName?: string
   projectPath?: string
   projectType?: 'normal' | 'git'
   onTaskCreated?: (task: any) => void
@@ -17,10 +20,13 @@ export function CreateTaskDialog({
   open,
   onOpenChange,
   projectId,
+  projectName,
   projectPath,
   projectType = 'normal',
   onTaskCreated
 }: CreateTaskDialogProps) {
+  const navigate = useNavigate()
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
@@ -38,6 +44,7 @@ export function CreateTaskDialog({
             active={open}
             resetOnActivate
             projectId={projectId}
+            projectName={projectName}
             projectPath={projectPath}
             projectType={projectType}
             titleRequired
@@ -45,9 +52,28 @@ export function CreateTaskDialog({
             promptPlaceholder="提示词"
             autoFocus
             className="w-full"
-            onCreated={async (task) => {
+            onOpenGeneratedWorkflowReview={async (request) => {
+              onOpenChange(false)
+              navigate(GENERATED_WORKFLOW_REVIEW_ROUTE, {
+                state: {
+                  ...request,
+                  returnTo: '/board'
+                }
+              })
+            }}
+            onCreated={async (task, context) => {
               onTaskCreated?.(task)
               onOpenChange(false)
+
+              if (context.navigateToTaskDetail) {
+                navigate(`/task/${(task as { id: string }).id}`, {
+                  state: {
+                    prompt: context.prompt,
+                    attachments: context.attachments,
+                    startError: context.startError
+                  }
+                })
+              }
             }}
           />
         </div>
