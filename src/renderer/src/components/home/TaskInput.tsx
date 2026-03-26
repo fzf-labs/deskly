@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings';
 import type { MessageAttachment } from '@/hooks/useAgent';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/providers/feedback-provider';
 import { useLanguage } from '@/providers/language-provider';
 import { notifyTasksChanged } from '@/lib/task-events';
 import { FileText, Globe, Palette, Smartphone } from 'lucide-react';
@@ -40,6 +41,7 @@ const quickActions: QuickAction[] = [
 
 export function TaskInput() {
   const { t } = useLanguage();
+  const toast = useToast();
   const navigate = useNavigate();
   const isRunning = false;
   const stopAgent = () => {};
@@ -56,7 +58,7 @@ export function TaskInput() {
       const settings = getSettings();
       const defaultCliToolId = getEnabledDefaultCliToolId(settings);
       if (!defaultCliToolId) {
-        window.alert(
+        toast.warning(
           t.settings?.cliDefaultRequired ||
             'Please enable and choose a default CLI in Settings -> Agent CLI'
         );

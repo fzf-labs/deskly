@@ -9,6 +9,7 @@ import {
   notifyTaskNodeNeedsReview,
   playTaskNodeReviewSound,
 } from './lib/notifications';
+import { FeedbackProvider } from './providers/feedback-provider';
 import { LanguageProvider } from './providers/language-provider';
 import { ThemeProvider } from './providers/theme-provider';
 
@@ -32,7 +33,9 @@ initializeSettings()
       <React.StrictMode>
         <LanguageProvider>
           <ThemeProvider>
-            <RouterProvider router={router} />
+            <FeedbackProvider>
+              <RouterProvider router={router} />
+            </FeedbackProvider>
           </ThemeProvider>
         </LanguageProvider>
       </React.StrictMode>

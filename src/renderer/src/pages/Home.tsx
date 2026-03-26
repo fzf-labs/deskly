@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import type { MessageAttachment } from '@/hooks/useAgent'
 import { useLanguage } from '@/providers/language-provider'
+import { useToast } from '@/providers/feedback-provider'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
 import { notifyTasksChanged } from '@/lib/task-events'
 
@@ -8,6 +9,7 @@ import { ChatInput } from '@/components/shared/ChatInput'
 
 export function HomePage() {
   const { t } = useLanguage()
+  const toast = useToast()
   const navigate = useNavigate()
 
   const handleSubmit = async (text: string, attachments?: MessageAttachment[]) => {
@@ -18,7 +20,7 @@ export function HomePage() {
       const settings = getSettings()
       const defaultCliToolId = getEnabledDefaultCliToolId(settings)
       if (!defaultCliToolId) {
-        window.alert(
+        toast.warning(
           t.settings?.cliDefaultRequired ||
             'Please enable and choose a default CLI in Settings -> Agent CLI'
         )

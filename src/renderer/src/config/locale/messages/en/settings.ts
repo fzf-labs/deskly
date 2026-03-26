@@ -39,6 +39,8 @@ export default {
   projectsNoDescription: 'No description yet',
   projectsUpdatedAt: 'Updated: {value}',
   projectsDeleteConfirm: 'Are you sure you want to delete project "{name}"?',
+  projectPathMissing: 'The project path no longer exists or has moved. Please verify it.',
+  projectPathCheckFailed: 'Unable to validate the project path right now. Please try again.',
 
   // Sound Alerts
   soundAlertsTitle: 'Sound alerts',

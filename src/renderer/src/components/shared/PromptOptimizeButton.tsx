@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { db, type OptimizePromptInput, type OptimizePromptResult } from '@/data'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
 import { resolvePromptOptimizationErrorMessage } from '@/lib/prompt-optimization'
+import { useToast } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
 
 interface PromptOptimizeButtonProps
@@ -35,6 +36,7 @@ export function PromptOptimizeButton({
   onError
 }: PromptOptimizeButtonProps) {
   const { t } = useLanguage()
+  const toast = useToast()
   const [isOptimizing, setIsOptimizing] = useState(false)
   const hasPrompt = prompt.trim().length > 0
 
@@ -44,7 +46,7 @@ export function PromptOptimizeButton({
       return
     }
 
-    window.alert(message)
+    toast.error(message)
   }
 
   const handleOptimize = async () => {

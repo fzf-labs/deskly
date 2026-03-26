@@ -11,6 +11,7 @@ import {
 import { MoreVertical } from 'lucide-react'
 import { useProjects } from '@/hooks/useProjects'
 import { db, type WorkflowDefinition } from '@/data'
+import { useConfirm } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
 import { EmptyStatePanel, PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
 import { buildWorkflowTemplateEditorRoute } from '@/components/pipeline'
@@ -18,6 +19,7 @@ import { Select } from '@/components/ui/select'
 
 export function PipelineTemplatesPage() {
   const { t } = useLanguage()
+  const confirm = useConfirm()
   const navigate = useNavigate()
   const { currentProject } = useProjects()
   const [templates, setTemplates] = useState<WorkflowDefinition[]>([])
@@ -74,7 +76,15 @@ export function PipelineTemplatesPage() {
   }
 
   const handleDelete = async (template: WorkflowDefinition) => {
-    if (!confirm(t.task.pipelineTemplateDeleteConfirm.replace('{name}', template.name))) {
+    const confirmed = await confirm({
+      title: t.common.delete,
+      description: t.task.pipelineTemplateDeleteConfirm.replace('{name}', template.name),
+      confirmText: t.common.delete,
+      cancelText: t.common.cancel,
+      tone: 'danger'
+    })
+
+    if (!confirmed) {
       return
     }
     await db.deleteWorkflowDefinition(template.id)

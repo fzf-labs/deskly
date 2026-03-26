@@ -23,6 +23,8 @@ export default {
   warning: 'Warning',
   info: 'Info',
   refresh: 'Refresh',
+  keepEditing: 'Keep editing',
+  leaveWithoutSaving: 'Leave without saving',
 
   // Scroll
   scrollToBottom: 'Scroll to bottom',
@@ -34,6 +36,8 @@ export default {
   deleteTaskConfirm: 'Are you sure you want to delete this task?',
   deleteTaskDescription:
     'This action cannot be undone. All messages in this task will be permanently deleted.',
+  deleteAutomation: 'Delete automation',
+  deleteAutomationConfirm: 'Are you sure you want to delete automation "{name}"?',
 
   // API error messages
   errors: {

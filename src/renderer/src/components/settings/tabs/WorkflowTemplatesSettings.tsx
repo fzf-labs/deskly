@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { MoreVertical } from 'lucide-react'
 import { db } from '@/data'
+import { useConfirm } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
 import { buildWorkflowTemplateEditorRoute } from '@/components/pipeline'
 import { buildSettingsRoute } from '@/components/settings/types'
@@ -16,6 +17,7 @@ import type { WorkflowDefinition } from '@/data'
 
 export function WorkflowTemplatesSettings() {
   const { t } = useLanguage()
+  const confirm = useConfirm()
   const navigate = useNavigate()
   const [templates, setTemplates] = useState<WorkflowDefinition[]>([])
 
@@ -50,7 +52,15 @@ export function WorkflowTemplatesSettings() {
   }
 
   const handleDelete = async (template: WorkflowDefinition) => {
-    if (!confirm(t.task.pipelineTemplateDeleteConfirm.replace('{name}', template.name))) {
+    const confirmed = await confirm({
+      title: t.common.delete,
+      description: t.task.pipelineTemplateDeleteConfirm.replace('{name}', template.name),
+      confirmText: t.common.delete,
+      cancelText: t.common.cancel,
+      tone: 'danger'
+    })
+
+    if (!confirmed) {
       return
     }
     await db.deleteWorkflowDefinition(template.id)

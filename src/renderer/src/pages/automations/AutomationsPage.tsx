@@ -5,11 +5,15 @@ import { Button } from '@/components/ui/button'
 import { EmptyStatePanel, PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
 import { db, type AgentToolConfig } from '@/data'
 import { useProjects } from '@/hooks/useProjects'
+import { useConfirm } from '@/providers/feedback-provider'
+import { useLanguage } from '@/providers/language-provider'
 import type { Automation, AutomationRun } from '@/types/automation'
 import { AutomationFormDialog } from './components/AutomationFormDialog'
 import { AutomationList } from './components/AutomationList'
 
 export function AutomationsPage() {
+  const { t, tt } = useLanguage()
+  const confirm = useConfirm()
   const navigate = useNavigate()
   const { currentProject } = useProjects()
   const [loading, setLoading] = useState(true)
@@ -100,13 +104,21 @@ export function AutomationsPage() {
 
   const handleDelete = useCallback(
     async (automation: Automation) => {
-      const confirmed = confirm(`确认删除规则「${automation.name}」吗？`)
+      const confirmed = await confirm({
+        title: t.common.deleteAutomation || '删除规则',
+        description:
+          tt('common.deleteAutomationConfirm', { name: automation.name }) ||
+          `确认删除规则「${automation.name}」吗？`,
+        confirmText: t.common.delete,
+        cancelText: t.common.cancel,
+        tone: 'danger'
+      })
       if (!confirmed) return
 
       await db.deleteAutomation(automation.id)
       await loadAutomations()
     },
-    [loadAutomations]
+    [confirm, loadAutomations, t.common.cancel, t.common.delete, t.common.deleteAutomation, tt]
   )
 
   const handleToggleEnabled = useCallback(

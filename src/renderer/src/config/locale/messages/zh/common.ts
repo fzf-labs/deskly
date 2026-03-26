@@ -23,6 +23,8 @@ export default {
   warning: '警告',
   info: '提示',
   refresh: '刷新',
+  keepEditing: '继续编辑',
+  leaveWithoutSaving: '不保存离开',
 
   // 滚动
   scrollToBottom: '滚动到底部',
@@ -33,6 +35,8 @@ export default {
   deleteTask: '删除任务',
   deleteTaskConfirm: '确定要删除这个任务吗？',
   deleteTaskDescription: '此操作无法撤销，任务中的所有消息将被永久删除。',
+  deleteAutomation: '删除规则',
+  deleteAutomationConfirm: '确认删除规则「{name}」吗？',
 
   // API 错误提示
   errors: {

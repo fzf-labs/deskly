@@ -128,8 +128,9 @@ export default {
   workflowGenerationInvalidResult:
     'The generated workflow result is invalid. Please refine the goal and try again.',
   workflowGenerationFailed: 'AI workflow generation failed. Please try again.',
-  workflowGenerationFallbackConfirm:
-    'AI generation failed. Do you want to fall back to rule-based generation?',
+  workflowUnsavedChangesTitle: 'Unsaved workflow changes',
+  workflowUnsavedChangesDescription:
+    'This workflow has unsaved changes. Leave without saving?',
   promptOptimizeButton: 'Optimize prompt',
   promptOptimizeLoading: 'Optimizing...',
   promptOptimizePromptRequired: 'Please enter a prompt to optimize first.',

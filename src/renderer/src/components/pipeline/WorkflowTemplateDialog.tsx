@@ -2,7 +2,6 @@ import {
   Controls,
   Handle,
   MarkerType,
-  MiniMap,
   Position,
   ReactFlow,
   type Connection,
@@ -27,7 +26,6 @@ import {
 } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useBeforeUnload, useBlocker } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { PromptOptimizeButton } from '@/components/shared/PromptOptimizeButton'
@@ -40,10 +38,12 @@ import {
   type WorkflowDefinitionNodePosition
 } from '@/data'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import { newUuid } from '@/lib/ids'
 import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
 import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools'
 import { cn } from '@/lib/utils'
+import { useConfirm } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
 
 export interface TaskNodeTemplateDraft {
@@ -672,49 +672,6 @@ const mapGeneratedDefinitionToDrafts = (
   }
 }
 
-const resolveWorkflowGenerationErrorMessage = (
-  error: unknown,
-  taskMessages: Record<string, string | undefined>
-): string => {
-  const message = error instanceof Error ? error.message : String(error)
-
-  if (message.includes('WORKFLOW_AI_CLI_UNAVAILABLE')) {
-    return taskMessages.workflowGenerationCliUnavailable || '未检测到可用的 AI CLI 工具。'
-  }
-
-  if (message.includes('WORKFLOW_AI_GENERATION_RUNTIME_UNAVAILABLE')) {
-    return (
-      taskMessages.workflowGenerationRuntimeUnavailable ||
-      '当前工作流生成功能暂不可用，请稍后重试。'
-    )
-  }
-
-  if (
-    message.includes('CLI_ONE_SHOT_TIMEOUT') ||
-    message.includes('WORKFLOW_AI_GENERATION_TIMEOUT')
-  ) {
-    return taskMessages.workflowGenerationFailed || 'AI 生成失败，请稍后重试。'
-  }
-
-  if (message.includes('WORKFLOW_AI_GENERATION_NO_OUTPUT')) {
-    return taskMessages.workflowGenerationNoOutput || 'AI 没有返回可解析的工作流结果。'
-  }
-
-  if (message.includes('WORKFLOW_AI_GENERATION_INVALID_DOCUMENT')) {
-    return taskMessages.workflowGenerationInvalidResult || 'AI 返回的工作流结果无效。'
-  }
-
-  if (message.includes('WORKFLOW_AI_GENERATION_PARSE_FAILED')) {
-    return taskMessages.workflowGenerationParseFailed || 'AI 返回的结果无法解析为工作流。'
-  }
-
-  if (message.includes('WORKFLOW_AI_GENERATION_FAILED')) {
-    return taskMessages.workflowGenerationFailed || 'AI 生成失败，请稍后重试。'
-  }
-
-  return message
-}
-
 export function WorkflowTemplateEditor({
   active = true,
   initialValues,
@@ -729,6 +686,7 @@ export function WorkflowTemplateEditor({
   onCancel
 }: WorkflowTemplateEditorProps) {
   const { t } = useLanguage()
+  const confirm = useConfirm()
   const isTaskDraft = mode === 'task-draft'
   const initialNodeRef = useRef<TaskNodeTemplateDraft>(createDefaultNode(0))
   const formRef = useRef<HTMLFormElement | null>(null)
@@ -1052,31 +1010,29 @@ export function WorkflowTemplateEditor({
   )
 
   const isDirty = currentSnapshot !== initialSnapshot
-  const blocker = useBlocker(isDirty)
-
-  useBeforeUnload(
-    useCallback(
-      (event) => {
-        if (!isDirty) return
-        event.preventDefault()
-        event.returnValue = ''
-      },
-      [isDirty]
-    )
+  const confirmLeave = useCallback(
+    () =>
+      confirm({
+        title: t.task.workflowUnsavedChangesTitle || '当前工作流还有未保存的修改',
+        description:
+          t.task.workflowUnsavedChangesDescription ||
+          '当前工作流还有未保存的修改，确定不保存直接离开吗？',
+        confirmText: t.common.leaveWithoutSaving || '不保存离开',
+        cancelText: t.common.keepEditing || '继续编辑',
+        tone: 'warning'
+      }),
+    [
+      confirm,
+      t.common.keepEditing,
+      t.common.leaveWithoutSaving,
+      t.task.workflowUnsavedChangesDescription,
+      t.task.workflowUnsavedChangesTitle
+    ]
   )
-
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return
-
-    const shouldLeave = window.confirm('当前工作流还有未保存的修改，确定不保存直接离开吗？')
-
-    if (shouldLeave) {
-      blocker.proceed()
-      return
-    }
-
-    blocker.reset()
-  }, [blocker])
+  const { confirmNavigationIfDirty } = useUnsavedChangesGuard({
+    isDirty,
+    confirmLeave
+  })
 
   const updateNode = useCallback(
     (nodeId: string, updater: (node: TaskNodeTemplateDraft) => TaskNodeTemplateDraft) => {
@@ -1239,18 +1195,13 @@ export function WorkflowTemplateEditor({
     fitCanvas()
   }, [fitCanvas, templateNodes])
 
-  const handleCancelRequest = useCallback(() => {
-    if (!isDirty) {
-      onCancel()
-      return
-    }
-
-    const shouldLeave = window.confirm('当前工作流还有未保存的修改，确定不保存直接离开吗？')
+  const handleCancelRequest = useCallback(async () => {
+    const shouldLeave = await confirmNavigationIfDirty()
 
     if (shouldLeave) {
       onCancel()
     }
-  }, [isDirty, onCancel])
+  }, [confirmNavigationIfDirty, onCancel])
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -1368,29 +1319,8 @@ export function WorkflowTemplateEditor({
           agentToolConfigId: generationAgentToolConfigId || undefined
         })
         applyGeneratedDraft(generated)
-      } catch (err) {
-        const errorMessage = resolveWorkflowGenerationErrorMessage(err, t.task)
-        const shouldFallback = window.confirm(
-          `${errorMessage}\n\n${
-            t.task.workflowGenerationFallbackConfirm || 'AI 生成失败，是否改用规则生成？'
-          }`
-        )
-
-        if (!shouldFallback) {
-          setError(errorMessage)
-          return
-        }
-
-        try {
-          const fallbackGenerated = await db.generateWorkflowDefinition({
-            prompt: nextPrompt,
-            name: templateName.trim() || undefined,
-            mode: 'rules'
-          })
-          applyGeneratedDraft(fallbackGenerated)
-        } catch (fallbackError) {
-          setError(resolveWorkflowGenerationErrorMessage(fallbackError, t.task))
-        }
+      } catch {
+        setError(t.task.workflowGenerationFailed || 'AI 生成失败，请稍后重试。')
       } finally {
         setIsGenerating(false)
       }
@@ -1753,10 +1683,29 @@ export function WorkflowTemplateEditor({
                           variant="outline"
                           onClick={() => void handleGenerate()}
                           disabled={isGenerating}
-                          className="rounded-[6px]"
+                          className={cn(
+                            'rounded-[6px]',
+                            isGenerating &&
+                              'relative overflow-hidden border-transparent bg-transparent text-sky-700 shadow-none disabled:opacity-100'
+                          )}
                         >
                           {isGenerating
-                            ? t.task.workflowGenerateLoading || '生成中...'
+                            ? (
+                                <>
+                                  <span
+                                    aria-hidden="true"
+                                    className="absolute inset-0 rounded-[6px] animate-spin bg-[conic-gradient(from_180deg_at_50%_50%,rgba(56,189,248,0)_0deg,rgba(14,165,233,0.95)_110deg,rgba(125,211,252,0.22)_220deg,rgba(56,189,248,0)_360deg)]"
+                                    style={{ animationDuration: '1.15s' }}
+                                  />
+                                  <span
+                                    aria-hidden="true"
+                                    className="absolute inset-[1.5px] rounded-[5px] bg-white/95"
+                                  />
+                                  <span className="relative z-10 inline-flex items-center">
+                                    {t.task.workflowGenerateLoading || '生成中...'}
+                                  </span>
+                                </>
+                              )
                             : t.task.workflowGenerateButton || '生成'}
                         </Button>
                       </div>
@@ -1834,18 +1783,10 @@ export function WorkflowTemplateEditor({
               nodesConnectable
               elementsSelectable
               zoomOnDoubleClick={false}
+              proOptions={{ hideAttribution: true }}
               onInit={setReactFlowInstance}
               className="bg-transparent"
             >
-              <MiniMap
-                pannable
-                zoomable
-                position="bottom-right"
-                className="!rounded-[2px] !border-slate-200/90 !bg-white !shadow-[0_1px_2px_rgba(15,23,42,0.06)]"
-                nodeColor={(node) =>
-                  node.id === selectedNodeId ? 'rgba(59,130,246,0.9)' : 'rgba(100,116,139,0.72)'
-                }
-              />
               <Controls
                 position="top-right"
                 showInteractive={false}

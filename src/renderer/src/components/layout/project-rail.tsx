@@ -8,8 +8,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useProjects, type Project } from '@/hooks/useProjects';
+import { useToast } from '@/providers/feedback-provider';
+import { useLanguage } from '@/providers/language-provider';
 
 export function ProjectRail() {
+  const { t } = useLanguage();
+  const toast = useToast();
   const navigate = useNavigate();
   const {
     projects,
@@ -23,7 +27,9 @@ export function ProjectRail() {
     try {
       const result = await checkProjectPath(id);
       if (!result.exists) {
-        alert('项目路径不存在或已移动，请检查项目路径。');
+        toast.warning(
+          t.settings?.projectPathMissing || '项目路径不存在或已移动，请检查项目路径。'
+        );
         return;
       }
       if (result.updated) {
@@ -32,7 +38,9 @@ export function ProjectRail() {
       setCurrentProjectId(id);
     } catch (error) {
       console.error('Failed to check project path:', error);
-      alert('无法验证项目路径，请稍后重试。');
+      toast.error(
+        t.settings?.projectPathCheckFailed || '无法验证项目路径，请稍后重试。'
+      );
     }
   };
 

@@ -12,10 +12,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useProjects, type Project } from '@/hooks/useProjects';
 import { cn } from '@/lib/utils';
+import { useConfirm } from '@/providers/feedback-provider';
 import { useLanguage } from '@/providers/language-provider';
 
 export function ProjectsSettings() {
   const { t, tt } = useLanguage();
+  const confirm = useConfirm();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
 
@@ -28,9 +30,17 @@ export function ProjectsSettings() {
   );
 
   const handleDeleteProject = async (project: Project) => {
-    if (confirm(tt('settings.projectsDeleteConfirm', { name: project.name }))) {
-      await deleteProject(project.id);
-    }
+    const confirmed = await confirm({
+      title: t.common.delete,
+      description: tt('settings.projectsDeleteConfirm', { name: project.name }),
+      confirmText: t.common.delete,
+      cancelText: t.common.cancel,
+      tone: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    await deleteProject(project.id);
   };
 
   return (

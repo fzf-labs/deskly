@@ -38,6 +38,8 @@ export default {
   projectsNoDescription: '暂无描述',
   projectsUpdatedAt: '最近更新：{value}',
   projectsDeleteConfirm: '确定要删除项目“{name}”吗？',
+  projectPathMissing: '项目路径不存在或已移动，请检查项目路径。',
+  projectPathCheckFailed: '无法验证项目路径，请稍后重试。',
 
   // Sound Alerts
   soundAlertsTitle: '提示音提醒',

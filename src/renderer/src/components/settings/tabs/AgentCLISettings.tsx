@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useConfirm } from '@/providers/feedback-provider';
 import { useLanguage } from '@/providers/language-provider';
 import { Terminal, Check, AlertCircle, Plus, Pencil, Star, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -146,6 +147,7 @@ export function AgentCLISettings({
   onSettingsChange,
 }: SettingsTabProps) {
   const { t, language } = useLanguage();
+  const confirm = useConfirm();
   const [tools, setTools] = useState<CLIToolInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -424,14 +426,28 @@ export function AgentCLISettings({
 
   const deleteConfig = useCallback(async (config: AgentToolConfig) => {
     const confirmText = t.settings?.cliConfigDeleteConfirm || 'Delete this config?';
-    if (!window.confirm(confirmText)) return;
+    const confirmed = await confirm({
+      title: t.common.delete,
+      description: confirmText,
+      confirmText: t.common.delete,
+      cancelText: t.common.cancel,
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await db.deleteAgentToolConfig(config.id);
       await loadConfigs(configToolId);
     } catch (err) {
       console.error('Failed to delete config:', err);
     }
-  }, [configToolId, loadConfigs, t.settings?.cliConfigDeleteConfirm]);
+  }, [
+    configToolId,
+    confirm,
+    loadConfigs,
+    t.common.cancel,
+    t.common.delete,
+    t.settings?.cliConfigDeleteConfirm,
+  ]);
 
   const handleConfigDialogOpenChange = useCallback((open: boolean) => {
     setConfigDialogOpen(open);
