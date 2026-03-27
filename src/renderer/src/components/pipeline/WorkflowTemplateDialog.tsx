@@ -1029,10 +1029,11 @@ export function WorkflowTemplateEditor({
       t.task.workflowUnsavedChangesTitle
     ]
   )
-  const { confirmNavigationIfDirty } = useUnsavedChangesGuard({
-    isDirty,
-    confirmLeave
-  })
+  const { allowNextNavigation, confirmNavigationIfDirty, resetNavigationAllowance } =
+    useUnsavedChangesGuard({
+      isDirty,
+      confirmLeave
+    })
 
   const updateNode = useCallback(
     (nodeId: string, updater: (node: TaskNodeTemplateDraft) => TaskNodeTemplateDraft) => {
@@ -1182,18 +1183,20 @@ export function WorkflowTemplateEditor({
     })
   }, [reactFlowInstance])
 
-  const applyAutoLayout = useCallback(() => {
-    const nextPositions = buildAutoLayoutPositions(templateNodes)
+  const getAutoLaidOutNodes = useCallback((nodes: TaskNodeTemplateDraft[]) => {
+    const nextPositions = buildAutoLayoutPositions(nodes)
 
-    setTemplateNodes((prev) =>
-      prev.map((node, index) => ({
-        ...node,
-        position: nextPositions.get(node.id) ?? normalizeDraftPosition(node.position, index)
-      }))
-    )
+    return nodes.map((node, index) => ({
+      ...node,
+      position: nextPositions.get(node.id) ?? normalizeDraftPosition(node.position, index)
+    }))
+  }, [])
+
+  const applyAutoLayout = useCallback(() => {
+    setTemplateNodes((prev) => getAutoLaidOutNodes(prev))
     setError(null)
     fitCanvas()
-  }, [fitCanvas, templateNodes])
+  }, [fitCanvas, getAutoLaidOutNodes])
 
   const handleCancelRequest = useCallback(async () => {
     const shouldLeave = await confirmNavigationIfDirty()
@@ -1283,7 +1286,9 @@ export function WorkflowTemplateEditor({
   const applyGeneratedDraft = useCallback(
     (generated: GeneratedWorkflowDefinitionResult) => {
       const draft = mapGeneratedDefinitionToDrafts(generated)
-      const nextNodes = draft.nodes.length > 0 ? draft.nodes : [createDefaultNode(0)]
+      const nextNodes = getAutoLaidOutNodes(
+        draft.nodes.length > 0 ? draft.nodes : [createDefaultNode(0)]
+      )
 
       setTemplateName((current) => current.trim() || draft.name)
       setTemplateDescription((current) => current.trim() || draft.description || '')
@@ -1292,7 +1297,7 @@ export function WorkflowTemplateEditor({
       setSelectedEdgeId(null)
       fitCanvas()
     },
-    [fitCanvas]
+    [fitCanvas, getAutoLaidOutNodes]
   )
 
   const handleGenerate = useCallback(
@@ -1399,9 +1404,11 @@ export function WorkflowTemplateEditor({
         description: templateDescription.trim() || undefined,
         nodes
       }
+      allowNextNavigation()
       await onSubmit(payload)
       setInitialSnapshot(serializeDrafts(payload))
     } catch (err) {
+      resetNavigationAllowance()
       setError(resolveTemplateSaveErrorMessage(err, t.task))
     } finally {
       setSaving(false)

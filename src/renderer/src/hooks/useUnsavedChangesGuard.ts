@@ -13,6 +13,7 @@ export function useUnsavedChangesGuard({
   const blocker = useBlocker(isDirty);
   const isPromptingRef = useRef(false);
   const allowNextNavigationRef = useRef(false);
+  const previousDirtyRef = useRef(isDirty);
 
   useBeforeUnload(
     useCallback(
@@ -58,6 +59,13 @@ export function useUnsavedChangesGuard({
     };
   }, [blocker, confirmLeave]);
 
+  useEffect(() => {
+    if (isDirty && !previousDirtyRef.current) {
+      allowNextNavigationRef.current = false;
+    }
+    previousDirtyRef.current = isDirty;
+  }, [isDirty]);
+
   const confirmIfDirty = useCallback(async () => {
     if (!isDirty) return true;
     if (isPromptingRef.current) return false;
@@ -78,8 +86,18 @@ export function useUnsavedChangesGuard({
     return confirmed;
   }, [confirmIfDirty]);
 
+  const allowNextNavigation = useCallback(() => {
+    allowNextNavigationRef.current = true;
+  }, []);
+
+  const resetNavigationAllowance = useCallback(() => {
+    allowNextNavigationRef.current = false;
+  }, []);
+
   return {
+    allowNextNavigation,
     confirmIfDirty,
     confirmNavigationIfDirty,
+    resetNavigationAllowance,
   };
 }
