@@ -1,5 +1,7 @@
 export type {
+  DbAutomation,
   Automation,
+  DbAutomationRun,
   AutomationRun,
   AutomationRunStatus,
   AutomationTemplate,
@@ -12,5 +14,6 @@ export type {
   CreateAutomationRunInput,
   UpdateAutomationInput,
   UpdateAutomationRunInput,
-  ReservedAutomationRun
-} from './db/automation'
+  ReservedAutomationRun,
+  RunAutomationNowResult
+} from '../../shared/contracts/automation'

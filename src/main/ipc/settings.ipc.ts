@@ -1,16 +1,13 @@
 import type { IpcModuleContext } from './types'
+import type { AppSettings } from '../../shared/contracts/settings'
 import { IPC_CHANNELS } from './channels'
 
 export const registerSettingsIpc = ({ handle, v, services }: IpcModuleContext): void => {
   const { settingsService } = services
 
-  handle(IPC_CHANNELS.settings.get, [], () =>
-    settingsService.getSettings() as unknown as Record<string, unknown>
-  )
+  handle(IPC_CHANNELS.settings.get, [], () => settingsService.getSettings())
   handle(IPC_CHANNELS.settings.update, [v.object()], (_, updates) =>
-    settingsService.updateSettings(updates) as unknown as Record<string, unknown>
+    settingsService.updateSettings(updates as Partial<AppSettings>)
   )
-  handle(IPC_CHANNELS.settings.reset, [], () =>
-    settingsService.resetSettings() as unknown as Record<string, unknown>
-  )
+  handle(IPC_CHANNELS.settings.reset, [], () => settingsService.resetSettings())
 }

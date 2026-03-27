@@ -12,6 +12,18 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
+      "@features/*": [
+        "src/renderer/src/features/*"
+      ],
+      "@data/*": [
+        "src/renderer/src/data/*"
+      ],
+      "@lib/*": [
+        "src/renderer/src/lib/*"
+      ],
+      "@shared/*": [
+        "src/shared/*"
+      ],
       "@renderer/*": [
         "src/renderer/src/*"
       ],

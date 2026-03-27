@@ -2,6 +2,13 @@
  * Electron API 封装
  * 替换 Tauri API，提供统一的接口
  */
+import type {
+  Automation,
+  AutomationRun,
+  CreateAutomationRequest,
+  RunAutomationNowResult,
+  UpdateAutomationRequest
+} from '@shared/contracts/automation'
 
 // 检查是否在 Electron 环境中
 export function isElectron(): boolean {
@@ -260,14 +267,14 @@ export const app = {
 }
 
 export const automation = {
-  async create(input: Record<string, unknown>): Promise<unknown> {
+  async create(input: CreateAutomationRequest): Promise<Automation> {
     if (!window.api) {
       throw new Error('Electron API not available')
     }
     return window.api.automation.create(input)
   },
 
-  async update(id: string, updates: Record<string, unknown>): Promise<unknown> {
+  async update(id: string, updates: UpdateAutomationRequest): Promise<Automation | null> {
     if (!window.api) {
       throw new Error('Electron API not available')
     }
@@ -281,38 +288,38 @@ export const automation = {
     return window.api.automation.delete(id)
   },
 
-  async get(id: string): Promise<unknown> {
+  async get(id: string): Promise<Automation | null> {
     if (!window.api) {
       throw new Error('Electron API not available')
     }
     return window.api.automation.get(id)
   },
 
-  async list(): Promise<unknown[]> {
+  async list(): Promise<Automation[]> {
     if (!window.api) {
       throw new Error('Electron API not available')
     }
-    return window.api.automation.list() as Promise<unknown[]>
+    return window.api.automation.list() as Promise<Automation[]>
   },
 
-  async setEnabled(id: string, enabled: boolean): Promise<unknown> {
+  async setEnabled(id: string, enabled: boolean): Promise<Automation | null> {
     if (!window.api) {
       throw new Error('Electron API not available')
     }
     return window.api.automation.setEnabled(id, enabled)
   },
 
-  async runNow(id: string): Promise<unknown> {
+  async runNow(id: string): Promise<RunAutomationNowResult> {
     if (!window.api) {
       throw new Error('Electron API not available')
     }
     return window.api.automation.runNow(id)
   },
 
-  async listRuns(id: string, limit?: number): Promise<unknown[]> {
+  async listRuns(id: string, limit?: number): Promise<AutomationRun[]> {
     if (!window.api) {
       throw new Error('Electron API not available')
     }
-    return window.api.automation.listRuns(id, limit) as Promise<unknown[]>
+    return window.api.automation.listRuns(id, limit) as Promise<AutomationRun[]>
   }
 }

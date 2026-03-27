@@ -1,5 +1,6 @@
 export type {
   WorkflowDefinitionScope,
+  WorkflowDefinitionNodeType,
   WorkflowNodeType,
   WorkflowDefinitionNodePosition,
   WorkflowDefinitionNode,
@@ -8,15 +9,10 @@ export type {
   DbWorkflowDefinition,
   CreateWorkflowDefinitionInput,
   UpdateWorkflowDefinitionInput,
+  WorkflowDefinitionFilter,
   GenerateWorkflowDefinitionInput,
-  GeneratedWorkflowDefinitionResult
-} from './db/workflow-definition'
-
-import type {
-  DbWorkflowDefinition,
-  WorkflowDefinitionDocument
-} from './db/workflow-definition'
-
-export interface WorkflowDefinition extends Omit<DbWorkflowDefinition, 'definition_json'> {
-  definition: WorkflowDefinitionDocument
-}
+  GeneratedWorkflowDefinitionResult,
+  WorkflowDefinition,
+  CreateWorkflowRunForTaskInput,
+  ApproveWorkflowRunNodeInput
+} from '../../shared/contracts/workflow'

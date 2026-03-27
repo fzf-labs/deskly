@@ -1,1 +1,6 @@
-export type { DbProject as Project, CreateProjectInput, UpdateProjectInput } from './db/project'
+export type {
+  DbProject as Project,
+  CreateProjectInput,
+  UpdateProjectInput,
+  CheckProjectPathResult
+} from '../../shared/contracts/project'

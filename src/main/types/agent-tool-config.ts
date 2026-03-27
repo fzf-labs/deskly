@@ -1,5 +1,5 @@
 export type {
-  DbAgentToolConfig as AgentToolConfig,
+  AgentToolConfig,
   CreateAgentToolConfigInput,
   UpdateAgentToolConfigInput
-} from './db/agent-tool-config'
+} from '../../shared/contracts/agent-tool-config'

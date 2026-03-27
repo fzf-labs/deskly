@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Notification } from 'electron'
 import { EventEmitter } from 'events'
+import type { NotificationSoundSettingsState } from '../../shared/contracts/notification'
 
 interface NotificationOptions {
   title: string
@@ -11,16 +12,9 @@ interface NotificationOptions {
   soundType?: 'success' | 'info' | 'error' | 'complete'
 }
 
-interface SoundSettings {
-  enabled: boolean
-  taskComplete: boolean
-  stageComplete: boolean
-  error: boolean
-}
-
 export class NotificationService extends EventEmitter {
   private enabled: boolean = true
-  private soundSettings: SoundSettings = {
+  private soundSettings: NotificationSoundSettingsState = {
     enabled: true,
     taskComplete: true,
     stageComplete: true,
@@ -45,11 +39,11 @@ export class NotificationService extends EventEmitter {
     return this.soundSettings.enabled
   }
 
-  setSoundSettings(settings: Partial<SoundSettings>): void {
+  setSoundSettings(settings: Partial<NotificationSoundSettingsState>): void {
     this.soundSettings = { ...this.soundSettings, ...settings }
   }
 
-  getSoundSettings(): SoundSettings {
+  getSoundSettings(): NotificationSoundSettingsState {
     return { ...this.soundSettings }
   }
 

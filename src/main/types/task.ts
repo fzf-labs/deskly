@@ -1,7 +1,12 @@
-export type { DbTask as Task, CreateTaskInput, UpdateTaskInput, TaskStatus } from './db/task'
 export type {
+  DbTask as Task,
+  CreateTaskInput,
+  UpdateTaskInput,
+  TaskStatus,
   DbTaskNode as TaskNode,
   CreateTaskNodeInput,
   CompleteTaskNodeInput,
-  TaskNodeStatus
-} from './db/task-node'
+  TaskNodeStatus,
+  UpdateCurrentTaskNodeRuntimeInput,
+  CompleteTaskNodeResultInput
+} from '../../shared/contracts/task'

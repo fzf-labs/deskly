@@ -3,18 +3,7 @@ import { cn } from '@/lib/utils'
 import { Play, CheckCircle, Clock, GitBranch, Trash2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { notifyTasksChanged } from '@/lib/task-events'
-
-interface Task {
-  id: string
-  title: string
-  prompt: string
-  status: string
-  projectId: string | null
-  worktreePath: string | null
-  branchName: string | null
-  createdAt: string
-  updatedAt: string
-}
+import type { TaskWithWorktree as Task } from '@shared/contracts/task'
 
 interface TaskListProps {
   projectId?: string

@@ -14,6 +14,10 @@ export default defineConfig({
     },
     resolve: {
       alias: {
+        '@features': resolve('src/renderer/src/features'),
+        '@data': resolve('src/renderer/src/data'),
+        '@lib': resolve('src/renderer/src/lib'),
+        '@shared': resolve('src/shared'),
         '@renderer': resolve('src/renderer/src'),
         '@': resolve('src/renderer/src')
       }

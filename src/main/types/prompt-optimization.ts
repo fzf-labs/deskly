@@ -2,4 +2,4 @@ export type {
   PromptOptimizationContextType,
   OptimizePromptInput,
   OptimizePromptResult
-} from './db/prompt-optimization'
+} from '../../shared/contracts/prompt'

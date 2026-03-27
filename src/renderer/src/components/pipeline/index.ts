@@ -1,7 +1,13 @@
-export { WorkflowTemplateDialog, WorkflowTemplateEditor } from './WorkflowTemplateDialog'
-export type { WorkflowTemplateFormValues, TaskNodeTemplateDraft } from './WorkflowTemplateDialog'
-export { buildWorkflowTemplateEditorRoute } from './routes'
+export {
+  WorkflowTemplateDialog,
+  WorkflowTemplateEditor
+} from '@features/pipeline/ui/WorkflowTemplateDialog'
+export type {
+  WorkflowTemplateFormValues,
+  TaskNodeTemplateDraft
+} from '@features/pipeline/ui/WorkflowTemplateDialog'
+export { buildWorkflowTemplateEditorRoute } from '@features/pipeline/ui/routes'
 export {
   buildWorkflowDefinitionFromForm,
   workflowDefinitionToFormValues
-} from './workflow-definition-form'
+} from '@features/pipeline/ui/workflow-definition-form'

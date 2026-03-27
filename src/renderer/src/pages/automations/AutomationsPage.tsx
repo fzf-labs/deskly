@@ -7,6 +7,7 @@ import { db, type AgentToolConfig } from '@/data'
 import { useProjects } from '@/hooks/useProjects'
 import { useConfirm } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
+import type { CreateAutomationRequest } from '@shared/contracts/automation'
 import type { Automation, AutomationRun } from '@/types/automation'
 import { AutomationFormDialog } from './components/AutomationFormDialog'
 import { AutomationList } from './components/AutomationList'
@@ -139,33 +140,14 @@ export function AutomationsPage() {
   )
 
   const handleSubmit = useCallback(
-    async (input: {
-      name: string
-      enabled?: boolean
-      trigger_type: 'interval' | 'daily' | 'weekly'
-      trigger_json: Record<string, unknown>
-      timezone: string
-      template_json: {
-        title: string
-        prompt: string
-        taskMode: 'conversation'
-        projectId?: string
-        projectPath?: string
-        createWorktree?: boolean
-        baseBranch?: string
-        worktreeBranchPrefix?: string
-        worktreeRootPath?: string
-        cliToolId?: string
-        agentToolConfigId?: string
-      }
-    }) => {
+    async (input: CreateAutomationRequest) => {
       setSaving(true)
       try {
         if (editingAutomation) {
-          await db.updateAutomation(editingAutomation.id, input as Record<string, unknown>)
+          await db.updateAutomation(editingAutomation.id, input)
           await refreshAutomationRuns(editingAutomation.id)
         } else {
-          await db.createAutomation(input as Record<string, unknown>)
+          await db.createAutomation(input)
         }
         await loadAutomations()
       } finally {

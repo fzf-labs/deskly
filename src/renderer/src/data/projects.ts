@@ -1,4 +1,4 @@
-import type { Project, CreateProjectInput } from './types';
+import type { DbProject as Project, CreateProjectInput } from '@shared/contracts/project';
 
 const PROJECTS_KEY = 'deskly_projects';
 const CURRENT_PROJECT_KEY = 'deskly_current_project';
@@ -41,7 +41,7 @@ export function createProject(input: CreateProjectInput): Project {
     id: Date.now().toString(),
     name: input.name,
     path: input.path,
-    description: input.description,
+    description: input.description ?? null,
     project_type: input.project_type || 'normal',
     created_at: now,
     updated_at: now,

@@ -1,5 +1,1 @@
-import { TaskDetailContainer } from './TaskDetailContainer';
-
-export function TaskDetailPage() {
-  return <TaskDetailContainer />;
-}
+export { TaskDetailPage } from '@features/task-detail/TaskDetailPage'

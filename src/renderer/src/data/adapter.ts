@@ -5,16 +5,25 @@ import {
 } from '@/lib/notifications'
 import { notifyTasksChanged } from '@/lib/task-events'
 import type {
+  AgentToolConfig,
+  CreateAgentToolConfigInput,
+  CreateAutomationRequest,
   CreateTaskInput,
+  CreateWorkflowDefinitionInput,
   GeneratedWorkflowDefinitionResult,
   GenerateWorkflowDefinitionInput,
   OptimizePromptInput,
   OptimizePromptResult,
+  RunAutomationNowResult,
   Task,
+  TaskNodeStatus,
   TaskNode,
+  UpdateAgentToolConfigInput,
+  UpdateAutomationRequest,
   UpdateTaskInput,
   WorkflowDefinition,
   WorkflowRun,
+  UpdateWorkflowDefinitionInput,
   WorkflowRunNode
 } from './types'
 import type { Automation, AutomationRun } from './types'
@@ -76,28 +85,31 @@ export const db = {
     return deleted
   },
 
-  listAgentToolConfigs: (toolId?: string): Promise<unknown[]> => {
-    return window.api.database.listAgentToolConfigs(toolId) as Promise<unknown[]>
+  listAgentToolConfigs: (toolId?: string): Promise<AgentToolConfig[]> => {
+    return window.api.database.listAgentToolConfigs(toolId) as Promise<AgentToolConfig[]>
   },
 
-  getAgentToolConfig: (id: string): Promise<unknown> => {
-    return window.api.database.getAgentToolConfig(id) as Promise<unknown>
+  getAgentToolConfig: (id: string): Promise<AgentToolConfig | null> => {
+    return window.api.database.getAgentToolConfig(id) as Promise<AgentToolConfig | null>
   },
 
-  createAgentToolConfig: (input: unknown): Promise<unknown> => {
-    return window.api.database.createAgentToolConfig(input) as Promise<unknown>
+  createAgentToolConfig: (input: CreateAgentToolConfigInput): Promise<AgentToolConfig> => {
+    return window.api.database.createAgentToolConfig(input) as Promise<AgentToolConfig>
   },
 
-  updateAgentToolConfig: (id: string, updates: unknown): Promise<unknown> => {
-    return window.api.database.updateAgentToolConfig(id, updates) as Promise<unknown>
+  updateAgentToolConfig: (
+    id: string,
+    updates: UpdateAgentToolConfigInput
+  ): Promise<AgentToolConfig | null> => {
+    return window.api.database.updateAgentToolConfig(id, updates) as Promise<AgentToolConfig | null>
   },
 
-  deleteAgentToolConfig: (id: string): Promise<unknown> => {
-    return window.api.database.deleteAgentToolConfig(id) as Promise<unknown>
+  deleteAgentToolConfig: (id: string): Promise<boolean> => {
+    return window.api.database.deleteAgentToolConfig(id) as Promise<boolean>
   },
 
-  setDefaultAgentToolConfig: (id: string): Promise<unknown> => {
-    return window.api.database.setDefaultAgentToolConfig(id) as Promise<unknown>
+  setDefaultAgentToolConfig: (id: string): Promise<AgentToolConfig | null> => {
+    return window.api.database.setDefaultAgentToolConfig(id) as Promise<AgentToolConfig | null>
   },
 
   getTaskNodes: (taskId: string): Promise<TaskNode[]> => {
@@ -127,7 +139,7 @@ export const db = {
     ) as Promise<TaskNode | null>
   },
 
-  getTaskNodesByStatus: (taskId: string, status: string): Promise<TaskNode[]> => {
+  getTaskNodesByStatus: (taskId: string, status: TaskNodeStatus): Promise<TaskNode[]> => {
     return window.api.database.getTaskNodesByStatus(taskId, status) as Promise<TaskNode[]>
   },
 
@@ -198,11 +210,11 @@ export const db = {
     return window.api.prompt.optimize(input) as Promise<OptimizePromptResult>
   },
 
-  createWorkflowDefinition: (input: Record<string, unknown>): Promise<WorkflowDefinition> => {
+  createWorkflowDefinition: (input: CreateWorkflowDefinitionInput): Promise<WorkflowDefinition> => {
     return window.api.workflow.createDefinition(input) as Promise<WorkflowDefinition>
   },
 
-  updateWorkflowDefinition: (input: Record<string, unknown>): Promise<WorkflowDefinition> => {
+  updateWorkflowDefinition: (input: UpdateWorkflowDefinitionInput): Promise<WorkflowDefinition> => {
     return window.api.workflow.updateDefinition(input) as Promise<WorkflowDefinition>
   },
 
@@ -210,11 +222,11 @@ export const db = {
     return window.api.workflow.deleteDefinition(id) as Promise<boolean>
   },
 
-  createAutomation: (input: Record<string, unknown>): Promise<Automation> => {
+  createAutomation: (input: CreateAutomationRequest): Promise<Automation> => {
     return window.api.automation.create(input) as Promise<Automation>
   },
 
-  updateAutomation: (id: string, updates: Record<string, unknown>): Promise<Automation | null> => {
+  updateAutomation: (id: string, updates: UpdateAutomationRequest): Promise<Automation | null> => {
     return window.api.automation.update(id, updates) as Promise<Automation | null>
   },
 
@@ -234,8 +246,8 @@ export const db = {
     return window.api.automation.setEnabled(id, enabled) as Promise<Automation | null>
   },
 
-  runAutomationNow: (id: string): Promise<{ runId: string; status: string }> => {
-    return window.api.automation.runNow(id) as Promise<{ runId: string; status: string }>
+  runAutomationNow: (id: string): Promise<RunAutomationNowResult> => {
+    return window.api.automation.runNow(id) as Promise<RunAutomationNowResult>
   },
 
   listAutomationRuns: (automationId: string, limit = 100): Promise<AutomationRun[]> => {

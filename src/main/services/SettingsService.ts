@@ -2,19 +2,9 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { getAppPaths } from '../app/AppPaths'
 import {
   createDefaultEnabledCliTools,
-  normalizeEnabledCliTools,
-  type EnabledCliTools
+  normalizeEnabledCliTools
 } from '../../shared/agent-cli-tool-enablement'
-
-export interface AppSettings {
-  enabledCliTools: EnabledCliTools
-  theme: 'light' | 'dark' | 'system'
-  language: string
-  notifications: {
-    enabled: boolean
-    sound: boolean
-  }
-}
+import type { AppSettings } from '../../shared/contracts/settings'
 
 const DEFAULT_SETTINGS: AppSettings = {
   enabledCliTools: createDefaultEnabledCliTools(),

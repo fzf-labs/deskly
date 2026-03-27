@@ -7,6 +7,7 @@ import { PromptOptimizeButton } from '@/components/shared/PromptOptimizeButton';
 import { useProjects } from '@/hooks/useProjects';
 import type { AgentToolConfig } from '@/data';
 import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement';
+import type { CreateAutomationRequest } from '@shared/contracts/automation';
 import type { Automation, AutomationTriggerType } from '@/types/automation';
 import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools';
 import { useLanguage } from '@/providers/language-provider';
@@ -16,26 +17,7 @@ interface AutomationFormDialogProps {
   onOpenChange: (open: boolean) => void;
   initialAutomation?: Automation | null;
   cliConfigs: AgentToolConfig[];
-  onSubmit: (input: {
-    name: string;
-    enabled?: boolean;
-    trigger_type: AutomationTriggerType;
-    trigger_json: Record<string, unknown>;
-    timezone: string;
-    template_json: {
-      title: string;
-      prompt: string;
-      taskMode: 'conversation';
-      projectId?: string;
-      projectPath?: string;
-      createWorktree?: boolean;
-      baseBranch?: string;
-      worktreeBranchPrefix?: string;
-      worktreeRootPath?: string;
-      cliToolId?: string;
-      agentToolConfigId?: string;
-    };
-  }) => Promise<void>;
+  onSubmit: (input: CreateAutomationRequest) => Promise<void>;
 }
 
 const weekdayOptions = [

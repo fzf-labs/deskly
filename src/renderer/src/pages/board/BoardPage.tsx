@@ -8,26 +8,7 @@ import { PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog'
 import { useProjects } from '@/hooks/useProjects'
 import type { TaskStatus } from '@/data/types'
-
-// Task type from API (camelCase fields)
-interface TaskWithWorktree {
-  id: string
-  title: string
-  prompt: string
-  status: string
-  projectId: string | null
-  worktreePath: string | null
-  branchName: string | null
-  baseBranch?: string | null
-  workspacePath?: string | null
-  taskMode: 'conversation' | 'workflow'
-  startedAt?: string | null
-  completedAt?: string | null
-  cost: number | null
-  duration: number | null
-  createdAt: string
-  updatedAt: string
-}
+import type { TaskWithWorktree } from '@shared/contracts/task'
 
 // Column configuration
 const columns: { id: TaskStatus; title: string; color: string }[] = [

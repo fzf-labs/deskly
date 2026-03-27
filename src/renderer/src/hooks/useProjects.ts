@@ -1,24 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { normalizeCurrentProjectId } from '@/lib/project-routing';
-
-export interface Project {
-  id: string;
-  name: string;
-  path: string;
-  description?: string;
-  config: Record<string, unknown>;
-  projectType: 'normal' | 'git';
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateProjectInput {
-  name: string;
-  path: string;
-  description?: string;
-  config?: Record<string, unknown>;
-  projectType?: 'normal' | 'git';
-}
+import type {
+  CreateProjectOptions as CreateProjectInput,
+  Project
+} from '@shared/contracts/project';
+export type {
+  CreateProjectOptions as CreateProjectInput,
+  Project
+} from '@shared/contracts/project';
 
 const CURRENT_PROJECT_KEY = 'deskly_current_project';
 const CURRENT_PROJECT_CHANGED_EVENT = 'current-project:changed';
@@ -99,15 +88,11 @@ export function useProjects() {
   const addProject = useCallback(async (input: CreateProjectInput): Promise<Project> => {
     const result = await window.api.projects.add({
       ...input,
-      config: {},
       projectType: input.projectType,
-    }) as { success: boolean; error?: string; data: Project };
-    if (!result.success) {
-      throw new Error(result.error || '添加项目失败');
-    }
+    }) as Project;
     await fetchProjects();
     window.dispatchEvent(new Event('projects:changed'));
-    return result.data;
+    return result;
   }, [fetchProjects]);
 
   const updateProject = useCallback(
