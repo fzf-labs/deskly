@@ -1,4 +1,4 @@
-import { ArtifactPreview, type Artifact } from '@/components/artifacts'
+import { ArtifactPreview, type Artifact } from '@features/artifacts'
 import { RightPanel } from '@/components/task'
 import type { RightPanelTab } from '@/components/task/RightPanel'
 

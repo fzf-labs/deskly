@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { TriggerBadge } from '@/components/automation/TriggerBadge';
+import { TriggerBadge } from '@features/automation';
 import type { Automation, AutomationRun } from '@/types/automation';
 import { AutomationRunList } from './AutomationRunList';
 

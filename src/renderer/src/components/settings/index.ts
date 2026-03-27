@@ -1,14 +1,13 @@
-export { SettingsContent } from './SettingsContent';
-export { SettingsSidebar } from './SettingsSidebar';
+export { SettingsContent, SettingsSidebar } from '@features/settings';
 export type {
   SettingsCategory,
   SettingsTabProps,
   MCPServerUI,
   SkillInfo,
-} from './types';
+} from '@features/settings';
 export {
   SETTINGS_CATEGORIES,
   isSettingsCategory,
   buildSettingsRoute,
   PROJECT_SETTINGS_ROUTE,
-} from './types';
+} from '@features/settings';

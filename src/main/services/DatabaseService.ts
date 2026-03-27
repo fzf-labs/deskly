@@ -65,6 +65,13 @@ export const composeTaskNodePrompt = (
   return basePrompt || templatePrompt
 }
 
+export interface DatabaseRuntimeServices {
+  cliSessionService: CliSessionService
+  cliToolDetectorService: AgentCLIToolDetectorService
+  settingsService: SettingsService
+  workflowSchedulerService: WorkflowSchedulerService
+}
+
 export class DatabaseService {
   private db: Database.Database
   private connection: DatabaseConnection
@@ -121,6 +128,25 @@ export class DatabaseService {
 
   setWorkflowSchedulerService(service: WorkflowSchedulerService): void {
     this.workflowSchedulerService = service
+  }
+
+  setRuntimeServices({
+    cliSessionService,
+    cliToolDetectorService,
+    settingsService,
+    workflowSchedulerService
+  }: DatabaseRuntimeServices): void {
+    this.setWorkflowGenerationRuntime(
+      cliSessionService,
+      cliToolDetectorService,
+      settingsService
+    )
+    this.setPromptOptimizationRuntime(
+      cliSessionService,
+      cliToolDetectorService,
+      settingsService
+    )
+    this.setWorkflowSchedulerService(workflowSchedulerService)
   }
 
   setWorkflowGenerationRuntime(
@@ -325,17 +351,17 @@ export class DatabaseService {
       return null
     }
 
-    const updated = this.workflowRunNodeRepo.markFailed(
-      nodeId,
-      'cancelled',
-      reason ?? 'stopped_by_user'
+    return this.handleWorkflowNodeUpdate(
+      this.workflowRunNodeRepo.markFailed(
+        nodeId,
+        'cancelled',
+        reason ?? 'stopped_by_user'
+      ),
+      {
+        syncRunStatus: true,
+        notifyScheduler: true
+      }
     )
-    if (updated) {
-      this.workflowRunService.syncRunStatus(updated.workflow_run_id)
-      this.notifyTaskNodeStatusChange(this.getTaskNode(updated.id)!)
-      void this.workflowSchedulerService?.onNodeUpdated(updated.id)
-    }
-    return updated ? this.getTaskNode(updated.id) : null
   }
 
   completeTaskNode(
@@ -370,14 +396,10 @@ export class DatabaseService {
             session_id: result.sessionId ?? null
           })
 
-      if (updated) {
-        this.workflowRunService.syncRunStatus(updated.workflow_run_id)
-        const mapped = this.getTaskNode(updated.id)!
-        this.notifyTaskNodeStatusChange(mapped)
-        void this.workflowSchedulerService?.onNodeUpdated(updated.id)
-        return mapped
-      }
-      return null
+      return this.handleWorkflowNodeUpdate(updated, {
+        syncRunStatus: true,
+        notifyScheduler: true
+      })
     }
     return null
   }
@@ -388,16 +410,13 @@ export class DatabaseService {
       return null
     }
 
-    const updated = this.workflowRunNodeRepo.markFailed(nodeId, 'execution_error', error)
-
-    if (updated) {
-      this.workflowRunService.syncRunStatus(updated.workflow_run_id)
-      const mapped = this.getTaskNode(updated.id)!
-      this.notifyTaskNodeStatusChange(mapped)
-      void this.workflowSchedulerService?.onNodeUpdated(updated.id)
-      return mapped
-    }
-    return null
+    return this.handleWorkflowNodeUpdate(
+      this.workflowRunNodeRepo.markFailed(nodeId, 'execution_error', error),
+      {
+        syncRunStatus: true,
+        notifyScheduler: true
+      }
+    )
   }
 
   approveTaskNode(nodeId: string): TaskNode | null {
@@ -406,14 +425,9 @@ export class DatabaseService {
       return null
     }
 
-    const updated = this.workflowRunService.approveNode(nodeId)
-    if (updated) {
-      const mapped = this.getTaskNode(updated.id)!
-      this.notifyTaskNodeStatusChange(mapped)
-      void this.workflowSchedulerService?.onNodeUpdated(updated.id)
-      return mapped
-    }
-    return null
+    return this.handleWorkflowNodeUpdate(this.workflowRunService.approveNode(nodeId), {
+      notifyScheduler: true
+    })
   }
 
   rerunTaskNode(nodeId: string): TaskNode | null {
@@ -422,14 +436,9 @@ export class DatabaseService {
       return null
     }
 
-    const updated = this.workflowRunService.retryNode(nodeId)
-    if (updated) {
-      const mapped = this.getTaskNode(updated.id)!
-      this.notifyTaskNodeStatusChange(mapped)
-      void this.workflowSchedulerService?.onNodeUpdated(updated.id)
-      return mapped
-    }
-    return null
+    return this.handleWorkflowNodeUpdate(this.workflowRunService.retryNode(nodeId), {
+      notifyScheduler: true
+    })
   }
 
   getTaskIdBySessionId(sessionId: string): string | null {
@@ -538,48 +547,24 @@ export class DatabaseService {
   async generateWorkflowDefinition(
     input: GenerateWorkflowDefinitionInput
   ): Promise<GeneratedWorkflowDefinitionResult> {
-    let resolvedToolConfig: Record<string, unknown> | null = null
-
-    if (input.toolId && input.agentToolConfigId) {
-      const configRecord = this.getAgentToolConfig(input.agentToolConfigId)
-      if (configRecord?.tool_id === input.toolId && configRecord.config_json) {
-        try {
-          const parsed = JSON.parse(configRecord.config_json)
-          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            resolvedToolConfig = parsed as Record<string, unknown>
-          }
-        } catch (error) {
-          console.error('[DatabaseService] Failed to parse workflow generation tool config:', error)
-        }
-      }
-    }
-
     return await this.workflowDefinitionGenerationService.generateDefinition({
       ...input,
-      resolvedToolConfig
+      resolvedToolConfig: this.resolveAgentToolConfig(
+        input.toolId,
+        input.agentToolConfigId,
+        'workflow generation'
+      )
     })
   }
 
   async optimizePrompt(input: OptimizePromptInput): Promise<OptimizePromptResult> {
-    let resolvedToolConfig: Record<string, unknown> | null = null
-
-    if (input.toolId && input.agentToolConfigId) {
-      const configRecord = this.getAgentToolConfig(input.agentToolConfigId)
-      if (configRecord?.tool_id === input.toolId && configRecord.config_json) {
-        try {
-          const parsed = JSON.parse(configRecord.config_json)
-          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            resolvedToolConfig = parsed as Record<string, unknown>
-          }
-        } catch (error) {
-          console.error('[DatabaseService] Failed to parse prompt optimization tool config:', error)
-        }
-      }
-    }
-
     return await this.promptOptimizationService.optimizePrompt({
       ...input,
-      resolvedToolConfig
+      resolvedToolConfig: this.resolveAgentToolConfig(
+        input.toolId,
+        input.agentToolConfigId,
+        'prompt optimization'
+      )
     })
   }
 
@@ -634,8 +619,9 @@ export class DatabaseService {
   ): WorkflowRunNode | null {
     const updated = this.workflowRunService.approveNode(workflowRunNodeId, input)
     if (updated) {
-      this.notifyTaskNodeStatusChange(this.getTaskNode(updated.id)!)
-      void this.workflowSchedulerService?.onNodeUpdated(updated.id)
+      this.handleWorkflowNodeUpdate(updated, {
+        notifyScheduler: true
+      })
     }
     return updated
   }
@@ -643,8 +629,9 @@ export class DatabaseService {
   retryWorkflowRunNode(workflowRunNodeId: string): WorkflowRunNode | null {
     const updated = this.workflowRunService.retryNode(workflowRunNodeId)
     if (updated) {
-      this.notifyTaskNodeStatusChange(this.getTaskNode(updated.id)!)
-      void this.workflowSchedulerService?.onNodeUpdated(updated.id)
+      this.handleWorkflowNodeUpdate(updated, {
+        notifyScheduler: true
+      })
     }
     return updated
   }
@@ -668,8 +655,9 @@ export class DatabaseService {
   markWorkflowRunNodeRunning(nodeId: string): WorkflowRunNode | null {
     const updated = this.workflowRunNodeRepo.markRunning(nodeId)
     if (updated) {
-      this.workflowRunService.syncRunStatus(updated.workflow_run_id)
-      this.notifyTaskNodeStatusChange(this.getTaskNode(updated.id)!)
+      this.handleWorkflowNodeUpdate(updated, {
+        syncRunStatus: true
+      })
       return updated
     }
     return null
@@ -849,6 +837,59 @@ export class DatabaseService {
       case 'failed':
         return 'failed'
     }
+  }
+
+  private resolveAgentToolConfig(
+    toolId: string | null | undefined,
+    agentToolConfigId: string | null | undefined,
+    contextLabel: string
+  ): Record<string, unknown> | null {
+    if (!toolId || !agentToolConfigId) {
+      return null
+    }
+
+    const configRecord = this.getAgentToolConfig(agentToolConfigId)
+    if (configRecord?.tool_id !== toolId || !configRecord.config_json) {
+      return null
+    }
+
+    try {
+      const parsed = JSON.parse(configRecord.config_json)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+    } catch (error) {
+      console.error(`[DatabaseService] Failed to parse ${contextLabel} tool config:`, error)
+    }
+
+    return null
+  }
+
+  private handleWorkflowNodeUpdate(
+    updated: WorkflowRunNode | null,
+    options: {
+      syncRunStatus?: boolean
+      notifyScheduler?: boolean
+    } = {}
+  ): TaskNode | null {
+    if (!updated) {
+      return null
+    }
+
+    if (options.syncRunStatus) {
+      this.workflowRunService.syncRunStatus(updated.workflow_run_id)
+    }
+
+    const mapped = this.getTaskNode(updated.id)
+    if (mapped) {
+      this.notifyTaskNodeStatusChange(mapped)
+    }
+
+    if (options.notifyScheduler) {
+      void this.workflowSchedulerService?.onNodeUpdated(updated.id)
+    }
+
+    return mapped
   }
 
   // ============ 清理和关闭 ============

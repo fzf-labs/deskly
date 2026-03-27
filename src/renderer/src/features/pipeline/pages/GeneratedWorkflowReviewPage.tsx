@@ -13,6 +13,7 @@ import { getSettings } from '@/data/settings'
 import type { MessageAttachment } from '@/hooks/useAgent'
 import { notifyTasksChanged } from '@/lib/task-events'
 import { useLanguage } from '@/providers/language-provider'
+import { createTaskWithSideEffects } from '@features/tasks'
 import {
   buildTaskCreatePayload,
   resolveWorkflowGenerationToolId,
@@ -59,7 +60,7 @@ export function GeneratedWorkflowReviewPage() {
       const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'WT-'
       const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
 
-      const createdTask = await window.api.task.create(
+      const createdTask = await createTaskWithSideEffects(
         buildTaskCreatePayload({
           createMode: 'generated-workflow',
           title: state.title,
@@ -75,8 +76,6 @@ export function GeneratedWorkflowReviewPage() {
           workflowDefinition: buildWorkflowDefinitionFromForm(values)
         })
       )
-
-      notifyTasksChanged()
 
       let startError: string | undefined
       try {

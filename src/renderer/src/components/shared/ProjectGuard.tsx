@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { PROJECT_SETTINGS_ROUTE } from '@/components/settings';
+import { PROJECT_SETTINGS_ROUTE } from '@features/settings';
 import { useProjects } from '@/hooks/useProjects';
 
 interface ProjectGuardProps {

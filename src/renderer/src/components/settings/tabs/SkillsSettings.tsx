@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { cn } from '@/lib/utils';
-import { useLanguage } from '@/providers/language-provider';
 import {
   CLI_SKILL_DIRECTORIES,
   loadSkillsFromDirectory,
   openFolderInSystem,
   resolvePath,
-} from '@/lib/skills';
+} from '@features/skills';
+import { cn } from '@/lib/utils';
+import { useLanguage } from '@/providers/language-provider';
 import {
   FolderOpen,
   Loader2,

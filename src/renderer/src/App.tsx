@@ -1,4 +1,4 @@
-import { TaskInput } from '@/components/home/TaskInput';
+import { TaskInput } from '@features/home';
 
 export default function App() {
   return (

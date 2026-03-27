@@ -16,67 +16,37 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
-import { Clock } from 'lucide-react'
 
 import { db, type Task, type WorkflowRun, type WorkflowRunNode } from '@/data'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
-import { filterEnabledCliTools, isCliToolEnabled } from '@/lib/agent-cli-tool-enablement'
+import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
 import { normalizeCliTools } from '@/lib/agent-cli-tools'
 import { newUuid } from '@/lib/ids'
-import type { AgentMessage, MessageAttachment } from '@/hooks/useAgent'
-import { hasValidSearchResults, type Artifact } from '@/components/artifacts'
-import type { RightPanelTab } from '@/components/task/RightPanel'
-import { getArtifactTypeFromExt } from '@/components/task'
-import type { CLISessionHandle } from '@features/cli-session'
+import type { AgentMessage, CLISessionHandle } from '@features/cli-session'
 
-import { statusConfig } from './constants'
+import { useArtifactPanel } from './hooks/useArtifactPanel'
+import { useMessageScroll } from './hooks/useMessageScroll'
+import { usePipelineRuntime } from './hooks/usePipelineRuntime'
+import { useTaskDetailActions } from './hooks/useTaskDetailActions'
+import { useTaskDetailViewModel } from './hooks/useTaskDetailViewModel'
+import { useTaskDialogs } from './hooks/useTaskDialogs'
+import { useToolSelectionState } from './hooks/useToolSelectionState'
+import { useWorkflowRuntime } from './hooks/useWorkflowRuntime'
+import { resolveTaskExecutionContext } from './model/execution-context'
+import {
+  buildWorkflowLinearNodes,
+  selectRuntimeWorkflowNode,
+  selectWorkflowNode
+} from './model/workflow-selectors'
 import { buildWorkflowGraph } from './workflow-graph'
 import {
-  filterVisibleMetaRows,
   type CLIToolInfo,
   type CurrentNodeRuntime,
   type ExecutionStatus,
   type PipelineDisplayStatus,
-  type PipelineStatus,
-  type PipelineTemplate,
-  type TaskMetaRow,
-  type WorkflowCurrentNode,
   type WorkflowGraph,
-  type WorkflowNode,
-  type WorkflowReviewNode,
-  type WorkflowSummary,
   type LanguageStrings
 } from './types'
-
-// ============================================================================
-// Utils
-// ============================================================================
-
-const FILE_PATH_PATTERNS = [
-  /`([^`]+\.(?:pptx|xlsx|docx|pdf))`/gi,
-  /(\/[^\s"'`\n]+\.(?:pptx|xlsx|docx|pdf))/gi,
-  /(\/[^\s"'\n]*[\u4e00-\u9fff][^\s"'\n]*\.(?:pptx|xlsx|docx|pdf))/gi
-]
-
-const extractFilePaths = (text: string): string[] => {
-  const results: string[] = []
-  for (const pattern of FILE_PATH_PATTERNS) {
-    pattern.lastIndex = 0
-    const matches = text.matchAll(pattern)
-    for (const match of matches) {
-      const filePath = match[1] || match[0]
-      if (filePath) results.push(filePath)
-    }
-  }
-  return results
-}
-
-const hasFilePathMatch = (text: string): boolean => {
-  return FILE_PATH_PATTERNS.some((pattern) => {
-    pattern.lastIndex = 0
-    return pattern.test(text)
-  })
-}
 
 // ============================================================================
 // Types
@@ -411,96 +381,14 @@ export function useTaskDetail({
   // ===========================================================================
   // Section 3: Dialog State
   // ===========================================================================
-  const [isEditOpen, setIsEditOpen] = useState(false)
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [editPrompt, setEditPrompt] = useState('')
-  const [editCliToolId, setEditCliToolId] = useState('')
-  const [editCliConfigId, setEditCliConfigId] = useState('')
-  const [cliConfigs, setCliConfigs] = useState<
-    Array<{ id: string; name: string; is_default?: number }>
-  >([])
-
-  useEffect(() => {
-    if (!isEditOpen) return
-    if (!editCliToolId || isCliToolEnabled(editCliToolId)) return
-    setEditCliToolId('')
-    setEditCliConfigId('')
-  }, [editCliToolId, isEditOpen])
-
-  const handleOpenEdit = useCallback(() => {
-    if (!task || task.status !== 'todo') return
-    setEditPrompt(task.prompt || '')
-    setEditCliToolId(
-      isCliToolEnabled(currentNodeRuntime.cliToolId) ? currentNodeRuntime.cliToolId || '' : ''
-    )
-    setEditCliConfigId(currentNodeRuntime.agentToolConfigId || '')
-    setIsEditOpen(true)
-  }, [currentNodeRuntime.agentToolConfigId, currentNodeRuntime.cliToolId, task])
-
-  const handleSaveEdit = useCallback(async () => {
-    if (!taskId) return
-    const trimmedPrompt = editPrompt.trim()
-    if (!trimmedPrompt) return
-    try {
-      const updatedTask = await db.updateTask(taskId, {
-        prompt: trimmedPrompt
-      })
-      await db.updateCurrentTaskNodeRuntime(taskId, {
-        cli_tool_id: editCliToolId || null,
-        agent_tool_config_id: editCliConfigId || null
-      })
-      await loadCurrentNodeRuntime()
-      if (updatedTask) setTask(updatedTask)
-      setIsEditOpen(false)
-    } catch (error) {
-      console.error('Failed to update task:', error)
-    }
-  }, [editCliToolId, editCliConfigId, editPrompt, loadCurrentNodeRuntime, taskId])
-
-  const handleDeleteTask = useCallback(async () => {
-    if (!taskId) return
-    try {
-      await db.deleteTask(taskId)
-      setIsDeleteOpen(false)
-      navigate('/board', { replace: true })
-    } catch (error) {
-      console.error('Failed to delete task:', error)
-    }
-  }, [navigate, taskId])
-
-  useEffect(() => {
-    if (!isEditOpen) return
-    if (!editCliToolId) {
-      setCliConfigs([])
-      setEditCliConfigId('')
-      return
-    }
-    let active = true
-    const loadConfigs = async () => {
-      try {
-        const result = await db.listAgentToolConfigs(editCliToolId)
-        const list = Array.isArray(result)
-          ? (result as Array<{ id: string; name: string; is_default?: number }>)
-          : []
-        if (!active) return
-        setCliConfigs(list)
-        const exists = editCliConfigId && list.some((cfg) => cfg.id === editCliConfigId)
-        if (!exists) {
-          const defaultConfig = list.find((cfg) => cfg.is_default)
-          setEditCliConfigId(defaultConfig?.id || '')
-        }
-      } catch {
-        if (active) {
-          setCliConfigs([])
-          setEditCliConfigId('')
-        }
-      }
-    }
-    void loadConfigs()
-    return () => {
-      active = false
-    }
-  }, [editCliConfigId, editCliToolId, isEditOpen])
+  const dialogs = useTaskDialogs({
+    taskId,
+    task,
+    currentNodeRuntime,
+    navigate,
+    setTask,
+    loadCurrentNodeRuntime
+  })
 
   // ===========================================================================
   // Section 4: CLI Session
@@ -672,611 +560,191 @@ export function useTaskDetail({
   // ===========================================================================
   // Section 6: Tool Selection
   // ===========================================================================
-  const [selectedToolIndex, setSelectedToolIndex] = useState<number | null>(null)
-  const toolCount = useMemo(() => messages.filter((m) => m.type === 'tool_use').length, [messages])
-
-  useEffect(() => {
-    if (isRunning && toolCount > 0) setSelectedToolIndex(toolCount - 1)
-  }, [toolCount, isRunning])
-  useEffect(() => {
-    setSelectedToolIndex(null)
-  }, [taskId])
-
-  const toolSelectionValue = useMemo(
-    () => ({ selectedToolIndex, setSelectedToolIndex, showComputer: () => {} }),
-    [selectedToolIndex]
-  )
+  const toolSelection = useToolSelectionState({
+    messages,
+    isRunning,
+    taskId
+  })
 
   // ===========================================================================
   // Section 7: Scroll
   // ===========================================================================
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const userScrolledUpRef = useRef(false)
-  const lastScrollTopRef = useRef(0)
-
-  useEffect(() => {
-    userScrolledUpRef.current = false
-    lastScrollTopRef.current = 0
-  }, [taskId])
-  useEffect(() => {
-    if (!userScrolledUpRef.current) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  const checkScrollPosition = useCallback(() => {
-    const container = messagesContainerRef.current
-    if (!container) return
-    const { scrollTop, scrollHeight, clientHeight } = container
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
-    if (scrollTop < lastScrollTopRef.current && distanceFromBottom > 100)
-      userScrolledUpRef.current = true
-    if (distanceFromBottom < 50) userScrolledUpRef.current = false
-    lastScrollTopRef.current = scrollTop
-  }, [])
-
-  useEffect(() => {
-    const container = messagesContainerRef.current
-    if (!container) return
-    container.addEventListener('scroll', checkScrollPosition)
-    checkScrollPosition()
-    return () => container.removeEventListener('scroll', checkScrollPosition)
-  }, [checkScrollPosition])
-
-  useEffect(() => {
-    if (!isLoading && messages.length > 0) requestAnimationFrame(() => checkScrollPosition())
-  }, [checkScrollPosition, isLoading, messages.length])
+  const scroll = useMessageScroll({
+    messages,
+    isLoading,
+    taskId
+  })
 
   // ===========================================================================
   // Section 8: Working Dir
   // ===========================================================================
-  const [artifacts, setArtifacts] = useState<Artifact[]>([])
-
-  const workingDir = useMemo(() => {
-    if (task?.workspace_path) return task.workspace_path
-    if (task?.worktree_path) return task.worktree_path
-    if (sessionFolder) return sessionFolder
-    for (const artifact of artifacts) {
-      if (artifact.path?.includes('/sessions/')) {
-        const match = artifact.path.match(/^(.+\/sessions\/[^/]+)/)
-        if (match) return match[1]
-      }
-    }
-    return ''
-  }, [artifacts, sessionFolder, task?.workspace_path, task?.worktree_path])
+  const preview = useArtifactPanel({
+    taskId,
+    task,
+    messages,
+    sessionFolder,
+    isRunning,
+    cliStatus
+  })
+  const workingDir = preview.workingDir
 
   // ===========================================================================
   // Section 9: Pipeline
   // ===========================================================================
-  const [pipelineTemplate, setPipelineTemplate] = useState<PipelineTemplate | null>(null)
-  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus>('idle')
   const [pipelineStageIndex, setPipelineStageIndex] = useState(0)
   const [pipelineStageMessageStart, setPipelineStageMessageStart] = useState(0)
-
-  useEffect(() => {
-    if (!taskId || task?.task_mode !== 'workflow') {
-      setPipelineTemplate(null)
-      setPipelineStatus('idle')
-      return
-    }
-
-    let active = true
-    const loadTemplate = async () => {
-      try {
-        const nodes = (await db.getTaskNodes(taskId)) as Array<{
-          id: string
-          node_order: number
-          name?: string
-          prompt?: string
-          requires_approval?: boolean | number
-        }>
-        if (!nodes.length) {
-          if (active) {
-            setPipelineTemplate(null)
-            setPipelineStatus('idle')
-          }
-          return
-        }
-
-        const sortedNodes = [...nodes].sort((a, b) => a.node_order - b.node_order)
-
-        if (active) {
-          setPipelineTemplate({
-            id: taskId,
-            name: t.task.workflowCardTitle || 'Workflow',
-            description: null,
-            scope: 'project',
-            project_id: task?.project_id ?? null,
-            created_at: '',
-            updated_at: '',
-            nodes: sortedNodes.map((node, index) => ({
-              id: node.id,
-              template_id: taskId,
-              node_order: Number.isFinite(node.node_order) ? node.node_order : index + 1,
-              name: node.name || `${t.task.stageLabel} ${index + 1}`,
-              prompt: node.prompt || '',
-              requires_approval: Boolean(node.requires_approval),
-              created_at: '',
-              updated_at: ''
-            }))
-          })
-          setPipelineStageIndex(0)
-          setPipelineStatus('idle')
-        }
-      } catch {
-        if (active) {
-          setPipelineTemplate(null)
-          setPipelineStatus('idle')
-        }
-      }
-    }
-
-    void loadTemplate()
-    return () => {
-      active = false
-    }
-  }, [task?.project_id, task?.task_mode, taskId, t.task.stageLabel, t.task.workflowCardTitle])
 
   // ===========================================================================
   // Section 10: Workflow
   // ===========================================================================
-  const [currentTaskNode, setCurrentTaskNode] = useState<WorkflowReviewNode | null>(null)
-  const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([])
-  const [workflowCurrentNode, setWorkflowCurrentNode] = useState<WorkflowCurrentNode | null>(null)
-  const [selectedWorkflowNodeId, setSelectedWorkflowNodeId] = useState<string | null>(null)
-  const [isWorkflowExpanded, setIsWorkflowExpanded] = useState(false)
-
-  const isMountedRef = useRef(true)
-  const workflowPrevTaskIdRef = useRef<string | undefined>(undefined)
-  const lastAutoRunTaskNodeIdRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (workflowPrevTaskIdRef.current !== taskId) {
-      if (workflowPrevTaskIdRef.current !== undefined) {
-        setCurrentTaskNode(null)
-        setWorkflowNodes([])
-        setWorkflowCurrentNode(null)
-        setSelectedWorkflowNodeId(null)
-        setIsWorkflowExpanded(false)
-        lastAutoRunTaskNodeIdRef.current = null
-      }
-      workflowPrevTaskIdRef.current = taskId
-    }
-  }, [taskId])
-
-  const resolveTaskNodePrompt = useCallback(
-    async (taskNodeId?: string | null, nodeIndex?: number | null) => {
-      const sortedNodes = [...workflowNodes].sort((a, b) => a.node_order - b.node_order)
-      const fromState =
-        (taskNodeId ? sortedNodes.find((n) => n.id === taskNodeId) : null) ||
-        (typeof nodeIndex === 'number' ? sortedNodes[nodeIndex] : null) ||
-        sortedNodes.find((n) => n.node_order === nodeIndex)
-      if (fromState?.prompt?.trim()) return fromState.prompt.trim()
-
-      if (!taskId) return ''
-      try {
-        const nodes = (await db.getTaskNodes(taskId)) as Array<{
-          id: string
-          node_order: number
-          prompt?: string
-        }>
-        const byId = taskNodeId ? nodes.find((n) => n.id === taskNodeId) : null
-        const byIndex =
-          typeof nodeIndex === 'number'
-            ? [...nodes].sort((a, b) => a.node_order - b.node_order)[nodeIndex]
-            : null
-        return (byId?.prompt || byIndex?.prompt || '').trim()
-      } catch {
-        return ''
-      }
-    },
-    [taskId, workflowNodes]
-  )
-
-  const resolveCurrentNodePrompt = useCallback(async () => {
-    if (!taskId) return ''
-
-    try {
-      const currentNode = (await db.getCurrentTaskNode(taskId)) as {
-        id?: string
-        node_order?: number
-        prompt?: string
-      } | null
-
-      if (currentNode?.prompt?.trim()) {
-        return currentNode.prompt.trim()
-      }
-
-      if (currentNode?.id) {
-        const resolved = await resolveTaskNodePrompt(
-          currentNode.id,
-          typeof currentNode.node_order === 'number'
-            ? Math.max(currentNode.node_order - 1, 0)
-            : null
-        )
-        if (resolved.trim()) {
-          return resolved.trim()
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    if (workflowCurrentNode?.id) {
-      const fallback = await resolveTaskNodePrompt(
-        workflowCurrentNode.id,
-        workflowCurrentNode.index
-      )
-      return fallback.trim()
-    }
-
-    return ''
-  }, [resolveTaskNodePrompt, taskId, workflowCurrentNode?.id, workflowCurrentNode?.index])
-
-  const loadWorkflowStatus = useCallback(async () => {
-    if (!taskId) return
-    try {
-      const nodes = (await db.getTaskNodes(taskId)) as Array<{
-        id: string
-        node_order: number
-        status: PipelineDisplayStatus
-        name?: string
-        prompt?: string
-        session_id?: string | null
-        cli_tool_id?: string | null
-        agent_tool_config_id?: string | null
-      }>
-      if (!nodes.length) {
-        if (isMountedRef.current) {
-          setCurrentTaskNode(null)
-          setWorkflowNodes([])
-          setWorkflowCurrentNode(null)
-          setSelectedWorkflowNodeId(null)
-        }
-        return
-      }
-
-      const sortedNodes = [...nodes].sort((a, b) => a.node_order - b.node_order)
-
-      const runtimeCurrentNode = (await db.getCurrentTaskNode(taskId)) as {
-        id: string
-        status: PipelineDisplayStatus
-        name?: string
-      } | null
-      const currentNode = runtimeCurrentNode ?? sortedNodes[sortedNodes.length - 1]
-      if (!currentNode) {
-        if (isMountedRef.current) {
-          setCurrentTaskNode(null)
-          setWorkflowCurrentNode(null)
-          setWorkflowNodes(sortedNodes)
-        }
-        return
-      }
-
-      const currentNodeIndex = Math.max(
-        0,
-        sortedNodes.findIndex((node) => node.id === currentNode.id)
-      )
-
-      if (isMountedRef.current) {
-        setWorkflowNodes(sortedNodes)
-        setWorkflowCurrentNode({
-          id: currentNode.id,
-          status: currentNode.status,
-          index: currentNodeIndex
-        })
-        const hasSelectedNode =
-          selectedWorkflowNodeId !== null &&
-          sortedNodes.some((node) => node.id === selectedWorkflowNodeId)
-        if (!hasSelectedNode) {
-          setSelectedWorkflowNodeId(currentNode.id)
-        }
-        if (useCliSession) setPipelineStageIndex(currentNodeIndex)
-      }
-
-      const selectedReviewNode = selectedWorkflowNodeId
-        ? sortedNodes.find(
-            (node) => node.id === selectedWorkflowNodeId && node.status === 'in_review'
-          )
-        : null
-
-      const runtimeReviewNode =
-        currentNode.status === 'in_review'
-          ? (sortedNodes.find((node) => node.id === currentNode.id) ?? null)
-          : null
-
-      const reviewNode = selectedReviewNode ?? runtimeReviewNode
-
-      if (reviewNode) {
-        const reviewNodeIndex = Math.max(
-          0,
-          sortedNodes.findIndex((node) => node.id === reviewNode.id)
-        )
-        const runtimeNode = workflowRunNodes.find((node) => node.id === reviewNode.id) ?? null
-        const definitionNode =
-          runtimeNode && backendWorkflowRun
-            ? (backendWorkflowRun.definition_snapshot.nodes.find(
-                (node) => node.id === runtimeNode.definition_node_id
-              ) ?? null)
-            : null
-        const fallbackName = `${t.task.stageLabel} ${reviewNodeIndex + 1}`
-        if (isMountedRef.current) {
-          setCurrentTaskNode({
-            id: reviewNode.id,
-            name: reviewNode.name || runtimeNode?.name || definitionNode?.name || fallbackName,
-            status: 'in_review'
-          })
-        }
-        return
-      }
-
-      if (isMountedRef.current) setCurrentTaskNode(null)
-    } catch {
-      /* ignore */
-    }
-  }, [
-    backendWorkflowRun,
-    selectedWorkflowNodeId,
+  const workflow = useWorkflowRuntime({
     taskId,
-    t.task.stageLabel,
     useCliSession,
-    workflowRunNodes
-  ])
+    backendWorkflowRun,
+    workflowRunNodes,
+    t,
+    cliStatus,
+    isRunning,
+    loadCurrentNodeRuntime,
+    refreshTask,
+    setTask,
+    setPipelineStageIndex
+  })
+  const {
+    currentTaskNode,
+    workflowNodes,
+    workflowCurrentNode,
+    selectedWorkflowNodeId,
+    isWorkflowExpanded,
+    lastAutoRunTaskNodeIdRef,
+    resolveTaskNodePrompt,
+    resolveCurrentNodePrompt,
+    loadWorkflowStatus,
+    handleApproveTaskNode,
+    handleSelectWorkflowNode,
+    toggleWorkflowExpanded
+  } = workflow
 
   // Assign to ref for use in handleCliStatusChange
   loadWorkflowStatusRef.current = loadWorkflowStatus
 
-  useEffect(() => {
-    if (!taskId) return
-
-    const refreshByTaskNodeEvent = async (eventTaskId?: string) => {
-      if (!eventTaskId || eventTaskId !== taskId) return
-      await loadCurrentNodeRuntime()
-      await loadWorkflowStatus()
-      await refreshTask()
-    }
-
-    const offCompleted = window.api?.taskNode?.onCompleted?.((data) => {
-      void refreshByTaskNodeEvent(data?.taskId)
-    })
-    const offReview = window.api?.taskNode?.onReview?.((data) => {
-      void refreshByTaskNodeEvent(data?.taskId)
-    })
-
-    return () => {
-      offCompleted?.()
-      offReview?.()
-    }
-  }, [taskId, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask])
-
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [taskId])
-
-  useEffect(() => {
-    if (!taskId) return
-    let active = true
-    void (async () => {
-      if (!active) return
-      await loadCurrentNodeRuntime()
-      if (!active) return
-      await loadWorkflowStatus()
-    })()
-    const shouldPoll = isRunning || cliStatus === 'running'
-    const interval = shouldPoll
-      ? setInterval(() => {
-          if (!active) return
-          void loadCurrentNodeRuntime()
-          void loadWorkflowStatus()
-          void refreshTask()
-        }, 2000)
-      : null
-    return () => {
-      active = false
-      if (interval) clearInterval(interval)
-    }
-  }, [taskId, loadCurrentNodeRuntime, loadWorkflowStatus, refreshTask, isRunning, cliStatus])
-
-  const handleApproveTaskNode = useCallback(async () => {
-    if (!currentTaskNode) return
-    await db.approveTaskNode(currentTaskNode.id)
-    await loadCurrentNodeRuntime()
-    setCurrentTaskNode(null)
-    setSelectedWorkflowNodeId(null)
-    lastAutoRunTaskNodeIdRef.current = null
-    await loadWorkflowStatus()
-    if (taskId) {
-      try {
-        const updatedTask = await db.getTask(taskId)
-        if (updatedTask) setTask(updatedTask as Task)
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [currentTaskNode, loadCurrentNodeRuntime, loadWorkflowStatus, taskId])
-
-  const handleSelectWorkflowNode = useCallback((nodeId: string) => {
-    setSelectedWorkflowNodeId(nodeId)
-  }, [])
-
-  // ===========================================================================
-  // Section 11: Pipeline Actions
-  // ===========================================================================
-  const appendPipelineNotice = useCallback(
-    async (content: string) => {
-      if (taskId) setMessages((prev) => [...prev, { type: 'text', content }])
-    },
-    [setMessages, taskId]
-  )
-
-  const startPipelineStage = useCallback(
-    async (index: number, approvalNote?: string) => {
-      if (!pipelineTemplate || !taskId) return
-      const stage = pipelineTemplate.nodes?.[index]
-      if (!stage) {
-        setPipelineStatus('completed')
-        await appendPipelineNotice(t.task.pipelineCompleted)
-        return
-      }
-
-      const resolvedPrompt = await resolveTaskNodePrompt(stage.id, index)
-      const stagePrompt = buildCliPrompt(resolvedPrompt)
-      if (!stagePrompt) return
-      const prompt = approvalNote
-        ? `${stagePrompt}\n\n${t.task.pipelineApprovalNotePrefix}: ${approvalNote}`
-        : stagePrompt
-
-      setPipelineStageIndex(index)
-      setPipelineStatus('running')
-      setPipelineStageMessageStart(messages.length)
-
-      if (useCliSession) {
-        try {
-          const sessionId = await appendCliUserLog(prompt)
-          await runCliPrompt(prompt, sessionId)
-        } catch {
-          setPipelineStatus('failed')
-        }
-        return
-      }
-
-      setPipelineStatus('failed')
-      await appendPipelineNotice(t.common.errors.serverNotRunning || 'CLI session is not running.')
-    },
-    [
-      appendCliUserLog,
-      appendPipelineNotice,
-      buildCliPrompt,
-      messages.length,
-      pipelineTemplate,
-      resolveTaskNodePrompt,
-      runCliPrompt,
-      taskId,
-      t.task.pipelineApprovalNotePrefix,
-      t.task.pipelineCompleted,
-      t.common.errors.serverNotRunning,
-      useCliSession
-    ]
-  )
-
-  const startNextPipelineStage = useCallback(
-    async (approvalNote?: string) => {
-      await startPipelineStage(pipelineStageIndex + 1, approvalNote)
-    },
-    [pipelineStageIndex, startPipelineStage]
-  )
-
   const normalizedTaskStatus = useMemo<PipelineDisplayStatus>(() => {
     const rawStatus = task?.status
-    if (!rawStatus) return 'todo'
-    if (['todo', 'in_progress', 'in_review', 'done', 'failed'].includes(rawStatus))
+    if (!rawStatus) {
+      return 'todo'
+    }
+
+    if (['todo', 'in_progress', 'in_review', 'done', 'failed'].includes(rawStatus)) {
       return rawStatus as PipelineDisplayStatus
+    }
+
     return 'todo'
   }, [task?.status])
 
-  // Auto-start pipeline
-  useEffect(() => {
-    if (backendWorkflowRun) return
-    if (!pipelineTemplate || pipelineStatus !== 'idle' || isRunning) return
-    if (useCliSession && cliStatus === 'running') return
-    if (!taskId || messages.length > 0) return
-    if (normalizedTaskStatus !== 'in_progress') return
-
-    let active = true
-    const maybeStart = async () => {
-      try {
-        const currentNode = (await db.getCurrentTaskNode(taskId)) as {
-          status?: PipelineDisplayStatus
-          session_id?: string | null
-        } | null
-        if (!currentNode) return
-        if (currentNode.status !== 'in_progress') return
-        if (currentNode.session_id) return
-      } catch {
-        return
-      }
-      if (!active) return
-      startPipelineStage(workflowCurrentNode?.index ?? 0).catch(() => {})
-    }
-    void maybeStart()
-    return () => {
-      active = false
-    }
-  }, [
-    backendWorkflowRun,
-    cliStatus,
-    isRunning,
-    messages.length,
-    normalizedTaskStatus,
-    pipelineStatus,
-    pipelineTemplate,
-    startPipelineStage,
+  const pipeline = usePipelineRuntime({
     taskId,
-    useCliSession,
-    workflowCurrentNode?.index
-  ])
-
-  // Handle pipeline stage completion
-  useEffect(() => {
-    if (backendWorkflowRun) return
-    if (!pipelineTemplate || pipelineStatus !== 'running' || isRunning) return
-    const stageMessages = messages.slice(pipelineStageMessageStart)
-    let outcome: (typeof stageMessages)[number] | undefined
-    for (let i = stageMessages.length - 1; i >= 0; i--) {
-      if (stageMessages[i].type === 'result' || stageMessages[i].type === 'error') {
-        outcome = stageMessages[i]
-        break
-      }
-    }
-    if (!outcome || !taskId) return
-
-    const stage = pipelineTemplate.nodes?.[pipelineStageIndex]
-    const stageName = stage?.name || `${t.task.stageLabel} ${pipelineStageIndex + 1}`
-
-    if (outcome.type === 'result' && outcome.subtype === 'success') {
-      setPipelineStatus('waiting_approval')
-      appendPipelineNotice(t.task.pipelineStageCompleted.replace('{name}', stageName))
-    } else {
-      setPipelineStatus('failed')
-      appendPipelineNotice(t.task.pipelineStageFailed.replace('{name}', stageName))
-    }
-  }, [
-    appendPipelineNotice,
-    backendWorkflowRun,
-    isRunning,
+    task,
     messages,
-    pipelineStageIndex,
-    pipelineStageMessageStart,
-    pipelineStatus,
-    pipelineTemplate,
-    taskId,
-    t.task.pipelineStageCompleted,
-    t.task.pipelineStageFailed,
-    t.task.stageLabel
-  ])
-
-  const pipelineBanner = useMemo(() => {
-    if (startupError) return startupError
-    if (!pipelineTemplate) return null
-    const stage = pipelineTemplate.nodes?.[pipelineStageIndex]
-    const stageName = stage?.name || `${t.task.stageLabel} ${pipelineStageIndex + 1}`
-    if (pipelineStatus === 'waiting_approval')
-      return t.task.pipelineStageCompleted.replace('{name}', stageName)
-    if (pipelineStatus === 'failed') return t.task.pipelineStageFailed.replace('{name}', stageName)
-    if (pipelineStatus === 'completed') return t.task.pipelineCompleted
-    return null
-  }, [
-    pipelineStageIndex,
-    pipelineStatus,
-    pipelineTemplate,
+    setMessages,
+    t,
+    isRunning,
+    cliStatus,
+    useCliSession,
+    backendWorkflowRun,
+    workflowCurrentNode,
     startupError,
-    t.task.pipelineCompleted,
-    t.task.pipelineStageCompleted,
-    t.task.pipelineStageFailed,
-    t.task.stageLabel
-  ])
+    normalizedTaskStatus,
+    pipelineStageIndex,
+    setPipelineStageIndex,
+    pipelineStageMessageStart,
+    setPipelineStageMessageStart,
+    resolveTaskNodePrompt,
+    buildCliPrompt,
+    appendCliUserLog,
+    runCliPrompt
+  })
+  const {
+    pipelineTemplate,
+    pipelineStatus,
+    pipelineBanner,
+    startPipelineStage,
+    startNextPipelineStage
+  } = pipeline
+
+  const selectedWorkflowNode = useMemo(
+    () =>
+      selectWorkflowNode({
+        taskMode: task?.task_mode,
+        workflowNodes,
+        selectedWorkflowNodeId,
+        workflowCurrentNode,
+        currentTaskNode
+      }),
+    [currentTaskNode, selectedWorkflowNodeId, task?.task_mode, workflowCurrentNode, workflowNodes]
+  )
+
+  const runtimeWorkflowNode = useMemo(
+    () =>
+      selectRuntimeWorkflowNode({
+        taskMode: task?.task_mode,
+        workflowNodes,
+        workflowCurrentNode,
+        currentTaskNode
+      }),
+    [currentTaskNode, task?.task_mode, workflowCurrentNode, workflowNodes]
+  )
+
+  const workflowLinearNodes = useMemo(
+    () =>
+      buildWorkflowLinearNodes({
+        workflowNodes,
+        pipelineTemplate
+      }),
+    [pipelineTemplate, workflowNodes]
+  )
+
+  const executionContext = useMemo(
+    () =>
+      resolveTaskExecutionContext({
+        taskMode: task?.task_mode,
+        currentNodeRuntime,
+        currentTaskNodeId: currentTaskNode?.id ?? null,
+        workflowCurrentNodeId: workflowCurrentNode?.id ?? null,
+        selectedWorkflowNode,
+        runtimeWorkflowNode,
+        useCliSession
+      }),
+    [
+      currentNodeRuntime,
+      currentTaskNode?.id,
+      runtimeWorkflowNode,
+      selectedWorkflowNode,
+      task?.task_mode,
+      useCliSession,
+      workflowCurrentNode?.id
+    ]
+  )
+
+  const viewState = useTaskDetailViewModel({
+    taskId,
+    task,
+    initialPrompt,
+    messages,
+    isRunning,
+    cliStatus,
+    useCliSession,
+    cliTools,
+    executionLogToolId: executionContext.executionLogToolId,
+    pipelineTemplate,
+    pipelineStatus,
+    workflowGraph,
+    workflowCurrentNode,
+    currentTaskNode,
+    selectedWorkflowNode,
+    t
+  })
+  const markStartedOnce = viewState.markStartedOnce
+  const selectedWorkflowNodeIsFailed = viewState.selectedWorkflowNodeIsFailed
 
   // Auto-run workflow node for CLI session
   useEffect(() => {
@@ -1335,6 +803,7 @@ export function useTaskDetail({
     buildCliPrompt,
     cliStatus,
     currentNodeRuntime.sessionId,
+    lastAutoRunTaskNodeIdRef,
     resolveTaskNodePrompt,
     runCliPrompt,
     useCliSession,
@@ -1342,333 +811,8 @@ export function useTaskDetail({
   ])
 
   // ===========================================================================
-  // Section 12: Artifacts
+  // Section 12: Workflow Graph
   // ===========================================================================
-  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null)
-  const [activePreviewTab, setActivePreviewTab] = useState<RightPanelTab>('files')
-  const [isPreviewVisible, setIsPreviewVisible] = useState(false)
-  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0)
-
-  const lastWorkspaceRefreshMessageIndexRef = useRef(0)
-  const prevRunStateRef = useRef<{ isRunning: boolean; cliStatus: ExecutionStatus }>({
-    isRunning: false,
-    cliStatus: 'idle'
-  })
-  const artifactsPrevTaskIdRef = useRef<string | undefined>(undefined)
-
-  useEffect(() => {
-    if (artifactsPrevTaskIdRef.current !== taskId) {
-      if (artifactsPrevTaskIdRef.current !== undefined) {
-        setIsPreviewVisible(false)
-        setActivePreviewTab('files')
-        setSelectedArtifact(null)
-        setArtifacts([])
-        lastWorkspaceRefreshMessageIndexRef.current = 0
-        setWorkspaceRefreshToken(0)
-      }
-      artifactsPrevTaskIdRef.current = taskId
-    }
-  }, [taskId])
-
-  const handleOpenPreviewTab = useCallback((tab: RightPanelTab) => {
-    setActivePreviewTab(tab)
-    setIsPreviewVisible(true)
-  }, [])
-
-  const handleTogglePreviewTab = useCallback(
-    (tab: RightPanelTab) => {
-      if (isPreviewVisible && activePreviewTab === tab) {
-        setIsPreviewVisible(false)
-        return
-      }
-
-      setActivePreviewTab(tab)
-      setIsPreviewVisible(true)
-    },
-    [activePreviewTab, isPreviewVisible]
-  )
-
-  const handleClosePreviewPanel = useCallback(() => {
-    setIsPreviewVisible(false)
-  }, [])
-
-  const handleSelectArtifact = useCallback((artifact: Artifact | null) => {
-    setSelectedArtifact(artifact)
-    if (artifact) {
-      setActivePreviewTab('files')
-      setIsPreviewVisible(true)
-    }
-  }, [])
-
-  const handleClosePreview = useCallback(() => {
-    setSelectedArtifact(null)
-  }, [])
-
-  // Extract artifacts from messages
-  useEffect(() => {
-    const extractedArtifacts: Artifact[] = []
-    const seenPaths = new Set<string>()
-
-    messages.forEach((msg) => {
-      if (msg.type === 'tool_use' && msg.name === 'Write') {
-        const input = msg.input as Record<string, unknown> | undefined
-        const filePath = input?.file_path as string | undefined
-        const content = input?.content as string | undefined
-        if (filePath && !seenPaths.has(filePath)) {
-          seenPaths.add(filePath)
-          const filename = filePath.split('/').pop() || filePath
-          const ext = filename.split('.').pop()?.toLowerCase()
-          extractedArtifacts.push({
-            id: filePath,
-            name: filename,
-            type: getArtifactTypeFromExt(ext),
-            content,
-            path: filePath
-          })
-        }
-      }
-
-      if (msg.type === 'tool_use' && msg.name === 'WebSearch') {
-        const input = msg.input as Record<string, unknown> | undefined
-        const query = input?.query as string | undefined
-        const toolUseId = msg.id
-        if (query) {
-          let output = ''
-          if (toolUseId) {
-            const resultMsg = messages.find(
-              (m) => m.type === 'tool_result' && m.toolUseId === toolUseId
-            )
-            output = resultMsg?.output || ''
-          }
-          if (!output) {
-            const msgIndex = messages.indexOf(msg)
-            for (let i = msgIndex + 1; i < messages.length; i++) {
-              if (messages[i].type === 'tool_result') {
-                output = messages[i].output || ''
-                break
-              }
-              if (messages[i].type === 'tool_use') break
-            }
-          }
-          const artifactId = `websearch-${query}`
-          if (!seenPaths.has(artifactId) && output && hasValidSearchResults(output)) {
-            seenPaths.add(artifactId)
-            extractedArtifacts.push({
-              id: artifactId,
-              name: `Search: ${query.slice(0, 50)}${query.length > 50 ? '...' : ''}`,
-              type: 'websearch',
-              content: output
-            })
-          }
-        }
-      }
-    })
-
-    messages.forEach((msg) => {
-      const textToSearch =
-        msg.type === 'tool_result' ? msg.output : msg.type === 'text' ? msg.content : null
-      if (textToSearch) {
-        const filePaths = extractFilePaths(textToSearch)
-        for (const filePath of filePaths) {
-          if (filePath && !seenPaths.has(filePath)) {
-            seenPaths.add(filePath)
-            const filename = filePath.split('/').pop() || filePath
-            const ext = filename.split('.').pop()?.toLowerCase()
-            extractedArtifacts.push({
-              id: filePath,
-              name: filename,
-              type: getArtifactTypeFromExt(ext),
-              path: filePath
-            })
-          }
-        }
-      }
-    })
-
-    setArtifacts(extractedArtifacts)
-  }, [messages, taskId])
-
-  // Workspace refresh tracking
-  useEffect(() => {
-    if (messages.length < lastWorkspaceRefreshMessageIndexRef.current)
-      lastWorkspaceRefreshMessageIndexRef.current = 0
-    if (messages.length === 0) return
-    const startIndex = lastWorkspaceRefreshMessageIndexRef.current
-    if (startIndex >= messages.length) return
-
-    const newMessages = messages.slice(startIndex)
-    lastWorkspaceRefreshMessageIndexRef.current = messages.length
-
-    let shouldRefresh = false
-    for (const msg of newMessages) {
-      if (msg.type === 'tool_use' && msg.name === 'Write') {
-        shouldRefresh = true
-        break
-      }
-      const textToSearch =
-        msg.type === 'tool_result' ? msg.output : msg.type === 'text' ? msg.content : null
-      if (textToSearch && hasFilePathMatch(textToSearch)) {
-        shouldRefresh = true
-        break
-      }
-    }
-    if (shouldRefresh) setWorkspaceRefreshToken((prev) => prev + 1)
-  }, [messages])
-
-  useEffect(() => {
-    const prev = prevRunStateRef.current
-    const wasRunning = prev.isRunning || prev.cliStatus === 'running'
-    const isNowRunning = isRunning || cliStatus === 'running'
-    if (wasRunning && !isNowRunning) setWorkspaceRefreshToken((prevToken) => prevToken + 1)
-    prevRunStateRef.current = { isRunning, cliStatus }
-  }, [cliStatus, isRunning])
-
-  // ===========================================================================
-  // Section 13: View State
-  // ===========================================================================
-  const [hasStartedOnce, setHasStartedOnce] = useState(false)
-
-  const isCliTaskReviewPending = useMemo(
-    () => Boolean(useCliSession && task?.task_mode !== 'workflow' && task?.status === 'in_review'),
-    [task?.status, task?.task_mode, useCliSession]
-  )
-
-  useEffect(() => {
-    if (task?.status && normalizedTaskStatus !== 'todo') setHasStartedOnce(true)
-  }, [normalizedTaskStatus, task?.status])
-  useEffect(() => {
-    if (messages.length > 0) setHasStartedOnce(true)
-  }, [messages.length])
-  useEffect(() => {
-    setHasStartedOnce(false)
-  }, [taskId])
-
-  const markStartedOnce = useCallback(() => {
-    setHasStartedOnce(true)
-  }, [])
-
-  const displayTitle = task?.title || task?.prompt || initialPrompt
-
-  const startDisabled = useMemo(() => {
-    if (!taskId) return true
-    if (task?.task_mode === 'workflow') {
-      return (
-        !pipelineTemplate ||
-        pipelineStatus !== 'idle' ||
-        isRunning ||
-        (useCliSession && cliStatus === 'running')
-      )
-    }
-    if (useCliSession) return cliStatus === 'running'
-    return isRunning
-  }, [
-    cliStatus,
-    isRunning,
-    pipelineStatus,
-    pipelineTemplate,
-    task?.task_mode,
-    taskId,
-    useCliSession
-  ])
-
-  const hasExecuted = useMemo(() => {
-    if (messages.length > 0) return true
-    if (hasStartedOnce) return true
-    if (isRunning) return true
-    if (!task) return false
-    if (task.status && normalizedTaskStatus !== 'todo') return true
-    return false
-  }, [hasStartedOnce, isRunning, messages.length, normalizedTaskStatus, task])
-
-  const showStartButton = !hasExecuted
-
-  const displayStatus = useMemo<PipelineDisplayStatus | null>(() => {
-    if (!task?.status) return null
-    return normalizedTaskStatus
-  }, [normalizedTaskStatus, task?.status])
-
-  const statusInfo = displayStatus ? statusConfig[displayStatus] : null
-  const StatusIcon = statusInfo?.icon || Clock
-
-  const executionStatus = useMemo<ExecutionStatus>(() => {
-    if (useCliSession) return cliStatus
-    if (isRunning) return 'running'
-    return 'idle'
-  }, [cliStatus, isRunning, useCliSession])
-
-  const cliStatusInfo = useMemo(() => {
-    const statusMap = {
-      idle: { label: t.task.cliStatusIdle || 'Idle', color: 'text-muted-foreground bg-muted/60' },
-      running: {
-        label: t.task.cliStatusRunning || 'Running',
-        color: 'text-blue-600 bg-blue-500/10'
-      },
-      stopped: {
-        label: t.task.cliStatusStopped || 'Stopped',
-        color: 'text-emerald-600 bg-emerald-500/10'
-      },
-      error: { label: t.task.cliStatusError || 'Error', color: 'text-red-600 bg-red-500/10' }
-    }
-    return statusMap[executionStatus]
-  }, [
-    executionStatus,
-    t.task.cliStatusError,
-    t.task.cliStatusIdle,
-    t.task.cliStatusRunning,
-    t.task.cliStatusStopped
-  ])
-
-  const showWorkflowCard = useMemo(
-    () => Boolean(task?.task_mode === 'workflow'),
-    [task?.task_mode]
-  )
-
-  const workflowSummary = useMemo<WorkflowSummary | null>(() => {
-    if (!showWorkflowCard) return null
-
-    const nodes = [...workflowGraph.nodes].sort((a, b) => a.node_order - b.node_order)
-    const total = nodes.length
-    const completed = nodes.filter((node) => node.status === 'done').length
-    const inProgress = nodes.filter((node) => node.status === 'in_progress').length
-    const inReview = nodes.filter((node) => node.status === 'in_review').length
-    const failed = nodes.filter((node) => node.status === 'failed').length
-    const pending = Math.max(total - completed - inProgress - inReview - failed, 0)
-
-    const runtimeNodeId = workflowCurrentNode?.id ?? currentTaskNode?.id ?? null
-    const currentGraphNode =
-      (runtimeNodeId ? nodes.find((node) => node.id === runtimeNodeId) : null) ??
-      nodes.find((node) => node.isCurrent) ??
-      nodes.find((node) => node.status === 'in_review' || node.status === 'in_progress') ??
-      nodes[0] ??
-      null
-
-    return {
-      total,
-      completed,
-      pending,
-      inProgress,
-      inReview,
-      failed,
-      currentNodeName: currentTaskNode?.name ?? currentGraphNode?.name ?? null,
-      currentNodeStatus: currentTaskNode?.status ?? currentGraphNode?.status ?? null
-    }
-  }, [currentTaskNode, showWorkflowCard, workflowCurrentNode?.id, workflowGraph.nodes])
-
-  const workflowLinearNodes = useMemo(() => {
-    if (workflowNodes.length > 0)
-      return [...workflowNodes].sort((a, b) => a.node_order - b.node_order)
-    if (pipelineTemplate?.nodes?.length) {
-      return pipelineTemplate.nodes.map((node, index) => ({
-        id: node.id,
-        node_order: Number.isFinite(node.node_order) ? node.node_order : index,
-        status: 'todo' as const,
-        name: node.name,
-        prompt: node.prompt
-      }))
-    }
-    return []
-  }, [pipelineTemplate?.nodes, workflowNodes])
-
   const nextWorkflowGraph = useMemo<WorkflowGraph>(
     () =>
       buildWorkflowGraph({
@@ -1709,471 +853,46 @@ export function useTaskDetail({
     workflowLinearNodes.length
   ])
 
-  const selectedWorkflowNode = useMemo(() => {
-    if (task?.task_mode !== 'workflow') return null
-    const sortedNodes = [...workflowNodes].sort((a, b) => a.node_order - b.node_order)
-    if (!sortedNodes.length) return null
-
-    const fallbackNodeId =
-      workflowCurrentNode?.id ?? currentTaskNode?.id ?? sortedNodes[0]?.id ?? null
-    const targetNodeId = selectedWorkflowNodeId ?? fallbackNodeId
-    if (!targetNodeId) return null
-
-    return sortedNodes.find((node) => node.id === targetNodeId) ?? sortedNodes[0]
-  }, [
-    currentTaskNode?.id,
-    selectedWorkflowNodeId,
-    task?.task_mode,
-    workflowCurrentNode?.id,
-    workflowNodes
-  ])
-
-  const selectedWorkflowNodeIsDone = useMemo(
-    () => Boolean(task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'done'),
-    [selectedWorkflowNode?.status, task?.task_mode]
-  )
-
-  const selectedWorkflowNodeIsFailed = useMemo(
-    () => Boolean(task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'failed'),
-    [selectedWorkflowNode?.status, task?.task_mode]
-  )
-
-  const showActionButton = showStartButton || isCliTaskReviewPending || selectedWorkflowNodeIsFailed
-  const actionKind = selectedWorkflowNodeIsFailed
-    ? ('retry' as const)
-    : isCliTaskReviewPending
-      ? ('complete' as const)
-      : ('start' as const)
-  const actionLabel = selectedWorkflowNodeIsFailed
-    ? 'Retry node'
-    : isCliTaskReviewPending
-      ? t.task.completeTask || 'Complete task'
-      : t.task.startExecution || 'Start'
-  const actionDisabled = selectedWorkflowNodeIsFailed
-    ? false
-    : isCliTaskReviewPending
-      ? false
-      : startDisabled
-
-  const runtimeWorkflowNode = useMemo(() => {
-    if (task?.task_mode !== 'workflow') return null
-
-    const sortedNodes = [...workflowNodes].sort((a, b) => a.node_order - b.node_order)
-    if (!sortedNodes.length) return null
-
-    const runtimeNodeId = workflowCurrentNode?.id ?? currentTaskNode?.id ?? null
-    if (!runtimeNodeId) return sortedNodes[0] ?? null
-
-    return sortedNodes.find((node) => node.id === runtimeNodeId) ?? sortedNodes[0] ?? null
-  }, [currentTaskNode?.id, task?.task_mode, workflowCurrentNode?.id, workflowNodes])
-
-  const executionTaskNodeId = useMemo(() => {
-    if (task?.task_mode === 'workflow') {
-      return (
-        runtimeWorkflowNode?.id ??
-        workflowCurrentNode?.id ??
-        currentTaskNode?.id ??
-        currentNodeRuntime.taskNodeId ??
-        null
-      )
-    }
-    return currentNodeRuntime.taskNodeId ?? currentTaskNode?.id ?? null
-  }, [
-    currentNodeRuntime.taskNodeId,
-    currentTaskNode?.id,
-    runtimeWorkflowNode?.id,
-    task?.task_mode,
-    workflowCurrentNode?.id
-  ])
-
-  const executionLogTaskNodeId = useMemo(() => {
-    if (task?.task_mode === 'workflow') {
-      return selectedWorkflowNode?.id ?? executionTaskNodeId ?? null
-    }
-    return executionTaskNodeId
-  }, [executionTaskNodeId, selectedWorkflowNode?.id, task?.task_mode])
-
-  const executionLogSource = useMemo(() => {
-    if (task?.task_mode !== 'workflow') return 'session' as const
-    if (!executionTaskNodeId || !executionLogTaskNodeId) return 'session' as const
-    return executionLogTaskNodeId === executionTaskNodeId ? ('session' as const) : ('file' as const)
-  }, [executionLogTaskNodeId, executionTaskNodeId, task?.task_mode])
-
-  const executionSessionId = useMemo(() => {
-    if (task?.task_mode !== 'workflow') {
-      return currentNodeRuntime.sessionId || ''
-    }
-
-    if (!executionTaskNodeId) return ''
-
-    if (runtimeWorkflowNode?.session_id) {
-      return runtimeWorkflowNode.session_id
-    }
-
-    const runtimeMatchesExecutionNode = currentNodeRuntime.taskNodeId === executionTaskNodeId
-    return runtimeMatchesExecutionNode ? currentNodeRuntime.sessionId || '' : ''
-  }, [
-    currentNodeRuntime.sessionId,
-    currentNodeRuntime.taskNodeId,
-    executionTaskNodeId,
-    runtimeWorkflowNode?.session_id,
-    task?.task_mode
-  ])
-
-  const executionCliToolId = useMemo(() => {
-    if (task?.task_mode !== 'workflow') {
-      return currentNodeRuntime.cliToolId || ''
-    }
-    return runtimeWorkflowNode?.cli_tool_id || currentNodeRuntime.cliToolId || ''
-  }, [currentNodeRuntime.cliToolId, runtimeWorkflowNode?.cli_tool_id, task?.task_mode])
-
-  const executionAgentToolConfigId = useMemo(() => {
-    if (task?.task_mode !== 'workflow') {
-      return currentNodeRuntime.agentToolConfigId ?? null
-    }
-    return runtimeWorkflowNode?.agent_tool_config_id ?? currentNodeRuntime.agentToolConfigId ?? null
-  }, [
-    currentNodeRuntime.agentToolConfigId,
-    runtimeWorkflowNode?.agent_tool_config_id,
-    task?.task_mode
-  ])
-
-  const executionLogToolId = useMemo(() => {
-    if (task?.task_mode !== 'workflow') {
-      return executionCliToolId
-    }
-
-    return (
-      selectedWorkflowNode?.cli_tool_id || executionCliToolId || currentNodeRuntime.cliToolId || ''
-    )
-  }, [
-    currentNodeRuntime.cliToolId,
-    executionCliToolId,
-    selectedWorkflowNode?.cli_tool_id,
-    task?.task_mode
-  ])
-
-  const useCliSessionPanel = useMemo(() => {
-    if (task?.task_mode === 'workflow') {
-      return Boolean(executionLogToolId || executionCliToolId || currentNodeRuntime.cliToolId)
-    }
-    return useCliSession
-  }, [
-    currentNodeRuntime.cliToolId,
-    executionCliToolId,
-    executionLogToolId,
-    task?.task_mode,
-    useCliSession
-  ])
-
-  const showExecutionLogPanel = useMemo(() => {
-    if (task?.task_mode !== 'workflow') {
-      return useCliSessionPanel
-    }
-
-    if (executionLogSource === 'file') {
-      return Boolean(executionLogTaskNodeId || executionTaskNodeId)
-    }
-
-    return useCliSessionPanel
-  }, [
-    executionLogSource,
-    executionLogTaskNodeId,
-    executionTaskNodeId,
-    task?.task_mode,
-    useCliSessionPanel
-  ])
-
-  const isTaskDone = task?.status === 'done'
-
-  const replyDisabled = Boolean(isTaskDone || selectedWorkflowNodeIsDone)
-
-  const replyPlaceholder = useMemo(() => {
-    if (isTaskDone) return '任务已结束'
-    if (selectedWorkflowNodeIsDone) return '当前节点已结束，请切换到进行中的节点继续提问'
-    return '有疑问，继续问我…'
-  }, [isTaskDone, selectedWorkflowNodeIsDone])
-
-  const cliToolName = useMemo(() => {
-    if (!executionLogToolId) return null
-    const match = cliTools.find((tool) => tool.id === executionLogToolId)
-    return match?.displayName || match?.name || executionLogToolId
-  }, [cliTools, executionLogToolId])
-
-  const cliToolLabel = cliToolName || t.task.detailCli || 'CLI'
-
-  const metaRows = useMemo<TaskMetaRow[]>(
-    () => [
-      {
-        key: 'status',
-        icon: StatusIcon,
-        value: statusInfo ? (
-          <span className="text-foreground text-xs font-medium">{statusInfo.label}</span>
-        ) : null,
-        visible: Boolean(statusInfo)
-      }
-    ],
-    [statusInfo, StatusIcon]
-  )
-
-  const visibleMetaRows = filterVisibleMetaRows(metaRows)
-
   // ===========================================================================
   // Section 14: Actions
   // ===========================================================================
-  const handleReply = useCallback(
-    async (text: string, messageAttachments?: MessageAttachment[]) => {
-      if ((text.trim() || (messageAttachments && messageAttachments.length > 0)) && taskId) {
-        let latestRuntime = await loadCurrentNodeRuntime()
-        if (task?.task_mode === 'conversation' && !latestRuntime.cliToolId) {
-          latestRuntime = await ensureConversationRuntime(task)
-        }
-        const shouldUseCliSession =
-          task?.task_mode === 'workflow' ? useCliSessionPanel : Boolean(latestRuntime.cliToolId)
-
-        if (!shouldUseCliSession && isRunning) return
-        if (shouldUseCliSession) {
-          if (task?.task_mode === 'workflow' && selectedWorkflowNode?.status === 'done') return
-
-          const content = text.trim()
-          let sessionId: string | null = null
-          if (content) {
-            sessionId = await appendCliUserLog(content)
-          }
-          if (task?.task_mode !== 'workflow' && task?.status === 'in_review') {
-            try {
-              const reviewNode = (await db.getCurrentTaskNode(taskId)) as {
-                id?: string
-                status?: string
-              } | null
-              if (reviewNode?.id && reviewNode.status === 'in_review') {
-                await db.rerunTaskNode(reviewNode.id)
-              }
-              const updatedTask = await db.getTask(taskId)
-              if (updatedTask) setTask(updatedTask)
-            } catch {
-              /* ignore */
-            }
-          }
-          if (
-            task?.task_mode === 'workflow' &&
-            selectedWorkflowNode?.id &&
-            selectedWorkflowNode.status === 'failed'
-          ) {
-            try {
-              await db.rerunTaskNode(selectedWorkflowNode.id)
-              const updatedTask = await db.getTask(taskId)
-              if (updatedTask) setTask(updatedTask)
-            } catch {
-              /* ignore */
-            }
-          }
-          try {
-            if (content) {
-              if (!cliSessionRef.current) throw new Error('CLI session not initialized')
-              await runCliPrompt(content, sessionId)
-            }
-          } catch {
-            await appendCliSystemLog(
-              t.common.errors.serverNotRunning || 'CLI session is not running.',
-              sessionId
-            )
-          }
-          return
-        }
-        if (activeTaskId !== taskId) await loadMessages(taskId)
-        if (
-          pipelineTemplate &&
-          (pipelineStatus === 'waiting_approval' || pipelineStatus === 'failed')
-        ) {
-          const approvalNote = text.trim()
-          if (approvalNote)
-            setMessages((prev) => [...prev, { type: 'user', content: approvalNote }])
-          await startNextPipelineStage(approvalNote)
-          return
-        }
-        setMessages((prev) => [
-          ...prev,
-          {
-            type: 'error',
-            message: t.common.errors.serverNotRunning || 'CLI session is not running.'
-          }
-        ])
-      }
-    },
-    [
-      activeTaskId,
-      appendCliSystemLog,
-      appendCliUserLog,
-      ensureConversationRuntime,
-      isRunning,
-      loadCurrentNodeRuntime,
-      loadMessages,
-      pipelineStatus,
-      pipelineTemplate,
-      runCliPrompt,
-      selectedWorkflowNode?.id,
-      selectedWorkflowNode?.status,
-      setMessages,
-      setTask,
-      startNextPipelineStage,
-      t.common.errors.serverNotRunning,
-      task,
-      taskId,
-      useCliSessionPanel
-    ]
-  )
-
-  const handleStartTask = useCallback(async () => {
-    if (!taskId) return
-
-    if (selectedWorkflowNodeIsFailed && selectedWorkflowNode?.id) {
-      await db.rerunTaskNode(selectedWorkflowNode.id)
-      await loadCurrentNodeRuntime()
-      await loadWorkflowStatus()
-      const refreshedTask = await db.getTask(taskId)
-      if (refreshedTask) setTask(refreshedTask)
-      return
-    }
-
-    setStartupError(null)
-    markStartedOnce()
-
-    let latestRuntime = currentNodeRuntime
-    try {
-      await db.startTaskExecution(taskId)
-      latestRuntime = await loadCurrentNodeRuntime()
-      if (task?.task_mode === 'conversation' && !latestRuntime.cliToolId) {
-        latestRuntime = await ensureConversationRuntime(task)
-      }
-      const refreshedTask = await db.getTask(taskId)
-      if (refreshedTask) setTask(refreshedTask)
-      const workflowRun = await db.getWorkflowRunByTask(taskId)
-      setBackendWorkflowRun(workflowRun)
-      if (workflowRun) {
-        const runNodes = await db.listWorkflowRunNodes(workflowRun.id)
-        setWorkflowRunNodes(Array.isArray(runNodes) ? runNodes : [])
-      } else {
-        setWorkflowRunNodes([])
-      }
-    } catch {
-      /* ignore */
-    }
-
-    if (task?.task_mode === 'workflow') {
-      if (backendWorkflowRun) {
-        await loadCurrentNodeRuntime()
-        await loadWorkflowStatus()
-        return
-      }
-      if (!pipelineTemplate || pipelineStatus !== 'idle' || isRunning) return
-      await startPipelineStage(0)
-      return
-    }
-
-    const shouldUseCliSession = Boolean(latestRuntime.cliToolId)
-
-    if (shouldUseCliSession) {
-      try {
-        if (!cliSessionRef.current) throw new Error('CLI session not initialized')
-        const prompt = buildCliPrompt(await resolveCurrentNodePrompt())
-        let sessionId: string | null = null
-        if (prompt) {
-          sessionId = await appendCliUserLog(prompt)
-        }
-        await runCliPrompt(prompt || undefined, sessionId)
-      } catch {
-        await appendCliSystemLog(t.common.errors.serverNotRunning || 'CLI session is not running.')
-      }
-      return
-    }
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        type: 'error',
-        message: t.common.errors.serverNotRunning || 'CLI session is not running.'
-      }
-    ])
-  }, [
-    appendCliSystemLog,
-    appendCliUserLog,
-    backendWorkflowRun,
-    buildCliPrompt,
-    currentNodeRuntime,
-    ensureConversationRuntime,
+  const actions = useTaskDetailActions({
+    taskId,
+    task,
+    activeTaskId,
     isRunning,
+    useCliSession,
+    currentNodeRuntime,
+    selectedWorkflowNode,
+    selectedWorkflowNodeIsFailed,
+    backendWorkflowRun,
+    pipelineTemplate,
+    pipelineStatus,
+    useCliSessionPanel: executionContext.useCliSessionPanel,
+    cliSessionRef,
+    t,
     loadCurrentNodeRuntime,
+    ensureConversationRuntime,
+    loadMessages,
+    resolveCurrentNodePrompt,
+    buildCliPrompt,
+    appendCliUserLog,
+    appendCliSystemLog,
+    runCliPrompt,
+    startNextPipelineStage,
     loadWorkflowStatus,
     markStartedOnce,
-    pipelineStatus,
-    pipelineTemplate,
-    resolveCurrentNodePrompt,
-    runCliPrompt,
-    selectedWorkflowNode?.id,
-    selectedWorkflowNodeIsFailed,
+    stopCli,
+    stopAgent,
     setMessages,
     setTask,
+    setStartupError,
     setBackendWorkflowRun,
-    startPipelineStage,
-    t.common.errors.serverNotRunning,
-    task,
-    taskId
-  ])
+    setWorkflowRunNodes,
+    startPipelineStage
+  })
 
-  const handleApproveCliTask = useCallback(async () => {
-    if (!taskId) return
-    try {
-      const reviewNode = (await db.getCurrentTaskNode(taskId)) as {
-        id?: string
-        status?: string
-      } | null
-      if (reviewNode?.id && reviewNode.status === 'in_review') {
-        await db.approveTaskNode(reviewNode.id)
-      }
-      const updatedTask = await db.getTask(taskId)
-      if (updatedTask) setTask(updatedTask)
-    } catch {
-      /* ignore */
-    }
-  }, [setTask, taskId])
-
-  const handleStopExecution = useCallback(async () => {
-    if (useCliSession) {
-      await stopCli()
-      if (taskId) {
-        try {
-          await db.stopTaskExecution(taskId)
-          const refreshedTask = await db.getTask(taskId)
-          if (refreshedTask) setTask(refreshedTask)
-        } catch {
-          /* ignore */
-        }
-      }
-      return
-    }
-
-    await stopAgent()
-    if (taskId) {
-      try {
-        await db.stopTaskExecution(taskId)
-        const refreshedTask = await db.getTask(taskId)
-        if (refreshedTask) setTask(refreshedTask)
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [stopAgent, stopCli, useCliSession, taskId, setTask])
-
-  const replyIsRunning = useMemo(() => {
-    if (useCliSession) return cliStatus === 'running'
-    return isRunning
-  }, [cliStatus, isRunning, useCliSession])
-
-  const agentToolConfigId = executionAgentToolConfigId
-  const toggleWorkflowExpanded = useCallback(() => {
-    setIsWorkflowExpanded((prev) => !prev)
-  }, [])
+  const agentToolConfigId = executionContext.executionAgentToolConfigId
 
   // ===========================================================================
   // Return
@@ -2184,50 +903,50 @@ export function useTaskDetail({
     setTask,
     isLoading,
     useCliSession,
-    useCliSessionPanel,
-    showExecutionLogPanel,
+    useCliSessionPanel: executionContext.useCliSessionPanel,
+    showExecutionLogPanel: executionContext.showExecutionLogPanel,
     agentToolConfigId,
 
     // CLI Tools
     cliTools,
 
     // Dialogs
-    isEditOpen,
-    setIsEditOpen,
-    editPrompt,
-    setEditPrompt,
-    editCliToolId,
-    setEditCliToolId,
-    editCliConfigId,
-    setEditCliConfigId,
-    cliConfigs,
-    isDeleteOpen,
-    setIsDeleteOpen,
-    handleOpenEdit,
-    handleSaveEdit,
-    handleDeleteTask,
+    isEditOpen: dialogs.isEditOpen,
+    setIsEditOpen: dialogs.setIsEditOpen,
+    editPrompt: dialogs.editPrompt,
+    setEditPrompt: dialogs.setEditPrompt,
+    editCliToolId: dialogs.editCliToolId,
+    setEditCliToolId: dialogs.setEditCliToolId,
+    editCliConfigId: dialogs.editCliConfigId,
+    setEditCliConfigId: dialogs.setEditCliConfigId,
+    cliConfigs: dialogs.cliConfigs,
+    isDeleteOpen: dialogs.isDeleteOpen,
+    setIsDeleteOpen: dialogs.setIsDeleteOpen,
+    handleOpenEdit: dialogs.handleOpenEdit,
+    handleSaveEdit: dialogs.handleSaveEdit,
+    handleDeleteTask: dialogs.handleDeleteTask,
 
     // CLI Session
     cliStatus,
     cliSessionRef,
     handleCliStatusChange,
     currentNodeRuntime,
-    executionSessionId,
-    executionTaskNodeId,
-    executionLogTaskNodeId,
-    executionLogSource,
-    executionLogToolId,
-    executionCliToolId,
+    executionSessionId: executionContext.executionSessionId,
+    executionTaskNodeId: executionContext.executionTaskNodeId,
+    executionLogTaskNodeId: executionContext.executionLogTaskNodeId,
+    executionLogSource: executionContext.executionLogSource,
+    executionLogToolId: executionContext.executionLogToolId,
+    executionCliToolId: executionContext.executionCliToolId,
 
     // Prompt
     taskPrompt,
 
     // Tool Selection
-    toolSelectionValue,
+    toolSelectionValue: toolSelection.toolSelectionValue,
 
     // Scroll
-    messagesEndRef,
-    messagesContainerRef,
+    messagesEndRef: scroll.messagesEndRef,
+    messagesContainerRef: scroll.messagesContainerRef,
 
     // Working Dir
     workingDir,
@@ -2243,7 +962,7 @@ export function useTaskDetail({
     currentTaskNode,
     workflowNodes,
     workflowCurrentNode,
-    workflowSummary,
+    workflowSummary: viewState.workflowSummary,
     isWorkflowExpanded,
     toggleWorkflowExpanded,
     selectedWorkflowNodeId: selectedWorkflowNode?.id ?? null,
@@ -2251,38 +970,38 @@ export function useTaskDetail({
     handleApproveTaskNode,
 
     // Artifacts
-    artifacts,
-    selectedArtifact,
-    activePreviewTab,
-    isPreviewVisible,
-    workspaceRefreshToken,
-    handleOpenPreviewTab,
-    handleTogglePreviewTab,
-    handleClosePreviewPanel,
-    handleSelectArtifact,
-    handleClosePreview,
-    setIsPreviewVisible,
+    artifacts: preview.artifacts,
+    selectedArtifact: preview.selectedArtifact,
+    activePreviewTab: preview.activePreviewTab,
+    isPreviewVisible: preview.isPreviewVisible,
+    workspaceRefreshToken: preview.workspaceRefreshToken,
+    handleOpenPreviewTab: preview.handleOpenPreviewTab,
+    handleTogglePreviewTab: preview.handleTogglePreviewTab,
+    handleClosePreviewPanel: preview.handleClosePreviewPanel,
+    handleSelectArtifact: preview.handleSelectArtifact,
+    handleClosePreview: preview.handleClosePreview,
+    setIsPreviewVisible: preview.setIsPreviewVisible,
 
     // View State
-    displayTitle,
-    cliToolLabel,
-    cliStatusInfo,
-    showActionButton,
-    actionKind,
-    actionLabel,
-    actionDisabled,
-    showWorkflowCard,
+    displayTitle: viewState.displayTitle,
+    cliToolLabel: viewState.cliToolLabel,
+    cliStatusInfo: viewState.cliStatusInfo,
+    showActionButton: viewState.showActionButton,
+    actionKind: viewState.actionKind,
+    actionLabel: viewState.actionLabel,
+    actionDisabled: viewState.actionDisabled,
+    showWorkflowCard: viewState.showWorkflowCard,
     workflowGraph,
-    visibleMetaRows,
+    visibleMetaRows: viewState.visibleMetaRows,
 
     // Actions
-    handleReply,
-    handleStartTask,
-    handleApproveCliTask,
-    handleStopExecution,
-    replyIsRunning,
-    replyDisabled,
-    replyPlaceholder,
-    isCliTaskReviewPending
+    handleReply: actions.handleReply,
+    handleStartTask: actions.handleStartTask,
+    handleApproveCliTask: actions.handleApproveCliTask,
+    handleStopExecution: actions.handleStopExecution,
+    replyIsRunning: viewState.replyIsRunning,
+    replyDisabled: viewState.replyDisabled,
+    replyPlaceholder: viewState.replyPlaceholder,
+    isCliTaskReviewPending: viewState.isCliTaskReviewPending
   }
 }

@@ -1,11 +1,11 @@
 import { useMemo, useRef } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
-import { useAgent } from '@/hooks/useAgent'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
 import { useAppShell, useSidebar } from '@/components/layout'
 import { ToolSelectionContext } from '@/components/task'
+import { useAgent } from '@features/cli-session'
 
 import { ExecutionPanel } from './components/ExecutionPanel'
 import { ReplyCard } from './components/ReplyCard'

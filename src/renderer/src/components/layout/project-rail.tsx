@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Plus, Settings, FolderPlus } from 'lucide-react';
-import { PROJECT_SETTINGS_ROUTE } from '@/components/settings';
+import { PROJECT_SETTINGS_ROUTE } from '@features/settings';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,

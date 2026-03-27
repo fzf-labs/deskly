@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Play, CheckCircle, Clock, GitBranch, Trash2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { notifyTasksChanged } from '@/lib/task-events'
+import { deleteTaskWithSideEffects } from '@features/tasks'
 import type { TaskWithWorktree as Task } from '@shared/contracts/task'
 
 interface TaskListProps {
@@ -59,9 +59,8 @@ export function TaskList({ projectId, onTaskSelect, className }: TaskListProps) 
   const handleDelete = async (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     try {
-      await window.api.task.delete(taskId, true)
+      await deleteTaskWithSideEffects(taskId, true)
       setTasks((prev) => prev.filter((t) => t.id !== taskId))
-      notifyTasksChanged()
     } catch (error) {
       console.error('Failed to delete task:', error)
     }

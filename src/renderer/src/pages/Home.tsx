@@ -3,7 +3,7 @@ import type { MessageAttachment } from '@/hooks/useAgent'
 import { useLanguage } from '@/providers/language-provider'
 import { useToast } from '@/providers/feedback-provider'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
-import { notifyTasksChanged } from '@/lib/task-events'
+import { createTaskWithSideEffects } from '@features/tasks'
 
 import { ChatInput } from '@/components/shared/ChatInput'
 
@@ -26,13 +26,12 @@ export function HomePage() {
         )
         return
       }
-      const createdTask = await window.api.task.create({
+      const createdTask = await createTaskWithSideEffects({
         title: prompt,
         prompt,
         taskMode: 'conversation',
         cliToolId: defaultCliToolId
       })
-      notifyTasksChanged()
       navigate(`/task/${createdTask.id}`, {
         state: { prompt, attachments }
       })

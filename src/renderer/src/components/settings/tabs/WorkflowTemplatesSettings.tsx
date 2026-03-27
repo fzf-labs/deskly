@@ -11,9 +11,10 @@ import { MoreVertical } from 'lucide-react'
 import { db } from '@/data'
 import { useConfirm } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
-import { buildSettingsRoute } from '@/components/settings/types'
 import type { WorkflowDefinition } from '@/data'
 import { buildWorkflowTemplateEditorRoute } from '@features/pipeline'
+
+import { buildSettingsRoute } from '../types'
 
 export function WorkflowTemplatesSettings() {
   const { t } = useLanguage()

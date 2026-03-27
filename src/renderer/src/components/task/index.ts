@@ -26,7 +26,7 @@ export { RunningIndicator } from './RunningIndicator';
 export { TaskGroupComponent } from './TaskGroupComponent';
 
 // Utils
-export { getArtifactTypeFromExt } from './utils';
+export { getArtifactTypeFromExt } from '@features/artifacts';
 
 // Re-export ArtifactPreview from its new location
-export { ArtifactPreview } from '@/components/artifacts';
+export { ArtifactPreview } from '@features/artifacts';

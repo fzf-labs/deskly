@@ -5,8 +5,8 @@ import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
 import type { MessageAttachment } from '@/hooks/useAgent'
 import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
 import { normalizeCliTools, type CLIToolInfo } from '@/lib/agent-cli-tools'
-import { notifyTasksChanged } from '@/lib/task-events'
 import { useLanguage } from '@/providers/language-provider'
+import { createTaskWithSideEffects } from '@features/tasks'
 
 import {
   buildTaskCreatePayload,
@@ -361,7 +361,7 @@ export function useTaskComposer({
         const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'WT-'
         const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
 
-        const createdTask = await window.api.task.create(
+        const createdTask = await createTaskWithSideEffects(
           buildTaskCreatePayload({
             createMode,
             title: resolvedTitle,
@@ -377,8 +377,6 @@ export function useTaskComposer({
             workflowDefinitionId: createMode === 'workflow' ? selectedTemplateId : undefined
           })
         )
-
-        notifyTasksChanged()
 
         return {
           task: createdTask,

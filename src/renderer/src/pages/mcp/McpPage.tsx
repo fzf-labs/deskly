@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { resolvePath } from '@features/skills'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { EmptyStatePanel, PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
 import { Loader2, RefreshCw, X } from 'lucide-react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { useProjects } from '@/hooks/useProjects'
-import { useLanguage } from '@/providers/language-provider'
-import { resolvePath } from '@/lib/skills'
 import {
   buildMcpServersFromConfig,
   extractMcpServers,
   getProjectMcpConfigPath,
   parseTomlMcpServers,
-  type MCPServerRecord
-} from '@/lib/mcp'
-import type { MCPServerUI } from '@/components/settings/types'
+  type MCPServerRecord,
+  type MCPServerUI
+} from '@features/settings'
+import { useProjects } from '@/hooks/useProjects'
+import { useLanguage } from '@/providers/language-provider'
 
 type CliToolInfo = { id: string; displayName?: string }
 type KeyValuePair = { id: string; key: string; value: string }

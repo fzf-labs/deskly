@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { fs } from '@/lib/electron-api';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/providers/language-provider';
-import type { Artifact } from '@/components/artifacts';
+import type { Artifact } from '@features/artifacts';
 import { getArtifactTypeFromExt } from './utils';
 
 interface WorkspaceEntry {

@@ -17,6 +17,14 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 1000): Promise<void
   }
 }
 
+const readFileIfExists = (path: string): string => {
+  if (!existsSync(path)) {
+    return ''
+  }
+
+  return readFileSync(path, 'utf-8')
+}
+
 const envSnapshot = {
   DESKLY_LOG_BATCH_MAX_BYTES: process.env.DESKLY_LOG_BATCH_MAX_BYTES,
   DESKLY_LOG_FLUSH_INTERVAL_MS: process.env.DESKLY_LOG_FLUSH_INTERVAL_MS,
@@ -83,7 +91,7 @@ describe('MsgStoreService', () => {
     store.push({ type: 'stdout', content: 'hello' } as any)
     expect(existsSync(logFilePath)).toBe(false)
 
-    await waitFor(() => existsSync(logFilePath), 1000)
+    await waitFor(() => readFileIfExists(logFilePath).includes('hello'), 1000)
 
     expect(existsSync(logFilePath)).toBe(true)
     const content = readFileSync(logFilePath, 'utf-8')
@@ -126,7 +134,7 @@ describe('MsgStoreService', () => {
     const nodeLogPath = join(sessionRoot, 'task-c', 'node-1.jsonl')
 
     store.push({ type: 'stdout', content: 'node-1-only' } as any)
-    await waitFor(() => existsSync(nodeLogPath), 1000)
+    await waitFor(() => readFileIfExists(nodeLogPath).includes('node-1-only'), 1000)
 
     expect(existsSync(nodeLogPath)).toBe(true)
 
@@ -163,7 +171,7 @@ describe('MsgStoreService', () => {
       }
     } as any)
 
-    await waitFor(() => existsSync(nodeLogPath), 1000)
+    await waitFor(() => readFileIfExists(nodeLogPath).includes('"type":"normalized"'), 1000)
 
     const fileContent = readFileSync(nodeLogPath, 'utf-8')
     expect(fileContent).toContain('"type":"normalized"')

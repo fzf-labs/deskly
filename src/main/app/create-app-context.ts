@@ -19,13 +19,43 @@ import { AutomationService } from '../services/AutomationService'
 import { WorkflowSchedulerService } from '../services/WorkflowSchedulerService'
 import { AppContext, AppServices } from './AppContext'
 
-export const createAppContext = (): AppContext => {
-  const appPaths = getAppPaths()
+type CoreServices = Pick<AppServices, 'databaseService' | 'settingsService'>
+type ProjectGitServices = Pick<AppServices, 'projectService' | 'gitService'>
+type CliSessionServices = Pick<
+  AppServices,
+  | 'cliProcessService'
+  | 'cliToolDetectorService'
+  | 'cliToolConfigService'
+  | 'systemCliToolService'
+  | 'cliSessionService'
+>
+type WorkspaceToolServices = Pick<
+  AppServices,
+  'editorService' | 'previewConfigService' | 'previewService'
+>
+type TaskWorkflowServices = Pick<
+  AppServices,
+  'taskService' | 'workflowSchedulerService' | 'terminalService'
+>
+type AutomationNotificationServices = Pick<
+  AppServices,
+  'notificationService' | 'automationRunnerService' | 'automationService'
+>
 
-  const settingsService = new SettingsService()
-  const databaseService = new DatabaseService()
-  const projectService = new ProjectService(databaseService)
-  const gitService = new GitService()
+const createCoreServices = (): CoreServices => ({
+  settingsService: new SettingsService(),
+  databaseService: new DatabaseService()
+})
+
+const createProjectGitServices = (databaseService: DatabaseService): ProjectGitServices => ({
+  projectService: new ProjectService(databaseService),
+  gitService: new GitService()
+})
+
+const createCliSessionServices = ({
+  databaseService,
+  settingsService
+}: CoreServices): CliSessionServices => {
   const cliProcessService = new CLIProcessService()
   const cliToolDetectorService = new AgentCLIToolDetectorService()
   const cliToolConfigService = new AgentCLIToolConfigService()
@@ -35,71 +65,143 @@ export const createAppContext = (): AppContext => {
     databaseService,
     settingsService
   )
-  databaseService.setWorkflowGenerationRuntime(
-    cliSessionService,
+
+  return {
+    cliProcessService,
     cliToolDetectorService,
-    settingsService
-  )
-  databaseService.setPromptOptimizationRuntime(
-    cliSessionService,
-    cliToolDetectorService,
-    settingsService
-  )
-  const workflowSchedulerService = new WorkflowSchedulerService(databaseService, cliSessionService)
-  databaseService.setWorkflowSchedulerService(workflowSchedulerService)
-  const terminalService = new TerminalService()
-  const editorService = new EditorService()
-  const previewConfigService = new PreviewConfigService()
-  const previewService = new PreviewService()
+    cliToolConfigService,
+    systemCliToolService,
+    cliSessionService
+  }
+}
+
+const createWorkspaceToolServices = (): WorkspaceToolServices => ({
+  editorService: new EditorService(),
+  previewConfigService: new PreviewConfigService(),
+  previewService: new PreviewService()
+})
+
+const createTaskWorkflowServices = ({
+  databaseService,
+  settingsService,
+  gitService,
+  cliSessionService
+}: CoreServices &
+  Pick<ProjectGitServices, 'gitService'> &
+  Pick<CliSessionServices, 'cliSessionService'>): TaskWorkflowServices => ({
+  taskService: new TaskService(databaseService, gitService, settingsService),
+  workflowSchedulerService: new WorkflowSchedulerService(databaseService, cliSessionService),
+  terminalService: new TerminalService()
+})
+
+const createAutomationNotificationServices = ({
+  databaseService,
+  taskService,
+  cliSessionService
+}: Pick<AppServices, 'databaseService' | 'taskService' | 'cliSessionService'>): AutomationNotificationServices => {
   const notificationService = new NotificationService()
-  const taskService = new TaskService(databaseService, gitService, settingsService)
   const automationRunnerService = new AutomationRunnerService(
     databaseService,
     taskService,
     cliSessionService
   )
-  const automationService = new AutomationService(databaseService, automationRunnerService)
+
+  return {
+    notificationService,
+    automationRunnerService,
+    automationService: new AutomationService(databaseService, automationRunnerService)
+  }
+}
+
+const wireDatabaseRuntime = ({
+  databaseService,
+  settingsService,
+  cliSessionService,
+  cliToolDetectorService,
+  workflowSchedulerService
+}: Pick<
+  AppServices,
+  | 'databaseService'
+  | 'settingsService'
+  | 'cliSessionService'
+  | 'cliToolDetectorService'
+  | 'workflowSchedulerService'
+>) => {
+  databaseService.setRuntimeServices({
+    cliSessionService,
+    cliToolDetectorService,
+    settingsService,
+    workflowSchedulerService
+  })
+}
+
+export const createAppContext = (): AppContext => {
+  const appPaths = getAppPaths()
+
+  const coreServices = createCoreServices()
+  const projectGitServices = createProjectGitServices(coreServices.databaseService)
+  const cliSessionServices = createCliSessionServices(coreServices)
+  const workspaceToolServices = createWorkspaceToolServices()
+  const taskWorkflowServices = createTaskWorkflowServices({
+    ...coreServices,
+    gitService: projectGitServices.gitService,
+    cliSessionService: cliSessionServices.cliSessionService
+  })
+
+  wireDatabaseRuntime({
+    databaseService: coreServices.databaseService,
+    settingsService: coreServices.settingsService,
+    cliSessionService: cliSessionServices.cliSessionService,
+    cliToolDetectorService: cliSessionServices.cliToolDetectorService,
+    workflowSchedulerService: taskWorkflowServices.workflowSchedulerService
+  })
+
+  const automationNotificationServices = createAutomationNotificationServices({
+    databaseService: coreServices.databaseService,
+    taskService: taskWorkflowServices.taskService,
+    cliSessionService: cliSessionServices.cliSessionService
+  })
 
   const services: AppServices = {
-    projectService,
-    gitService,
-    cliProcessService,
-    cliToolDetectorService,
-    cliToolConfigService,
-    systemCliToolService,
-    editorService,
-    previewConfigService,
-    previewService,
-    notificationService,
-    databaseService,
-    settingsService,
-    taskService,
-    cliSessionService,
-    workflowSchedulerService,
-    terminalService,
-    automationRunnerService,
-    automationService
+    projectService: projectGitServices.projectService,
+    gitService: projectGitServices.gitService,
+    cliProcessService: cliSessionServices.cliProcessService,
+    cliToolDetectorService: cliSessionServices.cliToolDetectorService,
+    cliToolConfigService: cliSessionServices.cliToolConfigService,
+    systemCliToolService: cliSessionServices.systemCliToolService,
+    editorService: workspaceToolServices.editorService,
+    previewConfigService: workspaceToolServices.previewConfigService,
+    previewService: workspaceToolServices.previewService,
+    notificationService: automationNotificationServices.notificationService,
+    databaseService: coreServices.databaseService,
+    settingsService: coreServices.settingsService,
+    taskService: taskWorkflowServices.taskService,
+    cliSessionService: cliSessionServices.cliSessionService,
+    workflowSchedulerService: taskWorkflowServices.workflowSchedulerService,
+    terminalService: taskWorkflowServices.terminalService,
+    automationRunnerService: automationNotificationServices.automationRunnerService,
+    automationService: automationNotificationServices.automationService
   }
 
   const serviceOrder = [
-    databaseService,
-    projectService,
-    gitService,
-    cliProcessService,
-    cliToolDetectorService,
-    cliToolConfigService,
-    systemCliToolService,
-    cliSessionService,
-    editorService,
-    previewConfigService,
-    previewService,
-    notificationService,
-    settingsService,
-    taskService,
-    workflowSchedulerService,
-    terminalService,
-    automationRunnerService,
-    automationService
+    coreServices.databaseService,
+    projectGitServices.projectService,
+    projectGitServices.gitService,
+    cliSessionServices.cliProcessService,
+    cliSessionServices.cliToolDetectorService,
+    cliSessionServices.cliToolConfigService,
+    cliSessionServices.systemCliToolService,
+    cliSessionServices.cliSessionService,
+    workspaceToolServices.editorService,
+    workspaceToolServices.previewConfigService,
+    workspaceToolServices.previewService,
+    automationNotificationServices.notificationService,
+    coreServices.settingsService,
+    taskWorkflowServices.taskService,
+    taskWorkflowServices.workflowSchedulerService,
+    taskWorkflowServices.terminalService,
+    automationNotificationServices.automationRunnerService,
+    automationNotificationServices.automationService
   ]
 
   return new AppContext(appPaths, services, serviceOrder)

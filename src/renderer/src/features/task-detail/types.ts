@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { WorkflowDefinitionNodePosition, WorkflowDefinitionNodeType } from '@/data'
 import type { useLanguage } from '@/providers/language-provider'
-import type { MessageAttachment } from '@/hooks/useAgent'
+import type { MessageAttachment } from '@features/cli-session'
 
 export type LanguageStrings = ReturnType<typeof useLanguage>['t']
 

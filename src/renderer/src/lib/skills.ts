@@ -1,4 +1,4 @@
-import type { SkillFile, SkillInfo } from '@/components/settings/types';
+import type { SkillFile, SkillInfo } from '@features/settings/types';
 
 export const CLI_SKILL_DIRECTORIES: Record<string, string> = {
   'claude-code': '.claude/skills',

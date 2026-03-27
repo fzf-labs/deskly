@@ -1,9 +1,3 @@
-import {
-  notifyTaskCompleted,
-  notifyTaskNeedsReview,
-  playTaskReviewSound
-} from '@/lib/notifications'
-import { notifyTasksChanged } from '@/lib/task-events'
 import type {
   AgentToolConfig,
   CreateAgentToolConfigInput,
@@ -30,9 +24,7 @@ import type { Automation, AutomationRun } from './types'
 
 export const db = {
   createTask: async (input: CreateTaskInput): Promise<Task> => {
-    const createdTask = (await window.api.database.createTask(input)) as Task
-    notifyTasksChanged()
-    return createdTask
+    return (await window.api.database.createTask(input)) as Task
   },
 
   getTask: (id: string): Promise<Task | null> => {
@@ -44,45 +36,11 @@ export const db = {
   },
 
   updateTask: async (id: string, updates: UpdateTaskInput): Promise<Task | null> => {
-    const updatedTask = (await window.api.database.updateTask(id, updates)) as Task | null
-    console.info('[NotifyDebug][renderer] db.updateTask result', {
-      taskId: id,
-      requestedStatus: updates.status,
-      updatedStatus: updatedTask?.status
-    })
-
-    if (updates.status === 'done' && updatedTask?.status === 'done') {
-      const taskTitle = updatedTask.title || updatedTask.prompt || undefined
-      console.info('[NotifyDebug][renderer] Trigger task-complete notification', {
-        taskId: id,
-        taskTitle
-      })
-      void notifyTaskCompleted(taskTitle)
-    }
-
-    if (updates.status === 'in_review' && updatedTask?.status === 'in_review') {
-      const taskTitle = updatedTask.title || updatedTask.prompt || undefined
-      console.info('[NotifyDebug][renderer] Trigger task-review notification and sound', {
-        taskId: id,
-        taskTitle
-      })
-      void notifyTaskNeedsReview(taskTitle)
-      void playTaskReviewSound()
-    }
-
-    if (updatedTask) {
-      notifyTasksChanged()
-    }
-
-    return updatedTask
+    return (await window.api.database.updateTask(id, updates)) as Task | null
   },
 
   deleteTask: async (id: string, removeWorktree: boolean = true): Promise<boolean> => {
-    const deleted = await window.api.task.delete(id, removeWorktree)
-    if (deleted) {
-      notifyTasksChanged()
-    }
-    return deleted
+    return await window.api.task.delete(id, removeWorktree)
   },
 
   listAgentToolConfigs: (toolId?: string): Promise<AgentToolConfig[]> => {

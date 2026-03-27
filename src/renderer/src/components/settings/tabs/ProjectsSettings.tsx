@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { MoreVertical } from 'lucide-react';
 
-import { CreateProjectDialog, ProjectEditDialog } from '@/components/projects/ProjectDialogs';
 import { EmptyStatePanel } from '@/components/shared/page-shell';
 import { Button } from '@/components/ui/button';
+import { CreateProjectDialog, ProjectEditDialog } from '@features/projects';
 import {
   DropdownMenu,
   DropdownMenuContent,

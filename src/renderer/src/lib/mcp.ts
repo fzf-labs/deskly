@@ -1,4 +1,4 @@
-import type { MCPServerStdio, MCPServerUI } from '@/components/settings/types';
+import type { MCPServerStdio, MCPServerUI } from '@features/settings/types';
 
 export type MCPServerRecord = Record<
   string,

@@ -4,7 +4,7 @@ import type { MessageAttachment } from '@/hooks/useAgent';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/providers/feedback-provider';
 import { useLanguage } from '@/providers/language-provider';
-import { notifyTasksChanged } from '@/lib/task-events';
+import { createTaskWithSideEffects } from '@features/tasks';
 import { FileText, Globe, Palette, Smartphone } from 'lucide-react';
 
 import { ChatInput } from '@/components/shared/ChatInput';
@@ -64,13 +64,12 @@ export function TaskInput() {
         );
         return;
       }
-      const createdTask = await window.api.task.create({
+      const createdTask = await createTaskWithSideEffects({
         title: prompt,
         prompt,
         taskMode: 'conversation',
         cliToolId: defaultCliToolId,
       });
-      notifyTasksChanged();
       navigate(`/task/${createdTask.id}`, {
         state: { prompt, attachments },
       });
