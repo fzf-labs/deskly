@@ -5,7 +5,7 @@ export default {
   automations: '自动化',
   board: '看板',
   pipelineTemplates: '工作流',
-  skills: 'Skill',
+  skills: 'Skills',
   mcp: 'MCP',
   newTask: '新建任务',
   newThread: '新对话',
