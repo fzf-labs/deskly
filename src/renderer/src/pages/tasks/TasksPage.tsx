@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bot, Sparkles } from 'lucide-react'
 
@@ -11,15 +12,18 @@ export function TasksPage() {
   const navigate = useNavigate()
   const { currentProject, currentProjectId, projects, setCurrentProjectId } = useProjects()
   const { t } = useLanguage()
-  const workspaceOptionValue = '__deskly_workspace__'
-  const selectedProjectValue = currentProjectId ?? workspaceOptionValue
-  const projectOptions = [
-    { value: workspaceOptionValue, label: 'Deskly workspace' },
-    ...projects.map((project) => ({
-      value: project.id,
-      label: project.name
-    }))
-  ]
+  const projectOptions = projects.map((project) => ({
+    value: project.id,
+    label: project.name
+  }))
+
+  useEffect(() => {
+    if (currentProjectId || projects.length === 0) {
+      return
+    }
+
+    setCurrentProjectId(projects[0].id)
+  }, [currentProjectId, projects, setCurrentProjectId])
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.08),transparent_26%),linear-gradient(180deg,#fbfcff_0%,#f5f7fb_100%)]">
@@ -31,11 +35,10 @@ export function TasksPage() {
             <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/70 bg-background/92 px-4 py-2 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
               <Bot className="size-3.5" />
               <Select
-                value={selectedProjectValue}
-                onValueChange={(value) =>
-                  setCurrentProjectId(value === workspaceOptionValue ? null : value)
-                }
+                value={currentProjectId ?? ''}
+                onValueChange={setCurrentProjectId}
                 options={projectOptions}
+                disabled={projectOptions.length === 0}
                 ariaLabel="Select current project"
                 triggerClassName="h-auto w-auto min-w-0 max-w-[min(28rem,calc(100vw-5rem))] border-0 bg-transparent px-0 py-0 text-xs font-medium text-muted-foreground shadow-none focus-visible:border-transparent focus-visible:ring-0"
                 contentClassName="min-w-[220px]"
