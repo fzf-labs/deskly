@@ -143,6 +143,11 @@ pnpm dev
 - 自动更新地址当前为占位值：`https://example.com/auto-updates`，发布前请替换。
 - `pnpm build:mac` 包含签名命令，仅适用于已配置签名环境的 macOS。
 
+## 文档
+
+- `docs/codex-exec-help.md`：Codex `exec` 参数中文说明。
+- `docs/architecture-adjustment-plan.md`：面向 AI 协作效率的架构调整方案。
+
 ## 项目结构
 
 ```text
