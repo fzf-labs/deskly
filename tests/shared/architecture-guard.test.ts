@@ -110,8 +110,11 @@ const requiredTaskDetailFeatureFiles = [
   'components/MessageItem.tsx',
   'components/MessageList.tsx',
   'components/PlanApproval.tsx',
+  'components/QuestionInput.tsx',
   'components/RightPanel.tsx',
   'components/RunningIndicator.tsx',
+  'components/TaskGroupComponent.tsx',
+  'components/ToolExecutionItem.tsx',
   'components/UserMessage.tsx'
 ]
 
@@ -119,7 +122,10 @@ const requiredTasksFeatureFiles = [
   'hooks/useTaskComposer.ts',
   'ui/CreateTaskDialog.tsx',
   'ui/TaskComposer.tsx',
-  'ui/TaskCreateMenu.tsx'
+  'ui/TaskCreateMenu.tsx',
+  'ui/TaskList.tsx',
+  'ui/TaskMetadataPanel.tsx',
+  'ui/WorkflowProgressBar.tsx'
 ]
 
 const featureImportPattern = /from\s+['"](@features\/[^'"]+)['"]/g

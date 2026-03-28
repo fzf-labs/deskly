@@ -8,3 +8,6 @@ export {
   type TaskMenuCliToolInfo,
   type TaskMenuWorkflowTemplate
 } from './ui/TaskCreateMenu'
+export { TaskList } from './ui/TaskList'
+export { TaskMetadataPanel } from './ui/TaskMetadataPanel'
+export { WorkflowProgressBar } from './ui/WorkflowProgressBar'
