@@ -70,6 +70,11 @@ pnpm dev
 | `pnpm build:mac` | 构建 macOS 包（含签名命令） |
 | `pnpm build:linux` | 构建 Linux 包（AppImage/snap/deb） |
 | `pnpm test` | 运行测试 |
+| `pnpm test:watch` | 进入 Vitest watch 模式，适合 TDD 循环 |
+| `pnpm test:main` | 仅运行主进程相关测试 |
+| `pnpm test:renderer` | 仅运行 renderer 相关测试 |
+| `pnpm test:shared` | 仅运行 shared / architecture guard 测试 |
+| `pnpm test:file <path>` | 运行单个测试文件，适合先红后绿 |
 | `pnpm lint` / `pnpm lint:fix` | 代码检查 / 自动修复 |
 | `pnpm typecheck` | Node + Web 类型检查 |
 | `pnpm format` | Prettier 格式化 |
@@ -165,6 +170,7 @@ pnpm dev
 ## 开发建议
 
 - 推荐 IDE：VS Code + ESLint + Prettier。
+- 推荐默认采用 TDD：先写一个失败测试，再写最小实现，再重构。
 - 提交前建议运行：
 
 ```bash

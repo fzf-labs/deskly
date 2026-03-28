@@ -21,12 +21,32 @@ These guides help you **ask the right questions before coding**.
 
 | Guide | Purpose | When to Use |
 |-------|---------|-------------|
+| [AI Development Enhancement Plan v2](./ai-development-enhancement-plan.md) | Improve AI delivery workflow after architecture cleanup | When planning the next wave of AI productivity investments |
 | [Code Reuse Thinking Guide](./code-reuse-thinking-guide.md) | Identify patterns and reduce duplication | When you notice repeated patterns |
 | [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md) | Think through data flow across layers | Features spanning multiple layers |
+| [TDD Development Guide](./tdd-development-guide.md) | Apply test-first development in a practical repo-specific way | When you want to write tests before implementation |
 
 ---
 
 ## Quick Reference: Thinking Triggers
+
+### When to Think About AI Development Ergonomics
+
+- [ ] Architecture is already cleaner, but AI tasks still feel inconsistent
+- [ ] Sessions spend too much time rediscovering boundaries or examples
+- [ ] Reviews keep finding the same import, contract, or scope mistakes
+- [ ] Full validation is too slow for normal iteration
+
+-> Read [AI Development Enhancement Plan v2](./ai-development-enhancement-plan.md)
+
+### When to Think About Test-First Development
+
+- [ ] You are changing logic, mappings, validation, or orchestration behavior
+- [ ] You are fixing a bug with a reproducible failure
+- [ ] You are refactoring a risky legacy module
+- [ ] You want a tighter feedback loop than manual testing
+
+-> Read [TDD Development Guide](./tdd-development-guide.md)
 
 ### When to Think About Cross-Layer Issues
 

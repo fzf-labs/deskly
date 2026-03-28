@@ -45,7 +45,14 @@ Minimum validation for architecture-oriented frontend work:
 - Relevant automated tests if the touched area already has them
 - Manual sanity checks for task detail, workflow/pipeline flows, and settings or automation screens when those areas are affected
 
-For refactors, behavior preservation matters more than cosmetic cleanup.
+Test-first expectations for non-trivial frontend behavior changes:
+
+- Start with a focused failing test when changing feature logic, transformations, routing rules, state transitions, or usecase behavior
+- Prefer testing `features/*/model/` and `features/*/usecases/` logic before testing UI structure
+- Add characterization tests before refactoring risky legacy code
+- Use manual checks to complement automated tests, not replace them
+
+For refactors, behavior preservation matters more than cosmetic cleanup. TDD is the preferred way to prove that preservation.
 
 ---
 

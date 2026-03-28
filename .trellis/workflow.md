@@ -97,9 +97,10 @@ cat .trellis/spec/backend/logging-guidelines.md    # For logging
 
 1. **Read Before Write** - Understand context before starting
 2. **Follow Standards** - [!] **MUST read `.trellis/spec/` guidelines before coding**
-3. **Incremental Development** - Complete one task at a time
-4. **Record Promptly** - Update tracking files immediately after completion
-5. **Document Limits** - [!] **Max 2000 lines per journal document**
+3. **Prefer Test-First Development** - For non-trivial behavior changes, write the focused failing test before implementation
+4. **Incremental Development** - Complete one task at a time
+5. **Record Promptly** - Update tracking files immediately after completion
+6. **Document Limits** - [!] **Max 2000 lines per journal document**
 
 ### File System
 
@@ -208,21 +209,41 @@ python3 ./.trellis/scripts/task.py create "<title>" --slug <task-name>
 1. Create or select task
    --> python3 ./.trellis/scripts/task.py create "<title>" --slug <name> or list
 
-2. Write code according to guidelines
+2. For non-trivial logic changes, write or update the focused failing test first
+   --> Prefer the smallest behavior-level test that proves the change
+   --> Use exact test files during the local loop
+
+3. Write code according to guidelines
    --> Read .trellis/spec/ docs relevant to your task
    --> For cross-layer: read .trellis/spec/guides/
 
-3. Self-test
+4. Self-test
    --> Run project's lint/test commands (see spec docs)
    --> Manual feature testing
 
-4. Commit code
+5. Commit code
    --> git add <files>
    --> git commit -m "type(scope): description"
        Format: feat/fix/docs/refactor/test/chore
 
-5. Record session (one command)
+6. Record session (one command)
    --> python3 ./.trellis/scripts/add_session.py --title "Title" --commit "hash"
+```
+
+### TDD Default (Recommended)
+
+For service logic, renderer pure logic, IPC validation, shared contracts, and bug fixes:
+
+1. Write the smallest failing test
+2. Run only that test or test file
+3. Implement the smallest change to pass
+4. Refactor safely
+5. Run the broader area checks
+
+Use the dedicated guide when needed:
+
+```bash
+cat .trellis/spec/guides/tdd-development-guide.md
 ```
 
 ### Code Quality Checklist
