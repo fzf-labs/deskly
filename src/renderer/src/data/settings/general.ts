@@ -238,6 +238,7 @@ const normalizeLoadedSettings = (value: unknown): Settings => {
     ...(value as Partial<Settings>),
   } as Settings & {
     mcpEnabled?: boolean;
+    recommendedSystemCliToolIds?: unknown;
     profile?: { avatar?: string };
     providers?: unknown;
     accentColor?: unknown;
@@ -254,6 +255,10 @@ const normalizeLoadedSettings = (value: unknown): Settings => {
 
   if ('backgroundStyle' in loadedSettings) {
     delete loadedSettings.backgroundStyle;
+  }
+
+  if ('recommendedSystemCliToolIds' in loadedSettings) {
+    delete loadedSettings.recommendedSystemCliToolIds;
   }
 
   if (!loadedSettings.profile || typeof loadedSettings.profile !== 'object') {

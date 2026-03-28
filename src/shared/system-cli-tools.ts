@@ -6,12 +6,18 @@ export type SystemCliToolInstallState = 'unknown' | 'checking' | 'installed' | '
 
 export type SystemCliToolDetectionLevel = 'fast' | 'full'
 export type SystemCliPackageManager = 'brew' | 'pipx' | 'npm' | 'cargo'
+export type SystemCliInstalledSource = SystemCliPackageManager | 'system'
 
 export const SYSTEM_CLI_PACKAGE_MANAGERS: SystemCliPackageManager[] = [
   'brew',
   'npm',
   'pipx',
   'cargo'
+]
+
+export const SYSTEM_CLI_INSTALLED_SOURCES: SystemCliInstalledSource[] = [
+  ...SYSTEM_CLI_PACKAGE_MANAGERS,
+  'system'
 ]
 
 export interface LocalizedText {
@@ -62,7 +68,7 @@ export interface SystemCliToolInfo extends SystemCliToolDefinition {
   lastCheckedAt?: string
   latencyMs?: number
   errorMessage?: string
-  installedVia?: SystemCliPackageManager
+  installedVia?: SystemCliInstalledSource
 }
 
 export const SYSTEM_CLI_TOOLS: SystemCliToolDefinition[] = [
@@ -319,6 +325,8 @@ export const SYSTEM_CLI_TOOLS: SystemCliToolDefinition[] = [
     homepageUrl: 'https://pandoc.org'
   }
 ]
+
+export const DEFAULT_RECOMMENDED_SYSTEM_CLI_TOOL_IDS = SYSTEM_CLI_TOOLS.map((tool) => tool.id)
 
 export const resolveSystemCliInstallMethods = (
   methods: SystemCliToolInstallMethod[],

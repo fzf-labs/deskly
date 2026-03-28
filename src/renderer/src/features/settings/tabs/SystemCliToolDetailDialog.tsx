@@ -10,6 +10,7 @@ import {
 import { shell } from '@/lib/electron-api'
 import {
   getSystemCliDocsUrl,
+  getSystemCliInstalledSources,
   getLocalizedSystemCliText,
   getSystemCliSupportedSources,
   isSystemCliToolInstalled
@@ -17,7 +18,7 @@ import {
 import { useLanguage } from '@/providers/language-provider'
 import {
   resolveSystemCliInstallMethods,
-  type SystemCliPackageManager,
+  type SystemCliInstalledSource,
   type SystemCliToolInfo
 } from '../../../../../shared/system-cli-tools'
 
@@ -58,10 +59,10 @@ export function SystemCliToolDetailDialog({
   const docsUrl = getSystemCliDocsUrl(tool)
   const installed = isSystemCliToolInstalled(tool)
   const sources = installed
-    ? (tool.installedVia ? [tool.installedVia] : getSystemCliSupportedSources(tool))
+    ? getSystemCliInstalledSources(tool)
     : getSystemCliSupportedSources(tool)
 
-  const getSourceLabel = (source: SystemCliPackageManager): string => {
+  const getSourceLabel = (source: SystemCliInstalledSource): string => {
     switch (source) {
       case 'brew':
         return t.settings.cliToolsSourceBrew
@@ -71,6 +72,8 @@ export function SystemCliToolDetailDialog({
         return t.settings.cliToolsSourceNpm
       case 'cargo':
         return t.settings.cliToolsSourceCargo
+      case 'system':
+        return t.settings.cliToolsSourceSystem
     }
   }
 

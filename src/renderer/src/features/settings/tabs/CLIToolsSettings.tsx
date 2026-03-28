@@ -11,8 +11,11 @@ import { Button } from '@/components/ui/button'
 import { shell } from '@/lib/electron-api'
 import { cn } from '@/lib/utils'
 import {
+  filterRecommendedSystemCliTools,
   getSystemCliDocsUrl,
+  getSystemCliInstalledSources,
   getLocalizedSystemCliText,
+  getSystemCliPrimarySupportedSource,
   getSystemCliSearchText,
   getSystemCliSupportedSources,
   isSystemCliToolInstalled,
@@ -20,7 +23,9 @@ import {
 } from '@features/cli-tools'
 import { useLanguage } from '@/providers/language-provider'
 import {
+  SYSTEM_CLI_INSTALLED_SOURCES,
   SYSTEM_CLI_PACKAGE_MANAGERS,
+  type SystemCliInstalledSource,
   type SystemCliPackageManager,
   type SystemCliToolInfo
 } from '../../../../../shared/system-cli-tools'
@@ -40,7 +45,7 @@ const openExternalUrl = async (url: string) => {
   }
 }
 
-const sourceTone = (source: SystemCliPackageManager): string => {
+const sourceTone = (source: SystemCliInstalledSource): string => {
   switch (source) {
     case 'brew':
       return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700'
@@ -50,6 +55,8 @@ const sourceTone = (source: SystemCliPackageManager): string => {
       return 'border-orange-500/20 bg-orange-500/10 text-orange-700'
     case 'cargo':
       return 'border-violet-500/20 bg-violet-500/10 text-violet-700'
+    case 'system':
+      return 'border-slate-500/20 bg-slate-500/10 text-slate-700'
   }
 }
 
@@ -59,7 +66,7 @@ export function CLIToolsSettings() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeSource, setActiveSource] = useState<'all' | SystemCliPackageManager>('all')
+  const [activeSource, setActiveSource] = useState<'all' | SystemCliInstalledSource>('all')
   const [page, setPage] = useState<CLIToolsPage>('installed')
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null)
 
@@ -111,47 +118,55 @@ export function CLIToolsSettings() {
     }
   }, [])
 
+  useEffect(() => {
+    if (page === 'recommended' && activeSource === 'system') {
+      setActiveSource('all')
+    }
+  }, [activeSource, page])
+
   const installedTools = useMemo(
     () => tools.filter((tool) => isSystemCliToolInstalled(tool)),
     [tools]
   )
 
-  const filteredTools = useMemo(() => {
+  const searchFilteredTools = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
 
     return tools.filter((tool) => {
-      const installed = isSystemCliToolInstalled(tool)
-
-      if (activeSource !== 'all') {
-        if (installed) {
-          const matchesInstalledSource =
-            tool.installedVia === activeSource ||
-            (!tool.installedVia && getSystemCliSupportedSources(tool).includes(activeSource))
-
-          if (!matchesInstalledSource) {
-            return false
-          }
-        } else if (!getSystemCliSupportedSources(tool).includes(activeSource)) {
-          return false
-        }
-      }
-
       if (!normalizedQuery) {
         return true
       }
 
       return getSystemCliSearchText(tool).includes(normalizedQuery)
     })
-  }, [activeSource, searchQuery, tools])
+  }, [searchQuery, tools])
 
   const recommendedTools = useMemo(
-    () => filteredTools.filter((tool) => !isSystemCliToolInstalled(tool)),
-    [filteredTools]
+    () =>
+      filterRecommendedSystemCliTools(searchFilteredTools).filter((tool) => {
+        if (activeSource === 'all') {
+          return true
+        }
+
+        return getSystemCliPrimarySupportedSource(tool) === (activeSource as SystemCliPackageManager)
+      }),
+    [activeSource, searchFilteredTools]
   )
 
   const visibleInstalledTools = useMemo(
-    () => filteredTools.filter((tool) => isSystemCliToolInstalled(tool)),
-    [filteredTools]
+    () =>
+      searchFilteredTools.filter((tool) => {
+        if (!isSystemCliToolInstalled(tool)) {
+          return false
+        }
+
+        if (activeSource === 'all') {
+          return true
+        }
+
+        return getSystemCliInstalledSources(tool).includes(activeSource)
+      }),
+    [activeSource, searchFilteredTools]
   )
 
   const selectedTool = useMemo(
@@ -159,38 +174,47 @@ export function CLIToolsSettings() {
     [selectedToolId, tools]
   )
 
-  const visibleSourceGroups = useMemo(
-    () => (activeSource === 'all' ? SYSTEM_CLI_PACKAGE_MANAGERS : [activeSource]),
-    [activeSource]
+  const sourceOptions = useMemo(
+    () =>
+      (page === 'installed'
+        ? SYSTEM_CLI_INSTALLED_SOURCES
+        : SYSTEM_CLI_PACKAGE_MANAGERS) as SystemCliInstalledSource[],
+    [page]
   )
 
-  const sourceInstalledCounts = useMemo(
-    () =>
-      Object.fromEntries(
+  const visibleSourceGroups = useMemo(
+    () => (activeSource === 'all' || !sourceOptions.includes(activeSource) ? sourceOptions : [activeSource]),
+    [activeSource, sourceOptions]
+  )
+
+  const sourceCounts = useMemo(() => {
+    if (page === 'recommended') {
+      return Object.fromEntries(
         SYSTEM_CLI_PACKAGE_MANAGERS.map((source) => [
           source,
-          installedTools.filter(
-            (tool) =>
-              tool.installedVia === source ||
-              (!tool.installedVia && getSystemCliSupportedSources(tool).includes(source))
+          filterRecommendedSystemCliTools(searchFilteredTools).filter(
+            (tool) => getSystemCliPrimarySupportedSource(tool) === source
           ).length
         ])
-      ) as Record<SystemCliPackageManager, number>,
-    [installedTools]
-  )
+      ) as Record<SystemCliInstalledSource, number>
+    }
+
+    return Object.fromEntries(
+      SYSTEM_CLI_INSTALLED_SOURCES.map((source) => [
+        source,
+        installedTools.filter((tool) => getSystemCliInstalledSources(tool).includes(source)).length
+      ])
+    ) as Record<SystemCliInstalledSource, number>
+  }, [installedTools, page, searchFilteredTools])
 
   const installedGroups = useMemo(
     () =>
       Object.fromEntries(
         visibleSourceGroups.map((source) => [
           source,
-          visibleInstalledTools.filter(
-            (tool) =>
-              tool.installedVia === source ||
-              (!tool.installedVia && getSystemCliSupportedSources(tool).includes(source))
-          )
+          visibleInstalledTools.filter((tool) => getSystemCliInstalledSources(tool).includes(source))
         ])
-      ) as Record<SystemCliPackageManager, SystemCliToolInfo[]>,
+      ) as Record<SystemCliInstalledSource, SystemCliToolInfo[]>,
     [visibleInstalledTools, visibleSourceGroups]
   )
 
@@ -199,9 +223,11 @@ export function CLIToolsSettings() {
       Object.fromEntries(
         visibleSourceGroups.map((source) => [
           source,
-          recommendedTools.filter((tool) => getSystemCliSupportedSources(tool).includes(source))
+          source === 'system'
+            ? []
+            : recommendedTools.filter((tool) => getSystemCliPrimarySupportedSource(tool) === source)
         ])
-      ) as Record<SystemCliPackageManager, SystemCliToolInfo[]>,
+      ) as Record<SystemCliInstalledSource, SystemCliToolInfo[]>,
     [recommendedTools, visibleSourceGroups]
   )
 
@@ -214,7 +240,7 @@ export function CLIToolsSettings() {
         ? t.settings.cliToolsRecommendedFilteredEmpty
         : t.settings.cliToolsRecommendedEmpty
 
-  const getSourceLabel = (source: 'all' | SystemCliPackageManager): string => {
+  const getSourceLabel = (source: 'all' | SystemCliInstalledSource): string => {
     switch (source) {
       case 'brew':
         return t.settings.cliToolsSourceBrew
@@ -224,19 +250,14 @@ export function CLIToolsSettings() {
         return t.settings.cliToolsSourceNpm
       case 'cargo':
         return t.settings.cliToolsSourceCargo
+      case 'system':
+        return t.settings.cliToolsSourceSystem
       default:
         return t.settings.cliToolsFilterAll
     }
   }
 
-  const getVisibleSources = (tool: SystemCliToolInfo): SystemCliPackageManager[] => {
-    const installed = isSystemCliToolInstalled(tool)
-    return installed
-      ? (tool.installedVia ? [tool.installedVia] : getSystemCliSupportedSources(tool))
-      : getSystemCliSupportedSources(tool)
-  }
-
-  const renderSourceBadge = (source: SystemCliPackageManager) => (
+  const renderSourceBadge = (source: SystemCliInstalledSource) => (
     <span
       key={source}
       className={cn('rounded-full border px-2 py-0.5 text-[10px] uppercase', sourceTone(source))}
@@ -309,10 +330,11 @@ export function CLIToolsSettings() {
 
   const renderRecommendedCard = (tool: SystemCliToolInfo) => {
     const docsUrl = getSystemCliDocsUrl(tool)
-    const visibleSources = getVisibleSources(tool)
+    const visibleSources = getSystemCliSupportedSources(tool)
     const primaryUseCase = tool.useCases[0]
     const summaryText = getLocalizedSystemCliText(tool.summary, language).trim()
     const shouldShowCommand = tool.command.trim() !== tool.displayName.trim()
+    const installed = isSystemCliToolInstalled(tool)
 
     return (
       <div
@@ -336,6 +358,19 @@ export function CLIToolsSettings() {
         </div>
 
         <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase text-primary">
+            {t.settings.cliToolsRecommendedTag}
+          </span>
+          <span
+            className={cn(
+              'rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase',
+              installed
+                ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700'
+                : 'border-amber-500/20 bg-amber-500/10 text-amber-700'
+            )}
+          >
+            {installed ? t.settings.cliToolsInstalled : t.settings.cliToolsNotInstalled}
+          </span>
           {visibleSources.map(renderSourceBadge)}
         </div>
 
@@ -374,7 +409,7 @@ export function CLIToolsSettings() {
   }
 
   const renderSourceSection = (
-    source: SystemCliPackageManager,
+    source: SystemCliInstalledSource,
     toolsInGroup: SystemCliToolInfo[],
     variant: CLIToolsPage
   ) => (
@@ -499,7 +534,7 @@ export function CLIToolsSettings() {
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {SYSTEM_CLI_PACKAGE_MANAGERS.map((source) => (
+          {sourceOptions.map((source) => (
             <button
               key={source}
               type="button"
@@ -513,7 +548,7 @@ export function CLIToolsSettings() {
             >
               {renderSourceBadge(source)}
               <span className="text-foreground text-xs font-medium">
-                {sourceInstalledCounts[source]}
+                {sourceCounts[source]}
               </span>
             </button>
           ))}

@@ -139,15 +139,6 @@ export class SystemCliToolService extends EventEmitter {
     )
   }
 
-  private isDefinitionInstalled(
-    definition: SystemCliToolDefinition,
-    snapshot: SystemCliPackageSnapshot
-  ): boolean {
-    return (definition.packageSources ?? []).some((source) =>
-      source.packages.some((packageName) => snapshot[source.manager].has(packageName))
-    )
-  }
-
   private createInstalledToolFromPackage(
     manager: SystemCliPackageManager,
     packageName: string,
@@ -541,15 +532,33 @@ export class SystemCliToolService extends EventEmitter {
     return null
   }
 
+  private getInstalledPackageMeta(
+    tool: Pick<SystemCliToolDefinition, 'packageSources'>,
+    manager: SystemCliPackageManager,
+    snapshot: SystemCliPackageSnapshot
+  ): SystemCliPackageMeta | undefined {
+    const matchedSource = tool.packageSources?.find(
+      (source) =>
+        source.manager === manager &&
+        source.packages.some((packageName) => snapshot[manager].has(packageName))
+    )
+    const matchedPackageName = matchedSource?.packages.find((packageName) =>
+      snapshot[manager].has(packageName)
+    )
+
+    return matchedPackageName ? snapshot.metadata[manager].get(matchedPackageName) : undefined
+  }
+
   private async enrichInstalledTool(
     tool: SystemCliToolInfo,
     level: SystemCliToolDetectionLevel,
-    startedAt: number
+    startedAt: number,
+    resolvedInstallPath?: string
   ): Promise<SystemCliToolInfo> {
-    const resolvedInstallPath = await this.resolveInstallPath(tool)
-    const installPath = resolvedInstallPath ?? tool.installPath
-    const version = level === 'full' && resolvedInstallPath
-      ? (await this.resolveVersion(resolvedInstallPath)) ?? tool.version
+    const detectedInstallPath = resolvedInstallPath ?? (await this.resolveInstallPath(tool))
+    const installPath = detectedInstallPath ?? tool.installPath
+    const version = level === 'full' && detectedInstallPath
+      ? (await this.resolveVersion(detectedInstallPath)) ?? tool.version
       : tool.version
 
     return {
@@ -560,6 +569,63 @@ export class SystemCliToolService extends EventEmitter {
     }
   }
 
+  private async buildDarwinKnownTool(
+    definition: SystemCliToolDefinition,
+    snapshot: SystemCliPackageSnapshot,
+    level: SystemCliToolDetectionLevel,
+    platform: SystemCliPlatform,
+    lastCheckedAt: string
+  ): Promise<SystemCliToolInfo> {
+    const base = this.createInitialTool(definition, platform)
+    const startedAt = Date.now()
+    const installedVia = this.detectInstalledViaPackages(base, snapshot)
+
+    if (installedVia) {
+      const packageMeta = this.getInstalledPackageMeta(base, installedVia, snapshot)
+      const installedTool: SystemCliToolInfo = {
+        ...base,
+        installed: true,
+        installedVia,
+        installState: 'installed',
+        installPath: packageMeta?.installPath,
+        version: packageMeta?.version,
+        checkedLevel: level,
+        lastCheckedAt,
+        errorMessage: undefined
+      }
+
+      return this.enrichInstalledTool(installedTool, level, startedAt).catch(() => ({
+        ...installedTool,
+        latencyMs: Date.now() - startedAt
+      }))
+    }
+
+    const installPath = await this.resolveInstallPath(base)
+    if (!installPath) {
+      return {
+        ...this.createRecommendedTool(definition, platform, level, lastCheckedAt),
+        latencyMs: Date.now() - startedAt
+      }
+    }
+
+    const installedTool: SystemCliToolInfo = {
+      ...base,
+      installed: true,
+      installedVia: 'system',
+      installState: 'installed',
+      installPath,
+      version: undefined,
+      checkedLevel: level,
+      lastCheckedAt,
+      errorMessage: undefined
+    }
+
+    return this.enrichInstalledTool(installedTool, level, startedAt, installPath).catch(() => ({
+      ...installedTool,
+      latencyMs: Date.now() - startedAt
+    }))
+  }
+
   private async rebuildDarwinTools(
     level: SystemCliToolDetectionLevel,
     force = false
@@ -567,9 +633,15 @@ export class SystemCliToolService extends EventEmitter {
     const platform = this.resolvePlatform()
     const snapshot = await this.getPackageSnapshot(level, force)
     const lastCheckedAt = snapshot.lastCheckedAt
+    const definitionEntries = await Promise.all(
+      SYSTEM_CLI_TOOLS.map((definition) =>
+        this.buildDarwinKnownTool(definition, snapshot, level, platform, lastCheckedAt)
+      )
+    )
 
     const installedEntries = SYSTEM_CLI_PACKAGE_MANAGERS.flatMap((manager) =>
       Array.from(snapshot[manager])
+        .filter((packageName) => !this.findDefinitionForPackage(manager, packageName))
         .sort((left, right) => left.localeCompare(right))
         .map((packageName) =>
           this.createInstalledToolFromPackage(
@@ -589,11 +661,7 @@ export class SystemCliToolService extends EventEmitter {
       )
     )
 
-    const recommendedEntries = SYSTEM_CLI_TOOLS
-      .filter((definition) => !this.isDefinitionInstalled(definition, snapshot))
-      .map((definition) => this.createRecommendedTool(definition, platform, level, lastCheckedAt))
-
-    this.tools = [...enrichedInstalledEntries, ...recommendedEntries]
+    this.tools = [...definitionEntries, ...enrichedInstalledEntries]
     this.emit('updated', this.getSnapshot())
     return this.getSnapshot()
   }

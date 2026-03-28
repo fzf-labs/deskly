@@ -31,7 +31,12 @@ export class SettingsService {
       if (existsSync(this.settingsFile)) {
         const data = readFileSync(this.settingsFile, 'utf-8')
         const loaded = JSON.parse(data)
-        const { accentColor: _accentColor, backgroundStyle: _backgroundStyle, ...rest } =
+        const {
+          accentColor: _accentColor,
+          backgroundStyle: _backgroundStyle,
+          recommendedSystemCliToolIds: _recommendedSystemCliToolIds,
+          ...rest
+        } =
           loaded as Record<string, unknown>
         return {
           ...DEFAULT_SETTINGS,
