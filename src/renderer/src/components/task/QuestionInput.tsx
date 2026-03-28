@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { AgentQuestion, PendingQuestion } from '@/hooks/useAgent';
+import type { AgentQuestion, PendingQuestion } from '@features/cli-session';
 import { cn } from '@/lib/utils';
 import { Check, Send } from 'lucide-react';
 

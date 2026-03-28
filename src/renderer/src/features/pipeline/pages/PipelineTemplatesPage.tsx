@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { MoreVertical } from 'lucide-react'
-import { useProjects } from '@/hooks/useProjects'
+import { useProjects } from '@features/projects'
 import { db, type WorkflowDefinition } from '@/data'
 import { useConfirm } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'

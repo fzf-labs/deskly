@@ -42,7 +42,11 @@ class ImmediateCloseCodexAdapter implements CliAdapter {
   userInputLogMode = 'inject-normalized' as const
 
   async startSession(options: CliStartOptions): Promise<CliSessionHandle> {
-    return new ImmediateCloseHandle(options.sessionId, options.toolId, options.msgStore as MsgStoreService)
+    return new ImmediateCloseHandle(
+      options.sessionId,
+      options.toolId,
+      options.msgStore as MsgStoreService
+    )
   }
 }
 
@@ -111,11 +115,8 @@ const setupServices = async (options?: {
         join(rootDir, 'sessions', projectId?.trim() || 'project', taskId),
       getTaskMessagesFile: (taskId: string, projectId?: string | null) =>
         join(rootDir, 'sessions', projectId?.trim() || 'project', `${taskId}.jsonl`),
-      getTaskNodeMessagesFile: (
-        taskId: string,
-        taskNodeId: string,
-        projectId?: string | null
-      ) => join(rootDir, 'sessions', projectId?.trim() || 'project', taskId, `${taskNodeId}.jsonl`)
+      getTaskNodeMessagesFile: (taskId: string, taskNodeId: string, projectId?: string | null) =>
+        join(rootDir, 'sessions', projectId?.trim() || 'project', taskId, `${taskNodeId}.jsonl`)
     })
   }))
 
@@ -156,7 +157,9 @@ const setupServices = async (options?: {
       getConfig: () => options?.config ?? {},
       saveConfig: vi.fn()
     } as never,
+    db.getAgentToolProfileService(),
     db,
+    db.getTaskNodeRuntimeService(),
     {
       getSettings: () => ({
         enabledCliTools: {
@@ -349,6 +352,9 @@ describe('CliSessionService', () => {
   })
 })
 
-function rootDirForTask(task: { workspace_path?: string | null; worktree_path?: string | null }): string {
+function rootDirForTask(task: {
+  workspace_path?: string | null
+  worktree_path?: string | null
+}): string {
   return task.workspace_path ?? task.worktree_path ?? process.cwd()
 }

@@ -15,9 +15,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import type { RightPanelTab } from '@/components/task/RightPanel'
 import { cn } from '@/lib/utils'
 
+import type { RightPanelTab } from '../model/right-panel'
 import type { LanguageStrings, TaskMetaRow } from '../types'
 
 interface TaskDetailHeaderProps {

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { MessageAttachment } from '@/hooks/useAgent'
+import type { MessageAttachment } from '@features/cli-session'
 import { useLanguage } from '@/providers/language-provider'
 import { useToast } from '@/providers/feedback-provider'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'

@@ -1,4 +1,4 @@
-import type { LogMsg } from '@/hooks/useLogStream'
+import type { LogMsg } from '../../hooks'
 import type { NormalizedEntry, NormalizedEntryType } from '../logTypes'
 
 type RecordLike = Record<string, unknown>

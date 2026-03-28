@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { PromptOptimizeButton } from '@/components/shared/PromptOptimizeButton';
-import { useProjects } from '@/hooks/useProjects';
+import { useProjects } from '@features/projects';
 import type { AgentToolConfig } from '@/data';
 import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement';
 import type { CreateAutomationRequest } from '@shared/contracts/automation';

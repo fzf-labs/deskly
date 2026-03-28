@@ -6,7 +6,7 @@ import {
   isProjectWorkflowTaskCreateMode,
   resolvePersistedTaskMode,
   resolveWorkflowGenerationToolId
-} from '../../src/renderer/src/components/task/task-create-utils'
+} from '../../src/renderer/src/features/tasks/model/task-create'
 
 const workflowDefinition = {
   version: 1 as const,

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { useProjects } from '@/hooks/useProjects'
-import { useDashboardData } from '@/hooks/useDashboardData'
+import { useProjects } from '@features/projects'
+import { useDashboardData } from '@features/home'
 import { PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
 import { SummaryCards } from './components/SummaryCards'
 import { ActivityList } from './components/ActivityList'

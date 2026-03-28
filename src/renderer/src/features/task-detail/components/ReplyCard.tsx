@@ -1,5 +1,5 @@
 import { ChatInput } from '@/components/shared/ChatInput'
-import type { MessageAttachment } from '@/hooks/useAgent'
+import type { MessageAttachment } from '@features/cli-session'
 
 import type { LanguageStrings } from '../types'
 

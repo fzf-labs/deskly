@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { MessageAttachment } from '@/hooks/useAgent';
+import type { MessageAttachment } from '@features/cli-session';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/providers/language-provider';
 import {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AgentMessage } from '@/hooks/useAgent';
+import type { AgentMessage } from '@features/cli-session';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 

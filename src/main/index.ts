@@ -86,7 +86,7 @@ app.whenReady().then(async () => {
   await appContext.init()
 
   const { services, appPaths } = appContext
-  const { databaseService, cliSessionService, terminalService } = services
+  const { cliSessionService, taskNodeRuntimeService, terminalService } = services
 
   try {
     await addAllowedRoot(process.resourcesPath)
@@ -100,7 +100,7 @@ app.whenReady().then(async () => {
   }
 
   appContext.trackDisposable(
-    databaseService.onTaskNodeStatusChange((node) => {
+    taskNodeRuntimeService.onTaskNodeStatusChange((node) => {
       if (!mainWindow || mainWindow.isDestroyed()) return
 
       const payload = {
@@ -126,7 +126,6 @@ app.whenReady().then(async () => {
         mainWindow.webContents.send(IPC_EVENTS.taskNode.completed, payload)
         return
       }
-
     })
   )
 

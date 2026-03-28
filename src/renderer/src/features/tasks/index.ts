@@ -1,1 +1,10 @@
 export * from './usecases/task-mutations'
+export * from './model/task-create'
+export { useTaskComposer } from './hooks/useTaskComposer'
+export { CreateTaskDialog } from './ui/CreateTaskDialog'
+export { TaskComposer } from './ui/TaskComposer'
+export {
+  TaskCreateMenu,
+  type TaskMenuCliToolInfo,
+  type TaskMenuWorkflowTemplate
+} from './ui/TaskCreateMenu'

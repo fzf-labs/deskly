@@ -1,0 +1,140 @@
+import { useEffect, useState } from 'react'
+
+import { fs } from '@/lib/electron-api'
+import { Eye, FileText, Loader2 } from 'lucide-react'
+
+import { FileTooLarge } from './FileTooLarge'
+import type { PreviewComponentProps } from '../model/types'
+import { getImageMimeType, isRemoteUrl, MAX_PREVIEW_SIZE, openFileExternal } from '../model/utils'
+
+export function ImagePreview({ artifact }: PreviewComponentProps) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [fileTooLarge, setFileTooLarge] = useState<number | null>(null)
+
+  const handleOpenExternal = () => {
+    if (artifact.path) {
+      openFileExternal(artifact.path)
+    }
+  }
+
+  useEffect(() => {
+    let blobUrl: string | null = null
+
+    async function loadImage() {
+      if (
+        artifact.content &&
+        (artifact.content.startsWith('data:') || artifact.content.startsWith('http'))
+      ) {
+        setImageUrl(artifact.content)
+        setLoading(false)
+        return
+      }
+
+      if (!artifact.path) {
+        setError('No image file path available')
+        setLoading(false)
+        return
+      }
+
+      console.log('[Image Preview] Loading image from path:', artifact.path)
+
+      try {
+        if (!isRemoteUrl(artifact.path)) {
+          const fileInfo = await fs.stat(artifact.path)
+          if (fileInfo.size > MAX_PREVIEW_SIZE) {
+            console.log('[Image Preview] File too large:', fileInfo.size)
+            setFileTooLarge(fileInfo.size)
+            setLoading(false)
+            return
+          }
+        }
+
+        const ext = artifact.path.split('.').pop()?.toLowerCase() || ''
+        const mimeType = getImageMimeType(ext)
+
+        let blob: Blob
+
+        if (isRemoteUrl(artifact.path)) {
+          console.log('[Image Preview] Fetching remote image...')
+          const url = artifact.path.startsWith('//') ? `https:${artifact.path}` : artifact.path
+          const response = await fetch(url)
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`)
+          }
+          blob = await response.blob()
+        } else {
+          console.log('[Image Preview] Reading local image file...')
+          const data = await fs.readFile(artifact.path)
+          blob = new Blob([data.slice().buffer], { type: mimeType })
+        }
+
+        console.log('[Image Preview] Loaded', blob.size, 'bytes')
+        blobUrl = URL.createObjectURL(blob)
+        setImageUrl(blobUrl)
+        setError(null)
+      } catch (err) {
+        console.error('[Image Preview] Failed to load image:', err)
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        setError(errorMsg)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void loadImage()
+
+    return () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl)
+      }
+    }
+  }, [artifact.path, artifact.content])
+
+  if (loading) {
+    return (
+      <div className="bg-muted/20 flex h-full flex-col items-center justify-center p-8">
+        <Loader2 className="text-muted-foreground size-8 animate-spin" />
+        <p className="text-muted-foreground mt-4 text-sm">Loading image...</p>
+      </div>
+    )
+  }
+
+  if (fileTooLarge !== null) {
+    return (
+      <FileTooLarge
+        artifact={artifact}
+        fileSize={fileTooLarge}
+        icon={Eye}
+        onOpenExternal={handleOpenExternal}
+      />
+    )
+  }
+
+  if (error || !imageUrl) {
+    return (
+      <div className="bg-muted/20 flex h-full flex-col items-center justify-center p-8">
+        <div className="flex max-w-md flex-col items-center text-center">
+          <div className="border-border bg-background mb-4 flex size-20 items-center justify-center rounded-xl border">
+            <FileText className="size-10 text-red-500" />
+          </div>
+          <h3 className="text-foreground mb-2 text-lg font-medium">{artifact.name}</h3>
+          <p className="text-muted-foreground text-sm break-all whitespace-pre-wrap">
+            {error || 'No image file path available'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-muted/20 flex h-full items-center justify-center p-4">
+      <img
+        src={imageUrl}
+        alt={artifact.name}
+        className="max-h-full max-w-full rounded-lg object-contain shadow-sm"
+      />
+    </div>
+  )
+}

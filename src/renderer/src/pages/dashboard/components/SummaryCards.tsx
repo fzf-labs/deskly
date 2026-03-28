@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle, Clock, Eye, Play } from 'lucide-react'
 import type { TaskStatus } from '@/data/types'
-import type { DashboardSummary } from '@/hooks/useDashboardData'
+import type { DashboardSummary } from '@features/home'
 import { cn } from '@/lib/utils'
 
 interface SummaryCardsProps {

@@ -1,9 +1,8 @@
 import type { IpcModuleContext } from './types'
-import type { DatabaseService } from '../services/DatabaseService'
 import { IPC_CHANNELS } from './channels'
 
 export const registerPromptIpc = ({ handle, v, services }: IpcModuleContext): void => {
-  const { databaseService } = services
+  const { aiAuthoringService } = services
 
   handle(
     IPC_CHANNELS.prompt.optimize,
@@ -17,8 +16,8 @@ export const registerPromptIpc = ({ handle, v, services }: IpcModuleContext): vo
       })
     ],
     async (_, input) =>
-      await databaseService.optimizePrompt(
-        input as unknown as Parameters<DatabaseService['optimizePrompt']>[0]
+      await aiAuthoringService.optimizePrompt(
+        input as unknown as Parameters<typeof aiAuthoringService.optimizePrompt>[0]
       )
   )
 }

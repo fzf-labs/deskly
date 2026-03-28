@@ -1,19 +1,16 @@
 export { ArtifactPreview } from './ui/ArtifactPreview'
-export { AudioPreview } from '@/components/artifacts/AudioPreview'
-export { CodePreview } from '@/components/artifacts/CodePreview'
-export { DocxPreview } from '@/components/artifacts/DocxPreview'
-export { ExcelPreview } from '@/components/artifacts/ExcelPreview'
+export { AudioPreview } from './ui/AudioPreview'
+export { CodePreview } from './ui/CodePreview'
+export { DocxPreview } from './ui/DocxPreview'
+export { ExcelPreview } from './ui/ExcelPreview'
 export { FileTooLarge } from './ui/FileTooLarge'
-export { FontPreview } from '@/components/artifacts/FontPreview'
-export { ImagePreview } from '@/components/artifacts/ImagePreview'
-export { PdfPreview } from '@/components/artifacts/PdfPreview'
-export { PptxPreview } from '@/components/artifacts/PptxPreview'
-export { VideoPreview } from '@/components/artifacts/VideoPreview'
+export { FontPreview } from './ui/FontPreview'
+export { ImagePreview } from './ui/ImagePreview'
+export { PdfPreview } from './ui/PdfPreview'
+export { PptxPreview } from './ui/PptxPreview'
+export { VideoPreview } from './ui/VideoPreview'
 export { WebSearchPreview } from './ui/WebSearchPreview'
-export {
-  parseSearchResults,
-  hasValidSearchResults
-} from './model/web-search'
+export { parseSearchResults, hasValidSearchResults } from './model/web-search'
 
 export type {
   Artifact,

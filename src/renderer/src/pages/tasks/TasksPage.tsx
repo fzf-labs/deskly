@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Bot, Sparkles } from 'lucide-react'
 
 import { Select } from '@/components/ui/select'
-import { TaskComposer } from '@/components/task'
-import { useProjects } from '@/hooks/useProjects'
+import { GENERATED_WORKFLOW_REVIEW_ROUTE, TaskComposer } from '@features/tasks'
+import { useProjects } from '@features/projects'
 import { useLanguage } from '@/providers/language-provider'
-import { GENERATED_WORKFLOW_REVIEW_ROUTE } from '@/components/task/task-create-utils'
 
 export function TasksPage() {
   const navigate = useNavigate()

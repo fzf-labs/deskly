@@ -10,16 +10,15 @@ import {
 } from '@/components/shared/page-shell'
 import { db } from '@/data'
 import { getSettings } from '@/data/settings'
-import type { MessageAttachment } from '@/hooks/useAgent'
+import type { MessageAttachment } from '@features/cli-session'
 import { notifyTasksChanged } from '@/lib/task-events'
 import { useLanguage } from '@/providers/language-provider'
-import { createTaskWithSideEffects } from '@features/tasks'
 import {
   buildTaskCreatePayload,
+  createTaskWithSideEffects,
   resolveWorkflowGenerationToolId,
   type GeneratedWorkflowReviewRequest
-} from '@/components/task/task-create-utils'
-
+} from '@features/tasks'
 import {
   WorkflowTemplateEditor,
   type WorkflowTemplateFormValues

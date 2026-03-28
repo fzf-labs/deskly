@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Artifact } from '@features/artifacts'
-import type { RightPanelTab } from '@/components/task/RightPanel'
 import type { Task } from '@/data'
 import type { AgentMessage } from '@features/cli-session'
 
 import { extractArtifactsFromMessages, shouldRefreshWorkspaceForMessages } from '../model/artifacts'
+import type { RightPanelTab } from '../model/right-panel'
 import type { ExecutionStatus } from '../types'
 
 interface UseArtifactPanelInput {

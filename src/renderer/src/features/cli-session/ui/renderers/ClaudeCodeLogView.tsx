@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { LogMsg } from '@/hooks/useLogStream'
+import type { LogMsg } from '../../hooks'
 import type { NormalizedEntry, NormalizedEntryType } from '../logTypes'
 import { cn } from '@/lib/utils'
 import {

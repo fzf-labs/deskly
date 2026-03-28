@@ -7,7 +7,7 @@ export const registerCliSessionIpc = ({
   services,
   resolveProjectIdForSession
 }: IpcModuleContext): void => {
-  const { cliSessionService, databaseService } = services
+  const { cliSessionService, databaseService, taskNodeRuntimeService } = services
   const logStreamSubscriptions = new Map<string, () => void>()
 
   handle(
@@ -41,10 +41,13 @@ export const registerCliSessionIpc = ({
         configId?: string | null
       }
     ) => {
-      const taskNode = options?.taskNodeId ? databaseService.getTaskNode(options.taskNodeId) : null
+      const taskNode = options?.taskNodeId
+        ? taskNodeRuntimeService.getTaskNode(options.taskNodeId)
+        : null
       const resolvedTaskId = options?.taskId ?? taskNode?.task_id
       const task = resolvedTaskId ? databaseService.getTask(resolvedTaskId) : null
-      const projectId = options?.projectId ?? task?.project_id ?? resolveProjectIdForSession(sessionId)
+      const projectId =
+        options?.projectId ?? task?.project_id ?? resolveProjectIdForSession(sessionId)
 
       await cliSessionService.startSession(
         sessionId,

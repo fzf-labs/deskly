@@ -13,7 +13,7 @@ import {
   type MCPServerRecord,
   type MCPServerUI
 } from '@features/settings'
-import { useProjects } from '@/hooks/useProjects'
+import { useProjects } from '@features/projects'
 import { useLanguage } from '@/providers/language-provider'
 
 type CliToolInfo = { id: string; displayName?: string }

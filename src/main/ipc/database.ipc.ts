@@ -1,4 +1,5 @@
 import type { IpcModuleContext } from './types'
+import type { AgentToolProfileService } from '../services/AgentToolProfileService'
 import type { DatabaseService } from '../services/DatabaseService'
 import type { TaskNodeStatus } from '../types/task'
 import { IPC_CHANNELS } from './channels'
@@ -9,7 +10,7 @@ export const registerDatabaseIpc = ({
   services,
   taskNodeStatusValues
 }: IpcModuleContext): void => {
-  const { databaseService } = services
+  const { databaseService, agentToolProfileService, taskNodeRuntimeService } = services
 
   handle(IPC_CHANNELS.database.createTask, [v.object()], (_, input) =>
     databaseService.createTask(input as unknown as Parameters<DatabaseService['createTask']>[0])
@@ -35,47 +36,44 @@ export const registerDatabaseIpc = ({
   handle(
     IPC_CHANNELS.database.listAgentToolConfigs,
     [v.optional(v.string({ allowEmpty: true }))],
-    (_, toolId) => databaseService.listAgentToolConfigs(toolId || undefined)
+    (_, toolId) => agentToolProfileService.list(toolId || undefined)
   )
 
   handle(IPC_CHANNELS.database.getAgentToolConfig, [v.string()], (_, id) =>
-    databaseService.getAgentToolConfig(id)
+    agentToolProfileService.get(id)
   )
 
   handle(IPC_CHANNELS.database.createAgentToolConfig, [v.object()], (_, input) =>
-    databaseService.createAgentToolConfig(
-      input as unknown as Parameters<DatabaseService['createAgentToolConfig']>[0]
+    agentToolProfileService.create(
+      input as unknown as Parameters<AgentToolProfileService['create']>[0]
     )
   )
 
-  handle(
-    IPC_CHANNELS.database.updateAgentToolConfig,
-    [v.string(), v.object()],
-    (_, id, updates) =>
-      databaseService.updateAgentToolConfig(
-        id,
-        updates as unknown as Parameters<DatabaseService['updateAgentToolConfig']>[1]
-      )
+  handle(IPC_CHANNELS.database.updateAgentToolConfig, [v.string(), v.object()], (_, id, updates) =>
+    agentToolProfileService.update(
+      id,
+      updates as unknown as Parameters<AgentToolProfileService['update']>[1]
+    )
   )
 
   handle(IPC_CHANNELS.database.deleteAgentToolConfig, [v.string()], (_, id) =>
-    databaseService.deleteAgentToolConfig(id)
+    agentToolProfileService.delete(id)
   )
 
   handle(IPC_CHANNELS.database.setDefaultAgentToolConfig, [v.string()], (_, id) =>
-    databaseService.setDefaultAgentToolConfig(id)
+    agentToolProfileService.setDefault(id)
   )
 
   handle(IPC_CHANNELS.database.getTaskNodes, [v.string()], (_, taskId) =>
-    databaseService.getTaskNodes(taskId)
+    taskNodeRuntimeService.getTaskNodes(taskId)
   )
 
   handle(IPC_CHANNELS.database.getTaskNode, [v.string()], (_, nodeId) =>
-    databaseService.getTaskNode(nodeId)
+    taskNodeRuntimeService.getTaskNode(nodeId)
   )
 
   handle(IPC_CHANNELS.database.getCurrentTaskNode, [v.string()], (_, taskId) =>
-    databaseService.getCurrentTaskNode(taskId)
+    taskNodeRuntimeService.getCurrentTaskNode(taskId)
   )
 
   handle(
@@ -90,16 +88,19 @@ export const registerDatabaseIpc = ({
       })
     ],
     (_, taskId, updates) =>
-      databaseService.updateCurrentTaskNodeRuntime(
+      taskNodeRuntimeService.updateCurrentTaskNodeRuntime(
         taskId,
-        updates as unknown as Parameters<DatabaseService['updateCurrentTaskNodeRuntime']>[1]
+        updates as unknown as Parameters<
+          typeof taskNodeRuntimeService.updateCurrentTaskNodeRuntime
+        >[1]
       )
   )
 
   handle(
     IPC_CHANNELS.database.getTaskNodesByStatus,
     [v.string(), v.enum(taskNodeStatusValues)],
-    (_, taskId, status) => databaseService.getTaskNodesByStatus(taskId, status as TaskNodeStatus)
+    (_, taskId, status) =>
+      taskNodeRuntimeService.getTaskNodesByStatus(taskId, status as TaskNodeStatus)
   )
 
   handle(
@@ -116,26 +117,26 @@ export const registerDatabaseIpc = ({
         })
       )
     ],
-    (_, nodeId, result) => databaseService.completeTaskNode(nodeId, result || {})
-  )
-
-  handle(IPC_CHANNELS.database.markTaskNodeErrorReview, [v.string(), v.string()], (_, nodeId, error) =>
-    databaseService.markTaskNodeErrorReview(nodeId, error)
-  )
-
-  handle(IPC_CHANNELS.database.approveTaskNode, [v.string()], (_, nodeId) =>
-    databaseService.approveTaskNode(nodeId)
+    (_, nodeId, result) => taskNodeRuntimeService.completeTaskNode(nodeId, result || {})
   )
 
   handle(
-    IPC_CHANNELS.database.rerunTaskNode,
-    [v.string()],
-    (_, nodeId) => databaseService.rerunTaskNode(nodeId)
+    IPC_CHANNELS.database.markTaskNodeErrorReview,
+    [v.string(), v.string()],
+    (_, nodeId, error) => taskNodeRuntimeService.markTaskNodeErrorReview(nodeId, error)
+  )
+
+  handle(IPC_CHANNELS.database.approveTaskNode, [v.string()], (_, nodeId) =>
+    taskNodeRuntimeService.approveTaskNode(nodeId)
+  )
+
+  handle(IPC_CHANNELS.database.rerunTaskNode, [v.string()], (_, nodeId) =>
+    taskNodeRuntimeService.rerunTaskNode(nodeId)
   )
 
   handle(
     IPC_CHANNELS.database.stopTaskNodeExecution,
     [v.string(), v.optional(v.string({ allowEmpty: true }))],
-    (_, nodeId, reason) => databaseService.stopTaskNodeExecution(nodeId, reason || undefined)
+    (_, nodeId, reason) => taskNodeRuntimeService.stopTaskNodeExecution(nodeId, reason || undefined)
   )
 }

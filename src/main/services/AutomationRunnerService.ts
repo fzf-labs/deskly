@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { newUlid } from '../utils/ids'
 import { DatabaseService } from './DatabaseService'
 import { TaskService } from './TaskService'
+import { TaskNodeRuntimeService } from './TaskNodeRuntimeService'
 import { CliSessionService } from './cli/CliSessionService'
 import type { Automation, AutomationRun, AutomationRunStatus } from '../types/automation'
 
@@ -12,13 +13,20 @@ export interface AutomationRunResult {
 
 export class AutomationRunnerService extends EventEmitter {
   private db: DatabaseService
+  private taskNodeRuntimeService: TaskNodeRuntimeService
   private taskService: TaskService
   private cliSessionService: CliSessionService
   private runningAutomationIds: Set<string> = new Set()
 
-  constructor(db: DatabaseService, taskService: TaskService, cliSessionService: CliSessionService) {
+  constructor(
+    db: DatabaseService,
+    taskNodeRuntimeService: TaskNodeRuntimeService,
+    taskService: TaskService,
+    cliSessionService: CliSessionService
+  ) {
     super()
     this.db = db
+    this.taskNodeRuntimeService = taskNodeRuntimeService
     this.taskService = taskService
     this.cliSessionService = cliSessionService
   }
@@ -31,10 +39,7 @@ export class AutomationRunnerService extends EventEmitter {
     return this.runningAutomationIds.size > 0
   }
 
-  async runReserved(
-    automation: Automation,
-    run: AutomationRun
-  ): Promise<AutomationRunResult> {
+  async runReserved(automation: Automation, run: AutomationRun): Promise<AutomationRunResult> {
     if (this.runningAutomationIds.has(automation.id)) {
       return {
         runId: run.id,
@@ -95,7 +100,7 @@ export class AutomationRunnerService extends EventEmitter {
 
       taskId = createdTask.id
 
-      const startedNode = this.db.startTaskExecution(taskId)
+      const startedNode = this.taskNodeRuntimeService.startTaskExecution(taskId)
       if (!startedNode) {
         throw new Error('Failed to start task execution')
       }
@@ -166,7 +171,11 @@ export class AutomationRunnerService extends EventEmitter {
     }
   }
 
-  private waitForRunFinish(runId: string, taskNodeId: string, sessionId: string): Promise<AutomationRunStatus> {
+  private waitForRunFinish(
+    runId: string,
+    taskNodeId: string,
+    sessionId: string
+  ): Promise<AutomationRunStatus> {
     return new Promise((resolve) => {
       let resolved = false
 
@@ -206,7 +215,11 @@ export class AutomationRunnerService extends EventEmitter {
         resolve(status)
       }
 
-      const onNodeStatus = (node: { id: string; status: string; error_message?: string | null }) => {
+      const onNodeStatus = (node: {
+        id: string
+        status: string
+        error_message?: string | null
+      }) => {
         if (node.id !== taskNodeId) return
 
         if (node.status === 'in_review' || node.status === 'done') {
@@ -236,11 +249,11 @@ export class AutomationRunnerService extends EventEmitter {
         finalize('failed', payload.error)
       }
 
-      const offNodeStatus = this.db.onTaskNodeStatusChange(onNodeStatus)
+      const offNodeStatus = this.taskNodeRuntimeService.onTaskNodeStatusChange(onNodeStatus)
       this.cliSessionService.on('close', onCliClose)
       this.cliSessionService.on('error', onCliError)
 
-      const currentNode = this.db.getTaskNode(taskNodeId)
+      const currentNode = this.taskNodeRuntimeService.getTaskNode(taskNodeId)
       if (currentNode && (currentNode.status === 'in_review' || currentNode.status === 'done')) {
         if (currentNode.error_message) {
           finalize('failed', currentNode.error_message)

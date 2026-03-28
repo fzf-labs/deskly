@@ -4,5 +4,5 @@ export {
   type DashboardSummary,
   type DashboardTask
 } from './hooks/useDashboardData'
-export { AgentMessages } from '@/components/home/AgentMessages'
-export { TaskInput } from '@/components/home/TaskInput'
+export { AgentMessages } from './ui/AgentMessages'
+export { TaskInput } from './ui/TaskInput'

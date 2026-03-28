@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { getSettings } from '@/data/settings';
-import { cn } from '@/lib/utils';
-import { fs } from '@/lib/electron-api';
-import { useLanguage } from '@/providers/language-provider';
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { getSettings } from '@/data/settings'
+import { cn } from '@/lib/utils'
+import { fs } from '@/lib/electron-api'
+import { useLanguage } from '@/providers/language-provider'
 import {
   Check,
   Code,
@@ -13,33 +13,24 @@ import {
   FileText,
   Loader2,
   Maximize2,
-  X,
-} from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+  X
+} from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
-import { AudioPreview } from '@/components/artifacts/AudioPreview';
-import { CodePreview } from '@/components/artifacts/CodePreview';
-import { DocxPreview } from '@/components/artifacts/DocxPreview';
-import { ExcelPreview } from '@/components/artifacts/ExcelPreview';
-import { FontPreview } from '@/components/artifacts/FontPreview';
-import { ImagePreview } from '@/components/artifacts/ImagePreview';
-import { PdfPreview } from '@/components/artifacts/PdfPreview';
-import { PptxPreview } from '@/components/artifacts/PptxPreview';
-import { VideoPreview } from '@/components/artifacts/VideoPreview';
-import { FileTooLarge } from './FileTooLarge';
-import type {
-  Artifact,
-  ArtifactPreviewProps,
-  ViewMode,
-} from '../model/types';
+import { AudioPreview } from './AudioPreview'
+import { CodePreview } from './CodePreview'
+import { DocxPreview } from './DocxPreview'
+import { ExcelPreview } from './ExcelPreview'
+import { FontPreview } from './FontPreview'
+import { ImagePreview } from './ImagePreview'
+import { PdfPreview } from './PdfPreview'
+import { PptxPreview } from './PptxPreview'
+import { VideoPreview } from './VideoPreview'
+import { FileTooLarge } from './FileTooLarge'
+import type { Artifact, ArtifactPreviewProps, ViewMode } from '../model/types'
 import {
   getFileExtension,
   getOpenWithApp,
@@ -47,23 +38,17 @@ import {
   isRemoteUrl,
   MAX_PREVIEW_SIZE,
   parseCSV,
-  parseFrontmatter,
-} from '../model/utils';
-import { WebSearchPreview } from './WebSearchPreview';
+  parseFrontmatter
+} from '../model/utils'
+import { WebSearchPreview } from './WebSearchPreview'
 
 // Expandable text component for long content
-function ExpandableText({
-  text,
-  maxLength = 100,
-}: {
-  text: string;
-  maxLength?: number;
-}) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const needsTruncation = text.length > maxLength;
+function ExpandableText({ text, maxLength = 100 }: { text: string; maxLength?: number }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const needsTruncation = text.length > maxLength
 
   if (!needsTruncation) {
-    return <span>{text}</span>;
+    return <span>{text}</span>
   }
 
   return (
@@ -76,205 +61,188 @@ function ExpandableText({
         {isExpanded ? 'Show less' : 'Show more'}
       </button>
     </span>
-  );
+  )
 }
 
-export function ArtifactPreview({
-  artifact,
-  onClose,
-  allArtifacts = [],
-}: ArtifactPreviewProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('preview');
-  const [copied, setCopied] = useState(false);
-  const [copiedPath, setCopiedPath] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [textContent, setTextContent] = useState<string | null>(null);
-  const [textLoading, setTextLoading] = useState(false);
-  const [textError, setTextError] = useState<string | null>(null);
-  const [textFileTooLarge, setTextFileTooLarge] = useState<number | null>(null);
-  const [textReloadToken, setTextReloadToken] = useState(0);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const { t, tt } = useLanguage();
+export function ArtifactPreview({ artifact, onClose, allArtifacts = [] }: ArtifactPreviewProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('preview')
+  const [copied, setCopied] = useState(false)
+  const [copiedPath, setCopiedPath] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [textContent, setTextContent] = useState<string | null>(null)
+  const [textLoading, setTextLoading] = useState(false)
+  const [textError, setTextError] = useState<string | null>(null)
+  const [textFileTooLarge, setTextFileTooLarge] = useState<number | null>(null)
+  const [textReloadToken, setTextReloadToken] = useState(0)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const { t, tt } = useLanguage()
 
   const isTextBasedType = useMemo(() => {
-    if (!artifact) return false;
-    return [
-      'code',
-      'text',
-      'markdown',
-      'csv',
-      'json',
-      'html',
-      'jsx',
-      'css',
-    ].includes(artifact.type);
-  }, [artifact]);
+    if (!artifact) return false
+    return ['code', 'text', 'markdown', 'csv', 'json', 'html', 'jsx', 'css'].includes(artifact.type)
+  }, [artifact])
 
   const shouldLoadTextContent = useMemo(() => {
-    if (!artifact) return false;
-    if (!isTextBasedType) return false;
-    if (artifact.content) return false;
-    return Boolean(artifact.path);
-  }, [artifact, isTextBasedType]);
+    if (!artifact) return false
+    if (!isTextBasedType) return false
+    if (artifact.content) return false
+    return Boolean(artifact.path)
+  }, [artifact, isTextBasedType])
 
   useEffect(() => {
     if (!artifact) {
-      setTextContent(null);
-      setTextError(null);
-      setTextFileTooLarge(null);
-      setTextLoading(false);
-      return;
+      setTextContent(null)
+      setTextError(null)
+      setTextFileTooLarge(null)
+      setTextLoading(false)
+      return
     }
 
-    setTextContent(null);
-    setTextError(null);
-    setTextFileTooLarge(null);
-    setTextLoading(false);
+    setTextContent(null)
+    setTextError(null)
+    setTextFileTooLarge(null)
+    setTextLoading(false)
 
     if (!shouldLoadTextContent || !artifact.path) {
-      return;
+      return
     }
 
-    const artifactPath = artifact.path;
+    const artifactPath = artifact.path
 
-    let active = true;
+    let active = true
     const loadTextContent = async () => {
-      setTextLoading(true);
-      setTextError(null);
-      setTextFileTooLarge(null);
+      setTextLoading(true)
+      setTextError(null)
+      setTextFileTooLarge(null)
       try {
         if (!isRemoteUrl(artifactPath)) {
-          const fileInfo = await fs.stat(artifactPath);
+          const fileInfo = await fs.stat(artifactPath)
           if (fileInfo.size > MAX_PREVIEW_SIZE) {
             if (active) {
-              setTextFileTooLarge(fileInfo.size);
+              setTextFileTooLarge(fileInfo.size)
             }
-            return;
+            return
           }
-          const content = await fs.readTextFile(artifactPath);
+          const content = await fs.readTextFile(artifactPath)
           if (active) {
-            setTextContent(content);
+            setTextContent(content)
           }
-          return;
+          return
         }
 
-        const url = artifactPath.startsWith('//')
-          ? `https:${artifactPath}`
-          : artifactPath;
-        const response = await fetch(url);
+        const url = artifactPath.startsWith('//') ? `https:${artifactPath}` : artifactPath
+        const response = await fetch(url)
         if (!response.ok) {
-          throw new Error(
-            `Failed to fetch file: ${response.status} ${response.statusText}`
-          );
+          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`)
         }
-        const content = await response.text();
+        const content = await response.text()
         if (active) {
-          setTextContent(content);
+          setTextContent(content)
         }
       } catch (error) {
         if (active) {
-          setTextError(error instanceof Error ? error.message : String(error));
+          setTextError(error instanceof Error ? error.message : String(error))
         }
       } finally {
         if (active) {
-          setTextLoading(false);
+          setTextLoading(false)
         }
       }
-    };
+    }
 
-    void loadTextContent();
+    void loadTextContent()
 
     return () => {
-      active = false;
-    };
-  }, [artifact, shouldLoadTextContent, textReloadToken]);
+      active = false
+    }
+  }, [artifact, shouldLoadTextContent, textReloadToken])
 
-  const resolvedContent = artifact?.content ?? textContent;
+  const resolvedContent = artifact?.content ?? textContent
 
   const previewArtifact = useMemo(() => {
-    if (!artifact) return null;
-    const mergedFileTooLarge = Boolean(artifact.fileTooLarge || textFileTooLarge);
-    const mergedFileSize = artifact.fileSize ?? textFileTooLarge ?? undefined;
+    if (!artifact) return null
+    const mergedFileTooLarge = Boolean(artifact.fileTooLarge || textFileTooLarge)
+    const mergedFileSize = artifact.fileSize ?? textFileTooLarge ?? undefined
     return {
       ...artifact,
       content: resolvedContent ?? undefined,
       fileTooLarge: mergedFileTooLarge,
-      fileSize: mergedFileSize,
-    };
-  }, [artifact, resolvedContent, textFileTooLarge]);
+      fileSize: mergedFileSize
+    }
+  }, [artifact, resolvedContent, textFileTooLarge])
 
   // Reset view mode and slide when artifact changes
   useEffect(() => {
     if (!artifact) {
-      setViewMode('preview');
-      setCurrentSlide(0);
-      return;
+      setViewMode('preview')
+      setCurrentSlide(0)
+      return
     }
 
     // For code-only types, default to code view
-    const codeOnlyTypes = ['code', 'jsx', 'css', 'json', 'text'];
+    const codeOnlyTypes = ['code', 'jsx', 'css', 'json', 'text']
     if (codeOnlyTypes.includes(artifact.type)) {
-      setViewMode('code');
+      setViewMode('code')
     } else {
-      setViewMode('preview');
+      setViewMode('preview')
     }
-    setCurrentSlide(0);
-  }, [artifact]);
+    setCurrentSlide(0)
+  }, [artifact])
 
   // Handle copy to clipboard
   const handleCopy = async () => {
-    if (!resolvedContent) return;
+    if (!resolvedContent) return
     try {
-      await navigator.clipboard.writeText(resolvedContent);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(resolvedContent)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     } catch (err) {
-      console.error('Failed to copy:', err);
+      console.error('Failed to copy:', err)
     }
-  };
+  }
 
   const handleCopyPath = async () => {
-    if (!artifact?.path) return;
+    if (!artifact?.path) return
     try {
-      await navigator.clipboard.writeText(artifact.path);
-      setCopiedPath(true);
-      setTimeout(() => setCopiedPath(false), 2000);
+      await navigator.clipboard.writeText(artifact.path)
+      setCopiedPath(true)
+      setTimeout(() => setCopiedPath(false), 2000)
     } catch (err) {
-      console.error('Failed to copy path:', err);
+      console.error('Failed to copy path:', err)
     }
-  };
+  }
 
   // Handle open in external app via API
   const handleOpenExternal = async () => {
-    if (!artifact) return;
+    if (!artifact) return
 
     if (artifact.path) {
       try {
         if (!window.api?.shell?.openPath) {
-          throw new Error('Shell IPC is unavailable');
+          throw new Error('Shell IPC is unavailable')
         }
-        await window.api.shell.openPath(artifact.path);
-        return;
+        await window.api.shell.openPath(artifact.path)
+        return
       } catch (err) {
-        console.error('[ArtifactPreview] Failed to open file:', err);
+        console.error('[ArtifactPreview] Failed to open file:', err)
       }
     }
 
     // Fallback for HTML content without path
     if (artifact.type === 'html' && artifact.content) {
-      const blob = new Blob([artifact.content], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      const blob = new Blob([artifact.content], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
     }
-  };
+  }
 
   // Check if artifact is a code file
   const isCodeFile = useMemo(() => {
-    if (!artifact) return false;
-    const codeTypes = ['code', 'jsx', 'css', 'json', 'text', 'markdown'];
-    if (codeTypes.includes(artifact.type)) return true;
-    const ext = getFileExtension(artifact.name);
+    if (!artifact) return false
+    const codeTypes = ['code', 'jsx', 'css', 'json', 'text', 'markdown']
+    if (codeTypes.includes(artifact.type)) return true
+    const ext = getFileExtension(artifact.name)
     const codeExtensions = [
       'js',
       'jsx',
@@ -316,19 +284,19 @@ export function ArtifactPreview({
       'scala',
       'php',
       'vue',
-      'svelte',
-    ];
-    return codeExtensions.includes(ext);
-  }, [artifact]);
+      'svelte'
+    ]
+    return codeExtensions.includes(ext)
+  }, [artifact])
 
   // Handle open in code editor via API
   const handleOpenInEditor = async () => {
-    if (!artifact?.path) return;
+    if (!artifact?.path) return
 
     try {
-      const settings = getSettings();
-      const editorType = settings.editor?.editorType ?? 'vscode';
-      const customCommand = settings.editor?.customCommand?.trim();
+      const settings = getSettings()
+      const editorType = settings.editor?.editorType ?? 'vscode'
+      const customCommand = settings.editor?.customCommand?.trim()
       const defaultCommandMap: Record<string, string> = {
         vscode: 'code',
         cursor: 'cursor',
@@ -336,127 +304,116 @@ export function ArtifactPreview({
         webstorm: 'webstorm',
         idea: 'idea',
         goland: 'goland',
-        xcode: 'xed',
-      };
-      let editorCommand: string | null = null;
+        xcode: 'xed'
+      }
+      let editorCommand: string | null = null
 
       if (editorType === 'custom') {
-        editorCommand = customCommand || 'code';
+        editorCommand = customCommand || 'code'
       } else {
-        editorCommand = defaultCommandMap[editorType] ?? 'code';
+        editorCommand = defaultCommandMap[editorType] ?? 'code'
       }
 
       if (editorCommand && window.api?.editor?.openProject) {
-        await window.api.editor.openProject(artifact.path, editorCommand);
-        return;
+        await window.api.editor.openProject(artifact.path, editorCommand)
+        return
       }
 
-      console.error('[ArtifactPreview] Editor API is unavailable.');
+      console.error('[ArtifactPreview] Editor API is unavailable.')
     } catch (err) {
-      console.error('[ArtifactPreview] Failed to open in editor:', err);
+      console.error('[ArtifactPreview] Failed to open in editor:', err)
     }
-  };
+  }
 
   // Generate iframe content for HTML with inlined assets
-  const shouldShowStaticPreview = viewMode === 'preview';
+  const shouldShowStaticPreview = viewMode === 'preview'
 
   const iframeSrc = useMemo(() => {
     // Only create blob URL when we need to show static preview
-    if (!shouldShowStaticPreview) return null;
-    if (!resolvedContent || artifact?.type !== 'html') return null;
+    if (!shouldShowStaticPreview) return null
+    if (!resolvedContent || artifact?.type !== 'html') return null
 
     const enhancedHtml =
-      allArtifacts.length > 0
-        ? inlineAssets(resolvedContent, allArtifacts)
-        : resolvedContent;
+      allArtifacts.length > 0 ? inlineAssets(resolvedContent, allArtifacts) : resolvedContent
 
-    const blob = new Blob([enhancedHtml], { type: 'text/html' });
-    return URL.createObjectURL(blob);
-  }, [
-    resolvedContent,
-    artifact?.type,
-    allArtifacts,
-    shouldShowStaticPreview,
-  ]);
+    const blob = new Blob([enhancedHtml], { type: 'text/html' })
+    return URL.createObjectURL(blob)
+  }, [resolvedContent, artifact?.type, allArtifacts, shouldShowStaticPreview])
 
   // Cleanup blob URL when it changes or on unmount
   useEffect(() => {
     return () => {
       if (iframeSrc) {
-        URL.revokeObjectURL(iframeSrc);
+        URL.revokeObjectURL(iframeSrc)
       }
-    };
-  }, [iframeSrc]);
+    }
+  }, [iframeSrc])
 
   // Parse CSV data
   const csvData = useMemo(() => {
     if (artifact?.type === 'csv' && resolvedContent) {
-      return parseCSV(resolvedContent);
+      return parseCSV(resolvedContent)
     }
     if (artifact?.data) {
-      return artifact.data;
+      return artifact.data
     }
-    return null;
-  }, [artifact?.type, resolvedContent, artifact?.data]);
+    return null
+  }, [artifact?.type, resolvedContent, artifact?.data])
 
   // Get slides for presentation
   const slides = useMemo(() => {
     if (artifact?.type === 'presentation' && artifact.slides) {
-      return artifact.slides;
+      return artifact.slides
     }
-    return null;
-  }, [artifact?.type, artifact?.slides]);
+    return null
+  }, [artifact?.type, artifact?.slides])
 
   // Get open with app info
-  const openWithApp = artifact ? getOpenWithApp(artifact) : null;
+  const openWithApp = artifact ? getOpenWithApp(artifact) : null
 
   // Check if preview is available
   const hasPreview = useMemo(() => {
-    if (!artifact) return false;
+    if (!artifact) return false
     switch (artifact.type) {
       case 'html':
-        return Boolean(resolvedContent || shouldLoadTextContent);
+        return Boolean(resolvedContent || shouldLoadTextContent)
       case 'image':
-        return !!artifact.content || !!artifact.path;
+        return !!artifact.content || !!artifact.path
       case 'markdown':
-        return Boolean(resolvedContent || shouldLoadTextContent);
+        return Boolean(resolvedContent || shouldLoadTextContent)
       case 'csv':
-        return Boolean(csvData || shouldLoadTextContent);
+        return Boolean(csvData || shouldLoadTextContent)
       case 'spreadsheet':
-        return !!artifact.path;
+        return !!artifact.path
       case 'presentation':
-        return !!artifact.path || !!slides;
+        return !!artifact.path || !!slides
       case 'pdf':
-        return !!artifact.content || !!artifact.path;
+        return !!artifact.content || !!artifact.path
       case 'audio':
-        return !!artifact.content || !!artifact.path;
+        return !!artifact.content || !!artifact.path
       case 'video':
-        return !!artifact.content || !!artifact.path;
+        return !!artifact.content || !!artifact.path
       case 'font':
-        return !!artifact.path;
+        return !!artifact.path
       case 'document':
-        return !!artifact.path;
+        return !!artifact.path
       case 'websearch':
-        return !!artifact.content;
+        return !!artifact.content
       default:
-        return false;
+        return false
     }
-  }, [artifact, csvData, slides, resolvedContent, shouldLoadTextContent]);
+  }, [artifact, csvData, slides, resolvedContent, shouldLoadTextContent])
 
   // Check if code view is available
   const hasCodeView = useMemo(() => {
-    if (!artifact) return false;
-    if (
-      ['image', 'pdf', 'document', 'spreadsheet', 'presentation'].includes(
-        artifact.type
-      )
-    ) {
-      return false;
+    if (!artifact) return false
+    if (['image', 'pdf', 'document', 'spreadsheet', 'presentation'].includes(artifact.type)) {
+      return false
     }
-    if (resolvedContent) return true;
-    if (shouldLoadTextContent) return true;
-    return false;
-  }, [artifact, resolvedContent, shouldLoadTextContent]);
+    if (resolvedContent) return true
+    if (shouldLoadTextContent) return true
+    return false
+  }, [artifact, resolvedContent, shouldLoadTextContent])
 
   // Empty state
   if (!artifact) {
@@ -470,27 +427,23 @@ export function ArtifactPreview({
             <h3 className="text-muted-foreground text-sm font-medium">
               {t.preview.noArtifactSelected}
             </h3>
-            <p className="text-muted-foreground/70 mt-1 text-xs">
-              {t.preview.selectArtifactHint}
-            </p>
+            <p className="text-muted-foreground/70 mt-1 text-xs">{t.preview.selectArtifactHint}</p>
           </div>
         </div>
       </div>
-    );
+    )
   }
 
-  const showTextLoading = shouldLoadTextContent && textLoading && !resolvedContent;
-  const showTextTooLarge = shouldLoadTextContent && textFileTooLarge !== null;
-  const showTextError = shouldLoadTextContent && Boolean(textError) && !resolvedContent;
+  const showTextLoading = shouldLoadTextContent && textLoading && !resolvedContent
+  const showTextTooLarge = shouldLoadTextContent && textFileTooLarge !== null
+  const showTextError = shouldLoadTextContent && Boolean(textError) && !resolvedContent
 
   const renderTextLoading = () => (
     <div className="bg-muted/20 flex h-full flex-col items-center justify-center p-8">
       <Loader2 className="text-muted-foreground size-8 animate-spin" />
-      <p className="text-muted-foreground mt-4 text-sm">
-        {t.preview.loadingFile}
-      </p>
+      <p className="text-muted-foreground mt-4 text-sm">{t.preview.loadingFile}</p>
     </div>
-  );
+  )
 
   const renderTextError = () => (
     <div className="bg-muted/20 flex h-full flex-col items-center justify-center p-8">
@@ -498,9 +451,7 @@ export function ArtifactPreview({
         <div className="border-border bg-background mb-4 flex size-20 items-center justify-center rounded-xl border">
           <FileText className="size-10 text-red-500" />
         </div>
-        <h3 className="text-foreground mb-2 text-lg font-medium">
-          {t.preview.fileLoadError}
-        </h3>
+        <h3 className="text-foreground mb-2 text-lg font-medium">{t.preview.fileLoadError}</h3>
         {textError && (
           <p className="text-muted-foreground mb-6 text-sm break-all whitespace-pre-wrap">
             {textError}
@@ -514,21 +465,14 @@ export function ArtifactPreview({
         </button>
       </div>
     </div>
-  );
+  )
 
   return (
-    <div
-      className={cn(
-        'bg-background flex h-full flex-col',
-        isFullscreen && 'fixed inset-0 z-50'
-      )}
-    >
+    <div className={cn('bg-background flex h-full flex-col', isFullscreen && 'fixed inset-0 z-50')}>
       {/* Header */}
       <div className="border-border/50 bg-muted/30 flex shrink-0 items-center justify-between border-b px-4 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-foreground truncate text-sm font-medium">
-            {artifact.name}
-          </span>
+          <span className="text-foreground truncate text-sm font-medium">{artifact.name}</span>
           <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase">
             {getFileExtension(artifact.name) || artifact.type}
           </span>
@@ -598,11 +542,7 @@ export function ArtifactPreview({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p>
-                  {isFullscreen
-                    ? t.preview.exitFullscreen
-                    : t.preview.fullscreen}
-                </p>
+                <p>{isFullscreen ? t.preview.exitFullscreen : t.preview.fullscreen}</p>
               </TooltipContent>
             </Tooltip>
 
@@ -727,7 +667,7 @@ export function ArtifactPreview({
         )}
       </div>
     </div>
-  );
+  )
 }
 
 // Preview content component
@@ -738,30 +678,30 @@ function PreviewContent({
   csvData,
   slides,
   currentSlide,
-  onSlideChange,
+  onSlideChange
 }: {
-  artifact: Artifact;
-  iframeSrc: string | null;
-  iframeRef: React.RefObject<HTMLIFrameElement | null>;
-  csvData: string[][] | null;
-  slides: string[] | null;
-  currentSlide: number;
-  onSlideChange: (slide: number) => void;
+  artifact: Artifact
+  iframeSrc: string | null
+  iframeRef: React.RefObject<HTMLIFrameElement | null>
+  csvData: string[][] | null
+  slides: string[] | null
+  currentSlide: number
+  onSlideChange: (slide: number) => void
 }) {
-  const { t } = useLanguage();
+  const { t } = useLanguage()
 
   // Open file in system application
   const handleOpenExternal = async () => {
-    if (!artifact.path) return;
+    if (!artifact.path) return
     try {
       if (!window.api?.shell?.openPath) {
-        throw new Error('Shell IPC is unavailable');
+        throw new Error('Shell IPC is unavailable')
       }
-      await window.api.shell.openPath(artifact.path);
+      await window.api.shell.openPath(artifact.path)
     } catch (err) {
-      console.error('[Preview] Error opening file:', err);
+      console.error('[Preview] Error opening file:', err)
     }
-  };
+  }
 
   // File too large
   if (artifact.fileTooLarge && artifact.fileSize) {
@@ -772,7 +712,7 @@ function PreviewContent({
         icon={FileText}
         onOpenExternal={handleOpenExternal}
       />
-    );
+    )
   }
 
   // HTML Preview
@@ -787,20 +727,18 @@ function PreviewContent({
           title={artifact.name}
         />
       </div>
-    );
+    )
   }
 
   // Image Preview
   if (artifact.type === 'image') {
-    return <ImagePreview artifact={artifact} />;
+    return <ImagePreview artifact={artifact} />
   }
 
   // Markdown Preview
   if (artifact.type === 'markdown' && artifact.content) {
     // Parse YAML frontmatter and content
-    const { frontmatter, content: markdownContent } = parseFrontmatter(
-      artifact.content
-    );
+    const { frontmatter, content: markdownContent } = parseFrontmatter(artifact.content)
     return (
       <div className="bg-background h-full overflow-auto">
         <div className="max-w-none p-6">
@@ -810,10 +748,7 @@ function PreviewContent({
               <table className="w-full text-sm">
                 <tbody>
                   {Object.entries(frontmatter).map(([key, value]) => (
-                    <tr
-                      key={key}
-                      className="border-border/30 border-b last:border-b-0"
-                    >
+                    <tr key={key} className="border-border/30 border-b last:border-b-0">
                       <td className="bg-muted/30 text-muted-foreground w-32 px-4 py-2 align-top font-medium">
                         {key}
                       </td>
@@ -828,13 +763,11 @@ function PreviewContent({
           )}
           {/* Markdown Content */}
           <div className="prose prose-sm dark:prose-invert prose-h1:text-xl prose-h1:font-semibold prose-h2:text-lg prose-h2:font-semibold max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {markdownContent}
-            </ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownContent}</ReactMarkdown>
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   // CSV Preview
@@ -860,10 +793,7 @@ function PreviewContent({
             {csvData.slice(1).map((row, rowIndex) => (
               <tr key={rowIndex} className="hover:bg-muted/50">
                 {row.map((cell, cellIndex) => (
-                  <td
-                    key={cellIndex}
-                    className="border-border text-foreground border px-3 py-2"
-                  >
+                  <td key={cellIndex} className="border-border text-foreground border px-3 py-2">
                     {cell}
                   </td>
                 ))}
@@ -872,22 +802,22 @@ function PreviewContent({
           </tbody>
         </table>
       </div>
-    );
+    )
   }
 
   // Excel Preview
   if (artifact.type === 'spreadsheet' && artifact.path) {
-    return <ExcelPreview artifact={artifact} />;
+    return <ExcelPreview artifact={artifact} />
   }
 
   // PPTX Preview
   if (artifact.type === 'presentation' && artifact.path) {
-    return <PptxPreview artifact={artifact} />;
+    return <PptxPreview artifact={artifact} />
   }
 
   // DOCX Preview
   if (artifact.type === 'document' && artifact.path) {
-    return <DocxPreview artifact={artifact} />;
+    return <DocxPreview artifact={artifact} />
   }
 
   // Legacy presentation preview (slides from artifact.slides)
@@ -959,32 +889,32 @@ function PreviewContent({
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   // PDF Preview
   if (artifact.type === 'pdf') {
-    return <PdfPreview artifact={artifact} />;
+    return <PdfPreview artifact={artifact} />
   }
 
   // Audio Preview
   if (artifact.type === 'audio') {
-    return <AudioPreview artifact={artifact} />;
+    return <AudioPreview artifact={artifact} />
   }
 
   // Video Preview
   if (artifact.type === 'video') {
-    return <VideoPreview artifact={artifact} />;
+    return <VideoPreview artifact={artifact} />
   }
 
   // Font Preview
   if (artifact.type === 'font') {
-    return <FontPreview artifact={artifact} />;
+    return <FontPreview artifact={artifact} />
   }
 
   // WebSearch Preview
   if (artifact.type === 'websearch') {
-    return <WebSearchPreview artifact={artifact} />;
+    return <WebSearchPreview artifact={artifact} />
   }
 
   // Document Preview (fallback)
@@ -995,15 +925,11 @@ function PreviewContent({
           <div className="border-border bg-background mb-4 flex size-20 items-center justify-center rounded-xl border">
             <FileText className="size-10 text-blue-500" />
           </div>
-          <h3 className="text-foreground mb-2 text-lg font-medium">
-            {artifact.name}
-          </h3>
-          <p className="text-muted-foreground text-sm">
-            {t.preview.documentHint}
-          </p>
+          <h3 className="text-foreground mb-2 text-lg font-medium">{artifact.name}</h3>
+          <p className="text-muted-foreground text-sm">{t.preview.documentHint}</p>
         </div>
       </div>
-    );
+    )
   }
 
   // Default: show prompt to switch to code view
@@ -1016,10 +942,8 @@ function PreviewContent({
         <h3 className="text-muted-foreground text-sm font-medium">
           {t.preview.previewNotAvailable}
         </h3>
-        <p className="text-muted-foreground/70 mt-1 text-xs">
-          {t.preview.switchToCodeHint}
-        </p>
+        <p className="text-muted-foreground/70 mt-1 text-xs">{t.preview.switchToCodeHint}</p>
       </div>
     </div>
-  );
+  )
 }

@@ -6,9 +6,11 @@ import { GeminiCliAdapter } from './adapters/GeminiCliAdapter'
 import { CodexCliAdapter } from './adapters/CodexCliAdapter'
 import { OpencodeAdapter } from './adapters/OpencodeAdapter'
 import { MsgStoreService } from '../MsgStoreService'
+import { AgentToolProfileService } from '../AgentToolProfileService'
 import { AgentCLIToolConfigService } from '../AgentCLIToolConfigService'
 import { DatabaseService } from '../DatabaseService'
 import { SettingsService } from '../SettingsService'
+import { TaskNodeRuntimeService } from '../TaskNodeRuntimeService'
 import { LogMsg, NormalizedEntry } from '../../types/log'
 import { normalizeCliToolConfig } from '../../../shared/agent-cli-config-spec'
 import { isCliToolEnabled } from '../../../shared/agent-cli-tool-enablement'
@@ -51,17 +53,23 @@ export class CliSessionService extends EventEmitter {
   private pendingMsgStores: Map<string, MsgStoreService> = new Map()
   private adapters: Map<string, CliAdapter> = new Map()
   private configService: AgentCLIToolConfigService
+  private agentToolProfileService: AgentToolProfileService
   private databaseService: DatabaseService
+  private taskNodeRuntimeService: TaskNodeRuntimeService
   private settingsService: SettingsService
 
   constructor(
     configService: AgentCLIToolConfigService,
+    agentToolProfileService: AgentToolProfileService,
     databaseService: DatabaseService,
+    taskNodeRuntimeService: TaskNodeRuntimeService,
     settingsService: SettingsService
   ) {
     super()
     this.configService = configService
+    this.agentToolProfileService = agentToolProfileService
     this.databaseService = databaseService
+    this.taskNodeRuntimeService = taskNodeRuntimeService
     this.settingsService = settingsService
 
     this.registerAdapter(new ClaudeCodeAdapter(configService))
@@ -152,11 +160,11 @@ export class CliSessionService extends EventEmitter {
       throw new Error(`Unsupported CLI tool: ${toolId}`)
     }
 
-    const explicitTaskNode = taskNodeId ? this.databaseService.getTaskNode(taskNodeId) : null
+    const explicitTaskNode = taskNodeId ? this.taskNodeRuntimeService.getTaskNode(taskNodeId) : null
     let resolvedTaskId = taskId ?? explicitTaskNode?.task_id
     const taskNode =
       explicitTaskNode ??
-      (resolvedTaskId ? this.databaseService.getCurrentTaskNode(resolvedTaskId) : null)
+      (resolvedTaskId ? this.taskNodeRuntimeService.getCurrentTaskNode(resolvedTaskId) : null)
     if (!resolvedTaskId && taskNode) {
       resolvedTaskId = taskNode.task_id
     }
@@ -172,24 +180,16 @@ export class CliSessionService extends EventEmitter {
       resolvedConfigId = taskNode.agent_tool_config_id
     }
     if (!resolvedConfigId && resolvedTaskId) {
-      const currentNode = this.databaseService.getCurrentTaskNode(resolvedTaskId)
+      const currentNode = this.taskNodeRuntimeService.getCurrentTaskNode(resolvedTaskId)
       resolvedConfigId = currentNode?.agent_tool_config_id ?? null
     }
 
-    let profileConfig: Record<string, unknown> = {}
-    if (resolvedConfigId) {
-      const record = this.databaseService.getAgentToolConfig(resolvedConfigId)
-      if (record?.config_json) {
-        try {
-          const parsed = JSON.parse(record.config_json)
-          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            profileConfig = parsed as Record<string, unknown>
-          }
-        } catch (error) {
-          console.error('[CliSessionService] Failed to parse agent tool config:', error)
-        }
-      }
-    }
+    const profileConfig =
+      this.agentToolProfileService.resolveConfigForTool(
+        toolId,
+        resolvedConfigId,
+        'CLI session start'
+      ) ?? {}
 
     const toolConfig = this.sanitizeToolConfig(toolId, {
       ...normalizedBase,
@@ -287,9 +287,9 @@ export class CliSessionService extends EventEmitter {
       if (!resolvedTaskNodeId) return
       const normalized = resumeId.trim()
       if (!normalized) return
-      const latestNode = this.databaseService.getTaskNode(resolvedTaskNodeId)
+      const latestNode = this.taskNodeRuntimeService.getTaskNode(resolvedTaskNodeId)
       if (latestNode?.resume_session_id === normalized) return
-      this.databaseService.updateTaskNodeResumeSessionId(resolvedTaskNodeId, normalized)
+      this.taskNodeRuntimeService.updateTaskNodeResumeSessionId(resolvedTaskNodeId, normalized)
     }
 
     const handle = await adapter.startSession({
@@ -319,7 +319,7 @@ export class CliSessionService extends EventEmitter {
     })
 
     if (resolvedTaskNodeId) {
-      this.databaseService.updateTaskNodeSession(resolvedTaskNodeId, sessionId)
+      this.taskNodeRuntimeService.updateTaskNodeSession(resolvedTaskNodeId, sessionId)
     }
 
     if (pendingMsgStore) {
@@ -342,12 +342,12 @@ export class CliSessionService extends EventEmitter {
 
       if (sessionRecord?.taskNodeId) {
         if (data.code === 0) {
-          this.databaseService.completeTaskNode(sessionRecord.taskNodeId, {
+          this.taskNodeRuntimeService.completeTaskNode(sessionRecord.taskNodeId, {
             sessionId: data.sessionId,
             duration: durationSeconds
           })
         } else if (typeof data.code === 'number') {
-          this.databaseService.markTaskNodeErrorReview(
+          this.taskNodeRuntimeService.markTaskNodeErrorReview(
             sessionRecord.taskNodeId,
             `CLI exited with code ${data.code}`
           )
@@ -366,7 +366,7 @@ export class CliSessionService extends EventEmitter {
       const sessionRecord = this.sessions.get(data.sessionId)
       const errorMessage = data.error instanceof Error ? data.error.message : data.error
       if (sessionRecord?.taskNodeId) {
-        this.databaseService.markTaskNodeErrorReview(sessionRecord.taskNodeId, errorMessage)
+        this.taskNodeRuntimeService.markTaskNodeErrorReview(sessionRecord.taskNodeId, errorMessage)
       }
       this.emit('error', {
         ...data,
@@ -482,7 +482,7 @@ export class CliSessionService extends EventEmitter {
 
     const task = this.databaseService.getTask(taskId)
     const resolvedTaskNodeId =
-      taskNodeId ?? this.databaseService.getCurrentTaskNode(taskId)?.id ?? null
+      taskNodeId ?? this.taskNodeRuntimeService.getCurrentTaskNode(taskId)?.id ?? null
 
     return MsgStoreService.loadFromFile(taskId, resolvedTaskNodeId, task?.project_id)
   }
@@ -623,11 +623,11 @@ export class CliSessionService extends EventEmitter {
   }
 
   private reconcileInProgressNodes(): void {
-    const inProgressNodes = this.databaseService.getInProgressTaskNodes()
+    const inProgressNodes = this.taskNodeRuntimeService.getInProgressTaskNodes()
     for (const node of inProgressNodes) {
       const hasRunningSession = node.session_id ? this.sessions.has(node.session_id) : false
       if (!hasRunningSession) {
-        this.databaseService.markTaskNodeErrorReview(
+        this.taskNodeRuntimeService.markTaskNodeErrorReview(
           node.id,
           node.error_message || 'session_not_running_after_restart'
         )

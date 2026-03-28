@@ -5,7 +5,7 @@ import { buildSettingsRoute } from '@features/settings'
 import { Button } from '@/components/ui/button'
 import { EmptyStatePanel, PageBody, PageFrame, PageHeader } from '@/components/shared/page-shell'
 import { db, type WorkflowDefinition, type WorkflowDefinitionScope } from '@/data'
-import { useProjects } from '@/hooks/useProjects'
+import { useProjects } from '@features/projects'
 import { useLanguage } from '@/providers/language-provider'
 
 import {

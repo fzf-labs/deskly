@@ -2,11 +2,16 @@ import { Terminal } from 'lucide-react'
 import type { RefObject } from 'react'
 
 import { cn } from '@/lib/utils'
-import { MessageList, RunningIndicator } from '@/components/task'
-import type { AgentMessage, AgentPhase } from '@/hooks/useAgent'
-import { CLISession, type CLISessionHandle } from '@features/cli-session'
+import {
+  CLISession,
+  type AgentMessage,
+  type AgentPhase,
+  type CLISessionHandle
+} from '@features/cli-session'
 
 import type { LanguageStrings } from '../types'
+import { MessageList } from './MessageList'
+import { RunningIndicator } from './RunningIndicator'
 
 interface ExecutionPanelProps {
   t: LanguageStrings

@@ -3,8 +3,14 @@ import type { TaskService } from '../services/TaskService'
 import type { TaskStatus } from '../types/task'
 import { IPC_CHANNELS } from './channels'
 
-export const registerTaskIpc = ({ handle, v, services, taskStatusValues }: IpcModuleContext): void => {
-  const { taskService, databaseService } = services
+export const registerTaskIpc = ({
+  handle,
+  v,
+  services,
+  taskStatusValues
+}: IpcModuleContext): void => {
+  const { taskService, databaseService, taskNodeRuntimeService, workflowRunLifecycleService } =
+    services
 
   handle(
     IPC_CHANNELS.task.create,
@@ -41,18 +47,22 @@ export const registerTaskIpc = ({ handle, v, services, taskStatusValues }: IpcMo
     taskService.updateTaskStatus(id, status as TaskStatus)
   )
 
-  handle(IPC_CHANNELS.task.delete, [v.string(), v.optional(v.boolean())], async (_, id, removeWorktree) => {
-    return await taskService.deleteTask(id, removeWorktree)
-  })
+  handle(
+    IPC_CHANNELS.task.delete,
+    [v.string(), v.optional(v.boolean())],
+    async (_, id, removeWorktree) => {
+      return await taskService.deleteTask(id, removeWorktree)
+    }
+  )
 
   handle(IPC_CHANNELS.task.startExecution, [v.string()], async (_, taskId) => {
     const task = taskService.getTask(taskId)
     if (task?.taskMode === 'workflow') {
       const workflowRun = databaseService.getWorkflowRunByTask(taskId)
       if (!workflowRun) return null
-      return await databaseService.startWorkflowRun(workflowRun.id)
+      return await workflowRunLifecycleService.startRun(workflowRun.id)
     }
-    return databaseService.startTaskExecution(taskId)
+    return taskNodeRuntimeService.startTaskExecution(taskId)
   })
 
   handle(IPC_CHANNELS.task.stopExecution, [v.string()], async (_, taskId) => {
@@ -60,8 +70,8 @@ export const registerTaskIpc = ({ handle, v, services, taskStatusValues }: IpcMo
     if (task?.taskMode === 'workflow') {
       const workflowRun = databaseService.getWorkflowRunByTask(taskId)
       if (!workflowRun) return null
-      return await databaseService.stopWorkflowRun(workflowRun.id)
+      return await workflowRunLifecycleService.stopRun(workflowRun.id)
     }
-    return databaseService.stopTaskExecution(taskId)
+    return taskNodeRuntimeService.stopTaskExecution(taskId)
   })
 }

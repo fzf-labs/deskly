@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 
-import type { LogMsg } from '@/hooks/useLogStream'
+import type { LogMsg } from '../../hooks'
 
 import { CodexErrorBlock } from './CodexErrorBlock'
 import { CodexMarkdownBlock } from './CodexMarkdownBlock'

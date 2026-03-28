@@ -3,7 +3,7 @@ import type { DatabaseService } from '../services/DatabaseService'
 import { IPC_CHANNELS } from './channels'
 
 export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): void => {
-  const { databaseService } = services
+  const { aiAuthoringService, databaseService, workflowRunLifecycleService } = services
 
   handle(
     IPC_CHANNELS.workflow.listDefinitions,
@@ -37,8 +37,8 @@ export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): 
       })
     ],
     async (_, input) =>
-      await databaseService.generateWorkflowDefinition(
-        input as unknown as Parameters<DatabaseService['generateWorkflowDefinition']>[0]
+      await aiAuthoringService.generateWorkflowDefinition(
+        input as unknown as Parameters<typeof aiAuthoringService.generateWorkflowDefinition>[0]
       )
   )
 
@@ -88,7 +88,7 @@ export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): 
   handle(
     IPC_CHANNELS.workflow.startRun,
     [v.string()],
-    async (_, runId) => await databaseService.startWorkflowRun(runId)
+    async (_, runId) => await workflowRunLifecycleService.startRun(runId)
   )
 
   handle(
@@ -103,16 +103,16 @@ export const registerWorkflowIpc = ({ handle, v, services }: IpcModuleContext): 
         })
       )
     ],
-    (_, nodeId, input) => databaseService.approveWorkflowRunNode(nodeId, input ?? undefined)
+    (_, nodeId, input) => workflowRunLifecycleService.approveNode(nodeId, input ?? undefined)
   )
 
   handle(IPC_CHANNELS.workflow.retryNode, [v.string()], (_, nodeId) =>
-    databaseService.retryWorkflowRunNode(nodeId)
+    workflowRunLifecycleService.retryNode(nodeId)
   )
 
   handle(
     IPC_CHANNELS.workflow.stopRun,
     [v.string()],
-    async (_, runId) => await databaseService.stopWorkflowRun(runId)
+    async (_, runId) => await workflowRunLifecycleService.stopRun(runId)
   )
 }

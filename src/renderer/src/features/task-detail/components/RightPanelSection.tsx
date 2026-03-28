@@ -1,6 +1,7 @@
 import { ArtifactPreview, type Artifact } from '@features/artifacts'
-import { RightPanel } from '@/components/task'
-import type { RightPanelTab } from '@/components/task/RightPanel'
+
+import type { RightPanelTab } from '../model/right-panel'
+import { RightPanel } from './RightPanel'
 
 interface RightPanelSectionProps {
   isVisible: boolean

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ChevronDown } from 'lucide-react';
-import type { AgentMessage } from '@/hooks/useAgent';
+import type { AgentMessage } from '@features/cli-session';
 import { useLanguage } from '@/providers/language-provider';
 import { cn } from '@/lib/utils';
 import { ToolExecutionItem } from '@/components/task/ToolExecutionItem';

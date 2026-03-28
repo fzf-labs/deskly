@@ -9,9 +9,13 @@ import type { EditorService } from '../services/EditorService'
 import type { PreviewConfigService } from '../services/PreviewConfigService'
 import type { PreviewService } from '../services/PreviewService'
 import type { NotificationService } from '../services/NotificationService'
+import type { AgentToolProfileService } from '../services/AgentToolProfileService'
+import type { AiAuthoringService } from '../services/AiAuthoringService'
 import type { DatabaseService } from '../services/DatabaseService'
 import type { SettingsService } from '../services/SettingsService'
 import type { TaskService } from '../services/TaskService'
+import type { TaskNodeRuntimeService } from '../services/TaskNodeRuntimeService'
+import type { WorkflowRunLifecycleService } from '../services/WorkflowRunLifecycleService'
 import type { CliSessionService } from '../services/cli/CliSessionService'
 import type { TerminalService } from '../services/terminal/TerminalService'
 import type { AutomationService } from '../services/AutomationService'
@@ -30,9 +34,13 @@ export interface IpcServices {
   previewConfigService: PreviewConfigService
   previewService: PreviewService
   notificationService: NotificationService
+  agentToolProfileService: AgentToolProfileService
+  aiAuthoringService: AiAuthoringService
   databaseService: DatabaseService
   settingsService: SettingsService
   taskService: TaskService
+  taskNodeRuntimeService: TaskNodeRuntimeService
+  workflowRunLifecycleService: WorkflowRunLifecycleService
   cliSessionService: CliSessionService
   terminalService: TerminalService
   automationService: AutomationService
@@ -48,7 +56,10 @@ export interface IpcHelpers {
   handle: <C extends IpcContractChannel>(
     channel: C,
     validators: ReadonlyArray<Validator<unknown>>,
-    handler: (event: IpcMainInvokeEvent, ...args: IpcArgs<C>) => Promise<IpcResult<C>> | IpcResult<C>
+    handler: (
+      event: IpcMainInvokeEvent,
+      ...args: IpcArgs<C>
+    ) => Promise<IpcResult<C>> | IpcResult<C>
   ) => void
   v: typeof import('../utils/ipc-response').v
   fileDataValidator: Validator<Uint8Array | string>

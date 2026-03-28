@@ -7,20 +7,21 @@ import {
   type Settings as SettingsType
 } from '@/data/settings'
 import { cn } from '@/lib/utils'
-import { AboutSettings } from '@/components/settings/tabs/AboutSettings'
-import { AccountSettings } from '@/components/settings/tabs/AccountSettings'
-import { AgentCLISettings } from '@/components/settings/tabs/AgentCLISettings'
-import { CLIToolsSettings } from '@/components/settings/tabs/CLIToolsSettings'
-import { DataSettings } from '@/components/settings/tabs/DataSettings'
-import { EditorSettings } from '@/components/settings/tabs/EditorSettings'
-import { GeneralSettings } from '@/components/settings/tabs/GeneralSettings'
-import { GitSettings } from '@/components/settings/tabs/GitSettings'
-import { MCPSettings } from '@/components/settings/tabs/MCPSettings'
-import { NotificationSettings } from '@/components/settings/tabs/NotificationSettings'
-import { ProjectsSettings } from '@/components/settings/tabs/ProjectsSettings'
-import { SkillsSettings } from '@/components/settings/tabs/SkillsSettings'
-import { SoundSettings } from '@/components/settings/tabs/SoundSettings'
-import { WorkflowTemplatesSettings } from '@/components/settings/tabs/WorkflowTemplatesSettings'
+
+import { AboutSettings } from '../tabs/AboutSettings'
+import { AccountSettings } from '../tabs/AccountSettings'
+import { AgentCLISettings } from '../tabs/AgentCLISettings'
+import { CLIToolsSettings } from '../tabs/CLIToolsSettings'
+import { DataSettings } from '../tabs/DataSettings'
+import { EditorSettings } from '../tabs/EditorSettings'
+import { GeneralSettings } from '../tabs/GeneralSettings'
+import { GitSettings } from '../tabs/GitSettings'
+import { MCPSettings } from '../tabs/MCPSettings'
+import { NotificationSettings } from '../tabs/NotificationSettings'
+import { ProjectsSettings } from '../tabs/ProjectsSettings'
+import { SkillsSettings } from '../tabs/SkillsSettings'
+import { SoundSettings } from '../tabs/SoundSettings'
+import { WorkflowTemplatesSettings } from '../tabs/WorkflowTemplatesSettings'
 
 import type { SettingsCategory } from '../types'
 
@@ -29,10 +30,7 @@ interface SettingsContentProps {
   className?: string
 }
 
-export function SettingsContent({
-  activeCategory,
-  className
-}: SettingsContentProps) {
+export function SettingsContent({ activeCategory, className }: SettingsContentProps) {
   const [settings, setSettings] = useState<SettingsType>(getSettings)
 
   useEffect(() => {

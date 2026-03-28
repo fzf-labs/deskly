@@ -1,5 +1,5 @@
 import { Clock, GitBranch } from 'lucide-react'
-import type { DashboardActivityItem } from '@/hooks/useDashboardData'
+import type { DashboardActivityItem } from '@features/home'
 import type { TaskStatus } from '@/data/types'
 import { cn } from '@/lib/utils'
 

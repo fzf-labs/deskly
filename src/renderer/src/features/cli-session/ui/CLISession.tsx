@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useImperativeHandle, useRef, forwardRef } from 'react'
-import type { LogMsg } from '@/hooks/useLogStream'
-import { useLogStream } from '@/hooks/useLogStream'
+import { useLogStream, type LogMsg } from '../hooks'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Play, Square } from 'lucide-react'

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PROJECT_SETTINGS_ROUTE } from '@features/settings';
-import { useProjects } from '@/hooks/useProjects';
+import { useProjects } from '@features/projects';
 
 interface ProjectGuardProps {
   children: ReactNode;

@@ -13,12 +13,11 @@ import { WorkflowDefinitionGenerationService } from './WorkflowDefinitionGenerat
 import { WorkflowDefinitionService } from './WorkflowDefinitionService'
 import { WorkflowRunService } from './WorkflowRunService'
 import { PromptOptimizationService } from './PromptOptimizationService'
-import { buildConversationWorkflowDefinition } from './workflow-definition-utils'
+import { AgentToolProfileService } from './AgentToolProfileService'
+import { WorkflowRunLifecycleService } from './WorkflowRunLifecycleService'
+import { AiAuthoringService } from './AiAuthoringService'
+import { TaskNodeRuntimeService } from './TaskNodeRuntimeService'
 import type { WorkflowSchedulerService } from './WorkflowSchedulerService'
-import type { CliSessionService } from './cli/CliSessionService'
-import type { AgentCLIToolDetectorService } from './AgentCLIToolDetectorService'
-import type { SettingsService } from './SettingsService'
-import { getWorkflowCurrentNodeId, getWorkflowNodeOrderMap } from './workflow-graph'
 import type { CreateProjectInput, Project, UpdateProjectInput } from '../types/project'
 import type {
   CreateTaskInput,
@@ -42,14 +41,8 @@ import type {
   UpdateWorkflowDefinitionInput,
   WorkflowDefinition
 } from '../types/workflow-definition'
-import type {
-  OptimizePromptInput,
-  OptimizePromptResult
-} from '../types/prompt-optimization'
+import type { OptimizePromptInput, OptimizePromptResult } from '../types/prompt-optimization'
 import type { WorkflowRun, WorkflowRunNode } from '../types/workflow-run'
-
-const TASK_NODE_STATUS_VALUES = ['todo', 'in_progress', 'in_review', 'done', 'failed'] as const
-type TaskNodeStatusValue = (typeof TASK_NODE_STATUS_VALUES)[number]
 
 export const composeTaskNodePrompt = (
   taskPrompt: string | null | undefined,
@@ -65,13 +58,6 @@ export const composeTaskNodePrompt = (
   return basePrompt || templatePrompt
 }
 
-export interface DatabaseRuntimeServices {
-  cliSessionService: CliSessionService
-  cliToolDetectorService: AgentCLIToolDetectorService
-  settingsService: SettingsService
-  workflowSchedulerService: WorkflowSchedulerService
-}
-
 export class DatabaseService {
   private db: Database.Database
   private connection: DatabaseConnection
@@ -79,13 +65,15 @@ export class DatabaseService {
   private projectRepo: ProjectRepository
   private workflowRunNodeRepo: WorkflowRunNodeRepository
   private agentToolConfigRepo: AgentToolConfigRepository
+  private agentToolProfileService: AgentToolProfileService
   private automationRepo: AutomationRepository
   private workflowDefinitionService: WorkflowDefinitionService
   private workflowDefinitionGenerationService: WorkflowDefinitionGenerationService
   private promptOptimizationService: PromptOptimizationService
+  private aiAuthoringService: AiAuthoringService
   private workflowRunService: WorkflowRunService
-  private workflowSchedulerService: WorkflowSchedulerService | null = null
-  private taskNodeStatusListeners: Array<(node: TaskNode) => void> = []
+  private workflowRunLifecycleService: WorkflowRunLifecycleService
+  private taskNodeRuntimeService: TaskNodeRuntimeService
   private dbPath: string
 
   constructor() {
@@ -104,10 +92,16 @@ export class DatabaseService {
     this.workflowRunNodeRepo = new WorkflowRunNodeRepository(this.db)
     const workflowRunReviewRepo = new WorkflowRunReviewRepository(this.db)
     this.agentToolConfigRepo = new AgentToolConfigRepository(this.db)
+    this.agentToolProfileService = new AgentToolProfileService(this.agentToolConfigRepo)
     this.automationRepo = new AutomationRepository(this.db)
     this.workflowDefinitionService = new WorkflowDefinitionService(workflowDefinitionRepo)
     this.workflowDefinitionGenerationService = new WorkflowDefinitionGenerationService()
     this.promptOptimizationService = new PromptOptimizationService()
+    this.aiAuthoringService = new AiAuthoringService(
+      this.workflowDefinitionGenerationService,
+      this.promptOptimizationService,
+      this.agentToolProfileService
+    )
     this.workflowRunService = new WorkflowRunService(
       this.taskRepo,
       workflowDefinitionRepo,
@@ -115,63 +109,57 @@ export class DatabaseService {
       this.workflowRunNodeRepo,
       workflowRunReviewRepo
     )
+    this.taskNodeRuntimeService = new TaskNodeRuntimeService(
+      this.taskRepo,
+      this.workflowRunService,
+      this.workflowRunNodeRepo
+    )
+    this.workflowRunLifecycleService = new WorkflowRunLifecycleService(
+      this.workflowRunService,
+      this.workflowRunNodeRepo,
+      {
+        getTaskNode: (nodeId) => this.taskNodeRuntimeService.getTaskNode(nodeId),
+        notifyTaskNodeStatusChange: (node) =>
+          this.taskNodeRuntimeService.notifyTaskNodeStatusChange(node)
+      }
+    )
   }
 
   onTaskNodeStatusChange(listener: (node: TaskNode) => void): () => void {
-    this.taskNodeStatusListeners.push(listener)
-    return () => {
-      this.taskNodeStatusListeners = this.taskNodeStatusListeners.filter(
-        (registered) => registered !== listener
-      )
-    }
+    return this.taskNodeRuntimeService.onTaskNodeStatusChange(listener)
   }
 
   setWorkflowSchedulerService(service: WorkflowSchedulerService): void {
-    this.workflowSchedulerService = service
+    this.taskNodeRuntimeService.setWorkflowSchedulerService(service)
+    this.workflowRunLifecycleService.setWorkflowSchedulerService(service)
   }
 
-  setRuntimeServices({
-    cliSessionService,
-    cliToolDetectorService,
-    settingsService,
-    workflowSchedulerService
-  }: DatabaseRuntimeServices): void {
-    this.setWorkflowGenerationRuntime(
-      cliSessionService,
-      cliToolDetectorService,
-      settingsService
-    )
-    this.setPromptOptimizationRuntime(
-      cliSessionService,
-      cliToolDetectorService,
-      settingsService
-    )
-    this.setWorkflowSchedulerService(workflowSchedulerService)
+  getAgentToolProfileService(): AgentToolProfileService {
+    return this.agentToolProfileService
   }
 
-  setWorkflowGenerationRuntime(
-    cliSessionService: CliSessionService,
-    cliToolDetectorService: AgentCLIToolDetectorService,
-    settingsService: SettingsService
-  ): void {
-    this.workflowDefinitionGenerationService.setCliRuntime(
-      cliSessionService,
-      cliToolDetectorService,
-      this.workflowDefinitionService,
-      settingsService
-    )
+  getWorkflowRunLifecycleService(): WorkflowRunLifecycleService {
+    return this.workflowRunLifecycleService
   }
 
-  setPromptOptimizationRuntime(
-    cliSessionService: CliSessionService,
-    cliToolDetectorService: AgentCLIToolDetectorService,
-    settingsService: SettingsService
-  ): void {
-    this.promptOptimizationService.setCliRuntime(
-      cliSessionService,
-      cliToolDetectorService,
-      settingsService
-    )
+  getTaskNodeRuntimeService(): TaskNodeRuntimeService {
+    return this.taskNodeRuntimeService
+  }
+
+  getWorkflowDefinitionService(): WorkflowDefinitionService {
+    return this.workflowDefinitionService
+  }
+
+  getWorkflowDefinitionGenerationService(): WorkflowDefinitionGenerationService {
+    return this.workflowDefinitionGenerationService
+  }
+
+  getPromptOptimizationService(): PromptOptimizationService {
+    return this.promptOptimizationService
+  }
+
+  getAiAuthoringService(): AiAuthoringService {
+    return this.aiAuthoringService
   }
 
   // ============ Task 操作 ============
@@ -201,41 +189,15 @@ export class DatabaseService {
   }
 
   getTaskNodes(taskId: string): TaskNode[] {
-    const workflowRun = this.workflowRunService.getRunByTask(taskId)
-    if (workflowRun) {
-      return this.mapWorkflowRunNodesToTaskNodes(
-        workflowRun,
-        this.workflowRunService.listRunNodes(workflowRun.id)
-      )
-    }
-    return []
+    return this.taskNodeRuntimeService.getTaskNodes(taskId)
   }
 
   getTaskNode(nodeId: string): TaskNode | null {
-    const workflowNode = this.workflowRunNodeRepo.getRunNode(nodeId)
-    if (!workflowNode) return null
-
-    const workflowRun = this.workflowRunService.getRun(workflowNode.workflow_run_id)
-    if (!workflowRun) return null
-
-    const orderMap = getWorkflowNodeOrderMap(workflowRun.definition_snapshot)
-    return this.mapWorkflowRunNodeToTaskNode(workflowRun.task_id, workflowNode, orderMap)
+    return this.taskNodeRuntimeService.getTaskNode(nodeId)
   }
 
   getCurrentTaskNode(taskId: string): TaskNode | null {
-    const workflowRun = this.workflowRunService.getRunByTask(taskId)
-    if (workflowRun) {
-      const nodes = this.workflowRunService.listRunNodes(workflowRun.id)
-      const currentNodeId = getWorkflowCurrentNodeId(workflowRun.definition_snapshot, nodes)
-      if (!currentNodeId) return null
-
-      const currentNode = nodes.find((node) => node.id === currentNodeId)
-      if (!currentNode) return null
-
-      const orderMap = getWorkflowNodeOrderMap(workflowRun.definition_snapshot)
-      return this.mapWorkflowRunNodeToTaskNode(taskId, currentNode, orderMap)
-    }
-    return null
+    return this.taskNodeRuntimeService.getCurrentTaskNode(taskId)
   }
 
   updateCurrentTaskNodeRuntime(
@@ -247,121 +209,35 @@ export class DatabaseService {
       agent_tool_config_id?: string | null
     }
   ): TaskNode | null {
-    this.ensureConversationTaskNode(taskId)
-    const workflowRun = this.workflowRunService.getRunByTask(taskId)
-    if (!workflowRun) {
-      return null
-    }
-
-    const currentNode = this.getCurrentTaskNode(taskId)
-    const updated = this.workflowRunNodeRepo.updateRunNodeRuntime(
-      workflowRun.id,
-      currentNode?.id ?? null,
-      updates
-    )
-    if (updated) {
-      this.notifyTaskNodeStatusChange(this.getTaskNode(updated.id)!)
-    }
-    return updated ? this.getTaskNode(updated.id) : null
+    return this.taskNodeRuntimeService.updateCurrentTaskNodeRuntime(taskId, updates)
   }
 
   updateTaskNodeResumeSessionId(nodeId: string, resumeSessionId: string | null): TaskNode | null {
-    const workflowNode = this.workflowRunNodeRepo.getRunNode(nodeId)
-    if (!workflowNode) {
-      return null
-    }
-
-    const updated = this.workflowRunNodeRepo.setNodeResumeSessionId(nodeId, resumeSessionId)
-    if (updated) {
-      this.notifyTaskNodeStatusChange(this.getTaskNode(updated.id)!)
-    }
-    return updated ? this.getTaskNode(updated.id) : null
+    return this.taskNodeRuntimeService.updateTaskNodeResumeSessionId(nodeId, resumeSessionId)
   }
 
   getTaskNodesByStatus(taskId: string, status: TaskNodeStatus): TaskNode[] {
-    if (!TASK_NODE_STATUS_VALUES.includes(status as TaskNodeStatusValue)) {
-      throw new Error(`Unsupported task node status: ${status}`)
-    }
-
-    return this.getTaskNodes(taskId).filter((node) => node.status === status)
+    return this.taskNodeRuntimeService.getTaskNodesByStatus(taskId, status)
   }
 
   getInProgressTaskNodes(): TaskNode[] {
-    const workflowNodes = this.workflowRunNodeRepo
-      .getAllNodesByStatus('running')
-      .map((node) => {
-        const run = this.workflowRunService.getRun(node.workflow_run_id)
-        if (!run) return null
-        return this.mapWorkflowRunNodeToTaskNode(
-          run.task_id,
-          node,
-          getWorkflowNodeOrderMap(run.definition_snapshot)
-        )
-      })
-      .filter((node): node is TaskNode => Boolean(node))
-
-    return workflowNodes
+    return this.taskNodeRuntimeService.getInProgressTaskNodes()
   }
 
   updateTaskNodeSession(nodeId: string, sessionId: string | null): TaskNode | null {
-    const workflowNode = this.workflowRunNodeRepo.getRunNode(nodeId)
-    if (!workflowNode) {
-      return null
-    }
-
-    const updated = this.workflowRunNodeRepo.setNodeSessionId(nodeId, sessionId)
-    if (updated) {
-      this.notifyTaskNodeStatusChange(this.getTaskNode(updated.id)!)
-    }
-    return updated ? this.getTaskNode(updated.id) : null
+    return this.taskNodeRuntimeService.updateTaskNodeSession(nodeId, sessionId)
   }
 
   startTaskExecution(taskId: string): TaskNode | null {
-    const task = this.taskRepo.getTask(taskId)
-    if (!task) return null
-    if (task.task_mode !== 'conversation') {
-      return this.getCurrentTaskNode(taskId)
-    }
-
-    const currentNode = this.ensureConversationTaskNode(taskId)
-    if (!currentNode) return null
-    if (currentNode.status === 'in_progress') return currentNode
-    if (currentNode.status !== 'todo') return currentNode
-
-    const updated = this.workflowRunNodeRepo.markRunning(currentNode.id)
-    if (updated) {
-      this.workflowRunService.syncRunStatus(updated.workflow_run_id)
-      const mapped = this.getTaskNode(updated.id)!
-      this.notifyTaskNodeStatusChange(mapped)
-      return mapped
-    }
-
-    return currentNode
+    return this.taskNodeRuntimeService.startTaskExecution(taskId)
   }
 
   stopTaskExecution(taskId: string): TaskNode | null {
-    const currentNode = this.getCurrentTaskNode(taskId)
-    if (!currentNode) return null
-    return this.stopTaskNodeExecution(currentNode.id, 'stopped_by_user')
+    return this.taskNodeRuntimeService.stopTaskExecution(taskId)
   }
 
   stopTaskNodeExecution(nodeId: string, reason?: string): TaskNode | null {
-    const workflowNode = this.workflowRunNodeRepo.getRunNode(nodeId)
-    if (!workflowNode) {
-      return null
-    }
-
-    return this.handleWorkflowNodeUpdate(
-      this.workflowRunNodeRepo.markFailed(
-        nodeId,
-        'cancelled',
-        reason ?? 'stopped_by_user'
-      ),
-      {
-        syncRunStatus: true,
-        notifyScheduler: true
-      }
-    )
+    return this.taskNodeRuntimeService.stopTaskNodeExecution(nodeId, reason)
   }
 
   completeTaskNode(
@@ -374,96 +250,40 @@ export class DatabaseService {
       allowConversationCompletion?: boolean
     } = {}
   ): TaskNode | null {
-    const workflowNode = this.workflowRunNodeRepo.getRunNode(nodeId)
-    if (workflowNode) {
-      const workflowRun = this.workflowRunService.getRun(workflowNode.workflow_run_id)
-      const task = workflowRun ? this.taskRepo.getTask(workflowRun.task_id) : null
-      const shouldEnterReview =
-        workflowNode.requires_approval_after_run ||
-        (task?.task_mode === 'conversation' && !result.allowConversationCompletion)
-
-      const updated = shouldEnterReview
-        ? this.workflowRunNodeRepo.markReview(nodeId, {
-            result_summary: result.resultSummary ?? null,
-            cost: result.cost ?? null,
-            duration: result.duration ?? null,
-            session_id: result.sessionId ?? null
-          })
-        : this.workflowRunNodeRepo.markDone(nodeId, {
-            result_summary: result.resultSummary ?? null,
-            cost: result.cost ?? null,
-            duration: result.duration ?? null,
-            session_id: result.sessionId ?? null
-          })
-
-      return this.handleWorkflowNodeUpdate(updated, {
-        syncRunStatus: true,
-        notifyScheduler: true
-      })
-    }
-    return null
+    return this.taskNodeRuntimeService.completeTaskNode(nodeId, result)
   }
 
   markTaskNodeErrorReview(nodeId: string, error: string): TaskNode | null {
-    const workflowNode = this.workflowRunNodeRepo.getRunNode(nodeId)
-    if (!workflowNode) {
-      return null
-    }
-
-    return this.handleWorkflowNodeUpdate(
-      this.workflowRunNodeRepo.markFailed(nodeId, 'execution_error', error),
-      {
-        syncRunStatus: true,
-        notifyScheduler: true
-      }
-    )
+    return this.taskNodeRuntimeService.markTaskNodeErrorReview(nodeId, error)
   }
 
   approveTaskNode(nodeId: string): TaskNode | null {
-    const workflowNode = this.workflowRunNodeRepo.getRunNode(nodeId)
-    if (!workflowNode) {
-      return null
-    }
-
-    return this.handleWorkflowNodeUpdate(this.workflowRunService.approveNode(nodeId), {
-      notifyScheduler: true
-    })
+    return this.taskNodeRuntimeService.approveTaskNode(nodeId)
   }
 
   rerunTaskNode(nodeId: string): TaskNode | null {
-    const workflowNode = this.workflowRunNodeRepo.getRunNode(nodeId)
-    if (!workflowNode) {
-      return null
-    }
-
-    return this.handleWorkflowNodeUpdate(this.workflowRunService.retryNode(nodeId), {
-      notifyScheduler: true
-    })
+    return this.taskNodeRuntimeService.rerunTaskNode(nodeId)
   }
 
   getTaskIdBySessionId(sessionId: string): string | null {
-    return this.workflowRunNodeRepo.getTaskIdBySessionId(sessionId)
+    return this.taskNodeRuntimeService.getTaskIdBySessionId(sessionId)
   }
 
   getCombinedPromptForTaskNode(taskNodeId: string): string | null {
-    const node = this.getTaskNode(taskNodeId)
-    if (!node) return null
-
-    const nodePrompt = node.prompt?.trim()
-    return nodePrompt || null
+    return this.taskNodeRuntimeService.getCombinedPromptForTaskNode(taskNodeId)
   }
 
   // ============ Agent Tool Config 操作 ============
   listAgentToolConfigs(toolId?: string) {
-    return this.agentToolConfigRepo.list(toolId)
+    return this.agentToolProfileService.list(toolId)
   }
 
   getAgentToolConfig(id: string) {
-    return this.agentToolConfigRepo.get(id)
+    return this.agentToolProfileService.get(id)
   }
 
   getDefaultAgentToolConfig(toolId: string) {
-    return this.agentToolConfigRepo.getDefault(toolId)
+    return this.agentToolProfileService.getDefault(toolId)
   }
 
   createAgentToolConfig(input: {
@@ -474,7 +294,7 @@ export class DatabaseService {
     config_json: string
     is_default?: number
   }) {
-    return this.agentToolConfigRepo.create(input)
+    return this.agentToolProfileService.create(input)
   }
 
   updateAgentToolConfig(
@@ -486,15 +306,15 @@ export class DatabaseService {
       is_default?: number
     }
   ) {
-    return this.agentToolConfigRepo.update(id, updates)
+    return this.agentToolProfileService.update(id, updates)
   }
 
   deleteAgentToolConfig(id: string) {
-    return this.agentToolConfigRepo.delete(id)
+    return this.agentToolProfileService.delete(id)
   }
 
   setDefaultAgentToolConfig(id: string) {
-    return this.agentToolConfigRepo.setDefault(id)
+    return this.agentToolProfileService.setDefault(id)
   }
 
   // ============ Project 操作 ============
@@ -547,25 +367,11 @@ export class DatabaseService {
   async generateWorkflowDefinition(
     input: GenerateWorkflowDefinitionInput
   ): Promise<GeneratedWorkflowDefinitionResult> {
-    return await this.workflowDefinitionGenerationService.generateDefinition({
-      ...input,
-      resolvedToolConfig: this.resolveAgentToolConfig(
-        input.toolId,
-        input.agentToolConfigId,
-        'workflow generation'
-      )
-    })
+    return await this.aiAuthoringService.generateWorkflowDefinition(input)
   }
 
   async optimizePrompt(input: OptimizePromptInput): Promise<OptimizePromptResult> {
-    return await this.promptOptimizationService.optimizePrompt({
-      ...input,
-      resolvedToolConfig: this.resolveAgentToolConfig(
-        input.toolId,
-        input.agentToolConfigId,
-        'prompt optimization'
-      )
-    })
+    return await this.aiAuthoringService.optimizePrompt(input)
   }
 
   updateWorkflowDefinition(input: UpdateWorkflowDefinitionInput): WorkflowDefinition {
@@ -605,8 +411,7 @@ export class DatabaseService {
   }
 
   async startWorkflowRun(workflowRunId: string): Promise<WorkflowRun | null> {
-    await this.workflowSchedulerService?.startRun(workflowRunId)
-    return this.workflowRunService.getRun(workflowRunId)
+    return await this.workflowRunLifecycleService.startRun(workflowRunId)
   }
 
   approveWorkflowRunNode(
@@ -617,54 +422,31 @@ export class DatabaseService {
       reviewed_at?: string
     }
   ): WorkflowRunNode | null {
-    const updated = this.workflowRunService.approveNode(workflowRunNodeId, input)
-    if (updated) {
-      this.handleWorkflowNodeUpdate(updated, {
-        notifyScheduler: true
-      })
-    }
-    return updated
+    return this.workflowRunLifecycleService.approveNode(workflowRunNodeId, input)
   }
 
   retryWorkflowRunNode(workflowRunNodeId: string): WorkflowRunNode | null {
-    const updated = this.workflowRunService.retryNode(workflowRunNodeId)
-    if (updated) {
-      this.handleWorkflowNodeUpdate(updated, {
-        notifyScheduler: true
-      })
-    }
-    return updated
+    return this.workflowRunLifecycleService.retryNode(workflowRunNodeId)
   }
 
   async stopWorkflowRun(workflowRunId: string): Promise<WorkflowRun | null> {
-    if (this.workflowSchedulerService) {
-      await this.workflowSchedulerService.stopRun(workflowRunId)
-      return this.workflowRunService.getRun(workflowRunId)
-    }
-    return this.workflowRunService.stopRun(workflowRunId)
+    return await this.workflowRunLifecycleService.stopRun(workflowRunId)
   }
 
   markWorkflowRunStarted(workflowRunId: string): WorkflowRun | null {
-    return this.workflowRunService.startRun(workflowRunId)
+    return this.workflowRunLifecycleService.markRunStarted(workflowRunId)
   }
 
   markWorkflowRunStopped(workflowRunId: string): WorkflowRun | null {
-    return this.workflowRunService.stopRun(workflowRunId)
+    return this.workflowRunLifecycleService.markRunStopped(workflowRunId)
   }
 
   markWorkflowRunNodeRunning(nodeId: string): WorkflowRunNode | null {
-    const updated = this.workflowRunNodeRepo.markRunning(nodeId)
-    if (updated) {
-      this.handleWorkflowNodeUpdate(updated, {
-        syncRunStatus: true
-      })
-      return updated
-    }
-    return null
+    return this.workflowRunLifecycleService.markNodeRunning(nodeId)
   }
 
   syncWorkflowRunStatus(workflowRunId: string): WorkflowRun | null {
-    return this.workflowRunService.syncRunStatus(workflowRunId)
+    return this.workflowRunLifecycleService.syncRunStatus(workflowRunId)
   }
 
   // ============ Automation 操作 =========
@@ -749,149 +531,6 @@ export class DatabaseService {
     return this.automationRepo.markStaleRunningRunsFailed(errorMessage)
   }
 
-  private ensureConversationTaskNode(taskId: string): TaskNode | null {
-    const task = this.taskRepo.getTask(taskId)
-    if (!task || task.task_mode !== 'conversation') {
-      return null
-    }
-
-    const existingRun = this.workflowRunService.getRunByTask(taskId)
-    if (existingRun) {
-      const existingNodes = this.workflowRunService.listRunNodes(existingRun.id)
-      const currentNodeId = getWorkflowCurrentNodeId(existingRun.definition_snapshot, existingNodes)
-      const currentNode =
-        existingNodes.find((node) => node.id === currentNodeId) ?? existingNodes[0] ?? null
-      if (!currentNode) {
-        return null
-      }
-      return this.mapWorkflowRunNodeToTaskNode(
-        task.id,
-        currentNode,
-        getWorkflowNodeOrderMap(existingRun.definition_snapshot)
-      )
-    }
-
-    const createdRun = this.workflowRunService.createRunForTask({
-      taskId,
-      definition: buildConversationWorkflowDefinition()
-    })
-
-    const createdNodes = this.workflowRunService.listRunNodes(createdRun.id)
-    const createdNode = createdNodes[0]
-    if (!createdNode) {
-      return null
-    }
-
-    return this.mapWorkflowRunNodeToTaskNode(
-      task.id,
-      createdNode,
-      getWorkflowNodeOrderMap(createdRun.definition_snapshot)
-    )
-  }
-
-  private mapWorkflowRunNodesToTaskNodes(run: WorkflowRun, nodes: WorkflowRunNode[]): TaskNode[] {
-    const orderMap = getWorkflowNodeOrderMap(run.definition_snapshot)
-    return nodes
-      .map((node) => this.mapWorkflowRunNodeToTaskNode(run.task_id, node, orderMap))
-      .sort((left, right) => left.node_order - right.node_order)
-  }
-
-  private mapWorkflowRunNodeToTaskNode(
-    taskId: string,
-    node: WorkflowRunNode,
-    orderMap: Map<string, number>
-  ): TaskNode {
-    return {
-      id: node.id,
-      task_id: taskId,
-      node_order: orderMap.get(node.definition_node_id) ?? Number.MAX_SAFE_INTEGER,
-      name: node.name,
-      prompt: node.prompt ?? '',
-      cli_tool_id: node.cli_tool_id,
-      agent_tool_config_id: node.agent_tool_config_id,
-      requires_approval: node.requires_approval_after_run ? 1 : 0,
-      status: this.mapWorkflowNodeStatusToTaskNodeStatus(node.status),
-      session_id: node.session_id,
-      resume_session_id: node.resume_session_id,
-      result_summary: node.result_summary,
-      error_message: node.error_message,
-      cost: node.cost,
-      duration: node.duration,
-      started_at: node.started_at,
-      completed_at: node.completed_at,
-      created_at: node.created_at,
-      updated_at: node.updated_at
-    }
-  }
-
-  private mapWorkflowNodeStatusToTaskNodeStatus(status: WorkflowRunNode['status']): TaskNodeStatus {
-    switch (status) {
-      case 'waiting':
-        return 'todo'
-      case 'running':
-        return 'in_progress'
-      case 'review':
-        return 'in_review'
-      case 'done':
-        return 'done'
-      case 'failed':
-        return 'failed'
-    }
-  }
-
-  private resolveAgentToolConfig(
-    toolId: string | null | undefined,
-    agentToolConfigId: string | null | undefined,
-    contextLabel: string
-  ): Record<string, unknown> | null {
-    if (!toolId || !agentToolConfigId) {
-      return null
-    }
-
-    const configRecord = this.getAgentToolConfig(agentToolConfigId)
-    if (configRecord?.tool_id !== toolId || !configRecord.config_json) {
-      return null
-    }
-
-    try {
-      const parsed = JSON.parse(configRecord.config_json)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>
-      }
-    } catch (error) {
-      console.error(`[DatabaseService] Failed to parse ${contextLabel} tool config:`, error)
-    }
-
-    return null
-  }
-
-  private handleWorkflowNodeUpdate(
-    updated: WorkflowRunNode | null,
-    options: {
-      syncRunStatus?: boolean
-      notifyScheduler?: boolean
-    } = {}
-  ): TaskNode | null {
-    if (!updated) {
-      return null
-    }
-
-    if (options.syncRunStatus) {
-      this.workflowRunService.syncRunStatus(updated.workflow_run_id)
-    }
-
-    const mapped = this.getTaskNode(updated.id)
-    if (mapped) {
-      this.notifyTaskNodeStatusChange(mapped)
-    }
-
-    if (options.notifyScheduler) {
-      void this.workflowSchedulerService?.onNodeUpdated(updated.id)
-    }
-
-    return mapped
-  }
-
   // ============ 清理和关闭 ============
   close(): void {
     console.log('[DatabaseService] Closing database connection')
@@ -900,15 +539,5 @@ export class DatabaseService {
 
   dispose(): void {
     this.close()
-  }
-
-  private notifyTaskNodeStatusChange(node: TaskNode): void {
-    this.taskNodeStatusListeners.forEach((listener) => {
-      try {
-        listener(node)
-      } catch (error) {
-        console.error('[DatabaseService] Task node status listener failed:', error)
-      }
-    })
   }
 }

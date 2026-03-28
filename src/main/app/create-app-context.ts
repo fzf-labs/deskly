@@ -19,7 +19,15 @@ import { AutomationService } from '../services/AutomationService'
 import { WorkflowSchedulerService } from '../services/WorkflowSchedulerService'
 import { AppContext, AppServices } from './AppContext'
 
-type CoreServices = Pick<AppServices, 'databaseService' | 'settingsService'>
+type CoreServices = Pick<
+  AppServices,
+  | 'databaseService'
+  | 'settingsService'
+  | 'agentToolProfileService'
+  | 'taskNodeRuntimeService'
+  | 'workflowRunLifecycleService'
+  | 'aiAuthoringService'
+>
 type ProjectGitServices = Pick<AppServices, 'projectService' | 'gitService'>
 type CliSessionServices = Pick<
   AppServices,
@@ -42,10 +50,19 @@ type AutomationNotificationServices = Pick<
   'notificationService' | 'automationRunnerService' | 'automationService'
 >
 
-const createCoreServices = (): CoreServices => ({
-  settingsService: new SettingsService(),
-  databaseService: new DatabaseService()
-})
+const createCoreServices = (): CoreServices => {
+  const settingsService = new SettingsService()
+  const databaseService = new DatabaseService()
+
+  return {
+    settingsService,
+    databaseService,
+    agentToolProfileService: databaseService.getAgentToolProfileService(),
+    taskNodeRuntimeService: databaseService.getTaskNodeRuntimeService(),
+    workflowRunLifecycleService: databaseService.getWorkflowRunLifecycleService(),
+    aiAuthoringService: databaseService.getAiAuthoringService()
+  }
+}
 
 const createProjectGitServices = (databaseService: DatabaseService): ProjectGitServices => ({
   projectService: new ProjectService(databaseService),
@@ -54,6 +71,8 @@ const createProjectGitServices = (databaseService: DatabaseService): ProjectGitS
 
 const createCliSessionServices = ({
   databaseService,
+  agentToolProfileService,
+  taskNodeRuntimeService,
   settingsService
 }: CoreServices): CliSessionServices => {
   const cliProcessService = new CLIProcessService()
@@ -62,7 +81,9 @@ const createCliSessionServices = ({
   const systemCliToolService = new SystemCliToolService()
   const cliSessionService = new CliSessionService(
     cliToolConfigService,
+    agentToolProfileService,
     databaseService,
+    taskNodeRuntimeService,
     settingsService
   )
 
@@ -83,6 +104,9 @@ const createWorkspaceToolServices = (): WorkspaceToolServices => ({
 
 const createTaskWorkflowServices = ({
   databaseService,
+  agentToolProfileService,
+  taskNodeRuntimeService,
+  workflowRunLifecycleService,
   settingsService,
   gitService,
   cliSessionService
@@ -90,18 +114,29 @@ const createTaskWorkflowServices = ({
   Pick<ProjectGitServices, 'gitService'> &
   Pick<CliSessionServices, 'cliSessionService'>): TaskWorkflowServices => ({
   taskService: new TaskService(databaseService, gitService, settingsService),
-  workflowSchedulerService: new WorkflowSchedulerService(databaseService, cliSessionService),
+  workflowSchedulerService: new WorkflowSchedulerService(
+    databaseService,
+    agentToolProfileService,
+    taskNodeRuntimeService,
+    cliSessionService,
+    workflowRunLifecycleService
+  ),
   terminalService: new TerminalService()
 })
 
 const createAutomationNotificationServices = ({
   databaseService,
+  taskNodeRuntimeService,
   taskService,
   cliSessionService
-}: Pick<AppServices, 'databaseService' | 'taskService' | 'cliSessionService'>): AutomationNotificationServices => {
+}: Pick<
+  AppServices,
+  'databaseService' | 'taskNodeRuntimeService' | 'taskService' | 'cliSessionService'
+>): AutomationNotificationServices => {
   const notificationService = new NotificationService()
   const automationRunnerService = new AutomationRunnerService(
     databaseService,
+    taskNodeRuntimeService,
     taskService,
     cliSessionService
   )
@@ -113,26 +148,33 @@ const createAutomationNotificationServices = ({
   }
 }
 
-const wireDatabaseRuntime = ({
+const wireAiRuntimeServices = ({
   databaseService,
   settingsService,
   cliSessionService,
-  cliToolDetectorService,
-  workflowSchedulerService
+  cliToolDetectorService
 }: Pick<
   AppServices,
-  | 'databaseService'
-  | 'settingsService'
-  | 'cliSessionService'
-  | 'cliToolDetectorService'
-  | 'workflowSchedulerService'
+  'databaseService' | 'settingsService' | 'cliSessionService' | 'cliToolDetectorService'
 >) => {
-  databaseService.setRuntimeServices({
-    cliSessionService,
-    cliToolDetectorService,
-    settingsService,
-    workflowSchedulerService
-  })
+  databaseService
+    .getWorkflowDefinitionGenerationService()
+    .setCliRuntime(
+      cliSessionService,
+      cliToolDetectorService,
+      databaseService.getWorkflowDefinitionService(),
+      settingsService
+    )
+  databaseService
+    .getPromptOptimizationService()
+    .setCliRuntime(cliSessionService, cliToolDetectorService, settingsService)
+}
+
+const wireWorkflowRuntimeServices = ({
+  databaseService,
+  workflowSchedulerService
+}: Pick<AppServices, 'databaseService' | 'workflowSchedulerService'>) => {
+  databaseService.setWorkflowSchedulerService(workflowSchedulerService)
 }
 
 export const createAppContext = (): AppContext => {
@@ -148,16 +190,21 @@ export const createAppContext = (): AppContext => {
     cliSessionService: cliSessionServices.cliSessionService
   })
 
-  wireDatabaseRuntime({
+  wireAiRuntimeServices({
     databaseService: coreServices.databaseService,
     settingsService: coreServices.settingsService,
     cliSessionService: cliSessionServices.cliSessionService,
-    cliToolDetectorService: cliSessionServices.cliToolDetectorService,
+    cliToolDetectorService: cliSessionServices.cliToolDetectorService
+  })
+
+  wireWorkflowRuntimeServices({
+    databaseService: coreServices.databaseService,
     workflowSchedulerService: taskWorkflowServices.workflowSchedulerService
   })
 
   const automationNotificationServices = createAutomationNotificationServices({
     databaseService: coreServices.databaseService,
+    taskNodeRuntimeService: coreServices.taskNodeRuntimeService,
     taskService: taskWorkflowServices.taskService,
     cliSessionService: cliSessionServices.cliSessionService
   })
@@ -173,9 +220,13 @@ export const createAppContext = (): AppContext => {
     previewConfigService: workspaceToolServices.previewConfigService,
     previewService: workspaceToolServices.previewService,
     notificationService: automationNotificationServices.notificationService,
+    agentToolProfileService: coreServices.agentToolProfileService,
+    aiAuthoringService: coreServices.aiAuthoringService,
     databaseService: coreServices.databaseService,
     settingsService: coreServices.settingsService,
     taskService: taskWorkflowServices.taskService,
+    taskNodeRuntimeService: coreServices.taskNodeRuntimeService,
+    workflowRunLifecycleService: coreServices.workflowRunLifecycleService,
     cliSessionService: cliSessionServices.cliSessionService,
     workflowSchedulerService: taskWorkflowServices.workflowSchedulerService,
     terminalService: taskWorkflowServices.terminalService,
@@ -185,6 +236,10 @@ export const createAppContext = (): AppContext => {
 
   const serviceOrder = [
     coreServices.databaseService,
+    coreServices.agentToolProfileService,
+    coreServices.aiAuthoringService,
+    coreServices.taskNodeRuntimeService,
+    coreServices.workflowRunLifecycleService,
     projectGitServices.projectService,
     projectGitServices.gitService,
     cliSessionServices.cliProcessService,

@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useProjects, type Project } from '@/hooks/useProjects';
+import { useProjects, type Project } from '@features/projects';
 import { useToast } from '@/providers/feedback-provider';
 import { useLanguage } from '@/providers/language-provider';
 
