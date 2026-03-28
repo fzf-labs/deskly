@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import type { LogMsg } from '../../../../src/renderer/src/hooks/useLogStream'
+import type { LogMsg } from '../../../../src/renderer/src/features/cli-session'
 import {
   buildCodexConversationTurns,
   buildCodexTimelineItems,
   parseCodexLogs
-} from '../../../../src/renderer/src/components/cli/renderers/codex-log-model'
+} from '../../../../src/renderer/src/features/cli-session'
 
 function stdout(content: string, timestamp: number, id: string): LogMsg {
   return {

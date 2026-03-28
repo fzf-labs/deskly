@@ -1,6 +1,7 @@
 export { SettingsPage } from './SettingsPage'
 export { SettingsContent } from './ui/SettingsContent'
 export { SettingsSidebar } from './ui/SettingsSidebar'
+export { categoryIcons, settingsCategories } from './ui/constants'
 export { Switch } from './components/Switch'
 export { AboutSettings } from './tabs/AboutSettings'
 export { AccountSettings } from './tabs/AccountSettings'
@@ -45,5 +46,5 @@ export {
   getProjectMcpConfigPath,
   mergeMcpServers,
   parseTomlMcpServers
-} from '@/lib/mcp'
-export type { MergedMcpServer, MCPServerRecord } from '@/lib/mcp'
+} from './model/mcp'
+export type { MergedMcpServer, MCPServerRecord } from './model/mcp'

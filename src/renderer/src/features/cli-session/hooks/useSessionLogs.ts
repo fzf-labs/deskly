@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { readSessionLogs, type SessionLogEntry } from '@/lib/session-logs'
+import { readSessionLogs, type SessionLogEntry } from '../model/session-logs'
 
 export function useSessionLogs(
   taskId: string | null,

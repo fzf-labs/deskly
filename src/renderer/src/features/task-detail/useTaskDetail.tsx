@@ -19,10 +19,9 @@ import type { NavigateFunction } from 'react-router-dom'
 
 import { db, type Task, type WorkflowRun, type WorkflowRunNode } from '@/data'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
-import { filterEnabledCliTools } from '@/lib/agent-cli-tool-enablement'
-import { normalizeCliTools } from '@/lib/agent-cli-tools'
 import { newUuid } from '@/lib/ids'
 import type { AgentMessage, CLISessionHandle } from '@features/cli-session'
+import { filterEnabledCliTools, normalizeCliTools } from '@features/cli-tools'
 
 import { useArtifactPanel } from './hooks/useArtifactPanel'
 import { useMessageScroll } from './hooks/useMessageScroll'

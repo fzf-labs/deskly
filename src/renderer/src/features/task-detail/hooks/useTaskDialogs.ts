@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
 import type { NavigateFunction } from 'react-router-dom'
 
 import { db, type Task } from '@/data'
-import { isCliToolEnabled } from '@/lib/agent-cli-tool-enablement'
+import { isCliToolEnabled } from '@features/cli-tools'
 import { deleteTaskWithSideEffects, updateTaskWithSideEffects } from '@features/tasks'
 
 import type { CurrentNodeRuntime } from '../types'

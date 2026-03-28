@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isProjectRequiredRoute,
   normalizeCurrentProjectId
-} from '../../src/renderer/src/lib/project-routing'
+} from '../../src/renderer/src/features/projects'
 
 describe('isProjectRequiredRoute', () => {
   it('matches project-scoped top-level routes', () => {

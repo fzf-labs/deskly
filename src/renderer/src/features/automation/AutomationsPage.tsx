@@ -10,8 +10,8 @@ import { useConfirm } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
 import type { CreateAutomationRequest } from '@shared/contracts/automation'
 import type { Automation, AutomationRun } from '@/types/automation'
-import { AutomationFormDialog } from '@/pages/automations/components/AutomationFormDialog'
-import { AutomationList } from '@/pages/automations/components/AutomationList'
+import { AutomationFormDialog } from './ui/AutomationFormDialog'
+import { AutomationList } from './ui/AutomationList'
 
 export function AutomationsPage() {
   const { t, tt } = useLanguage()

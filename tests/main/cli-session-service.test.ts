@@ -120,10 +120,12 @@ const setupServices = async (options?: {
     })
   }))
 
-  const [{ DatabaseService }, { TaskService }, { CliSessionService }] = await Promise.all([
+  const [{ DatabaseService }, { TaskService }, { CliSessionService }, { TaskNodeRuntimeService }] =
+    await Promise.all([
     import('../../src/main/services/DatabaseService'),
     import('../../src/main/services/TaskService'),
-    import('../../src/main/services/cli/CliSessionService')
+    import('../../src/main/services/cli/CliSessionService'),
+    import('../../src/main/services/TaskNodeRuntimeService')
   ])
 
   let db
@@ -152,6 +154,11 @@ const setupServices = async (options?: {
       })
     } as never
   )
+  const taskNodeRuntimeService = new TaskNodeRuntimeService(
+    db.getTaskRepository(),
+    db.getWorkflowRunService(),
+    db.getWorkflowRunNodeRepository()
+  )
   const cliSessionService = new CliSessionService(
     {
       getConfig: () => options?.config ?? {},
@@ -159,7 +166,7 @@ const setupServices = async (options?: {
     } as never,
     db.getAgentToolProfileService(),
     db,
-    db.getTaskNodeRuntimeService(),
+    taskNodeRuntimeService,
     {
       getSettings: () => ({
         enabledCliTools: {
@@ -174,7 +181,7 @@ const setupServices = async (options?: {
   )
   cliSessionService.registerAdapter(options?.adapter ?? new ImmediateCloseCodexAdapter())
 
-  return { db, taskService, cliSessionService }
+  return { db, taskService, cliSessionService, taskNodeRuntimeService }
 }
 
 describe('CliSessionService', () => {
@@ -193,7 +200,7 @@ describe('CliSessionService', () => {
     if (!setup) {
       return
     }
-    const { db, taskService, cliSessionService } = setup
+    const { db, taskService, cliSessionService, taskNodeRuntimeService } = setup
 
     try {
       const task = await taskService.createTask({
@@ -203,7 +210,7 @@ describe('CliSessionService', () => {
         cliToolId: 'codex'
       })
 
-      const runningNode = db.startTaskExecution(task.id)
+      const runningNode = taskNodeRuntimeService.startTaskExecution(task.id)
       expect(runningNode?.status).toBe('in_progress')
 
       await cliSessionService.startSession(
@@ -219,7 +226,7 @@ describe('CliSessionService', () => {
         runningNode?.id
       )
 
-      const updatedNode = db.getTaskNode(runningNode!.id)
+      const updatedNode = taskNodeRuntimeService.getTaskNode(runningNode!.id)
       expect(updatedNode?.status).toBe('in_review')
       expect(updatedNode?.session_id).toBe('session-immediate-close')
       expect(cliSessionService.getSession('session-immediate-close')).toBeNull()
@@ -240,7 +247,7 @@ describe('CliSessionService', () => {
     if (!setup) {
       return
     }
-    const { db, taskService, cliSessionService } = setup
+    const { db, taskService, cliSessionService, taskNodeRuntimeService } = setup
 
     try {
       const task = await taskService.createTask({
@@ -250,7 +257,7 @@ describe('CliSessionService', () => {
         cliToolId: 'codex'
       })
 
-      const runningNode = db.startTaskExecution(task.id)
+      const runningNode = taskNodeRuntimeService.startTaskExecution(task.id)
       expect(runningNode?.status).toBe('in_progress')
 
       await cliSessionService.startSession(
@@ -307,7 +314,7 @@ describe('CliSessionService', () => {
     if (!setup) {
       return
     }
-    const { db, taskService, cliSessionService } = setup
+    const { db, taskService, cliSessionService, taskNodeRuntimeService } = setup
 
     try {
       const task = await taskService.createTask({
@@ -317,7 +324,7 @@ describe('CliSessionService', () => {
         cliToolId: 'codex'
       })
 
-      const runningNode = db.startTaskExecution(task.id)
+      const runningNode = taskNodeRuntimeService.startTaskExecution(task.id)
       expect(runningNode?.status).toBe('in_progress')
 
       await cliSessionService.startSession(

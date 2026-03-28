@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { normalizeCurrentProjectId } from '@/lib/project-routing';
+import { normalizeCurrentProjectId } from '../model/routing';
 import type {
   CreateProjectOptions as CreateProjectInput,
   Project

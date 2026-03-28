@@ -17,12 +17,12 @@ import {
 import { db } from '@/data';
 import type { AgentToolConfig } from '@/data';
 import { isCliToolEnabledInSettings } from '@/data/settings';
-import type { SettingsTabProps } from '../types';
 import {
   normalizeCliTools,
   isCliToolInstalled,
   type CLIToolInfo,
-} from '@/lib/agent-cli-tools';
+} from '@features/cli-tools';
+import type { SettingsTabProps } from '../types';
 import {
   createCliToolConfigTemplate,
   deriveCodexPermissionsPreset,

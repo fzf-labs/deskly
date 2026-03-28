@@ -8,7 +8,7 @@ import {
   notifyTaskNodeCompleted,
   notifyTaskNodeNeedsReview,
   playTaskNodeReviewSound,
-} from './lib/notifications';
+} from '@features/notifications';
 import { FeedbackProvider } from './providers/feedback-provider';
 import { LanguageProvider } from './providers/language-provider';
 import { ThemeProvider } from './providers/theme-provider';

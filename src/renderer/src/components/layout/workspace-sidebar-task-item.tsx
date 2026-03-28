@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { taskStatusUi } from '@/lib/task-status'
+import { taskStatusUi } from '@features/tasks'
 
 import type { WorkspaceTaskItem } from './useWorkspaceSidebar'
 

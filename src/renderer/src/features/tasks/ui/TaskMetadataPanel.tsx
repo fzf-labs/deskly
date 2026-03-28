@@ -2,8 +2,8 @@ import { Clock, ExternalLink, FolderGit2, GitBranch } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { type Task, type TaskStatus } from '@/data'
+import { taskStatusUi } from '@features/tasks'
 import { cn } from '@/lib/utils'
-import { taskStatusUi } from '@/lib/task-status'
 
 interface TaskMetadataPanelProps {
   task: Task | null

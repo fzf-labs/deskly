@@ -1,1 +1,0 @@
-export { getArtifactTypeFromExt } from './artifactUtils';

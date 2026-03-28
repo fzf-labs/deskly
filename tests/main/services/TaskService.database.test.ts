@@ -25,9 +25,10 @@ const setupTaskServiceWithRealDatabase = async () => {
     })
   }))
 
-  const [{ DatabaseService }, { TaskService }] = await Promise.all([
+  const [{ DatabaseService }, { TaskService }, { TaskNodeRuntimeService }] = await Promise.all([
     import('../../../src/main/services/DatabaseService'),
-    import('../../../src/main/services/TaskService')
+    import('../../../src/main/services/TaskService'),
+    import('../../../src/main/services/TaskNodeRuntimeService')
   ])
 
   let db
@@ -56,8 +57,13 @@ const setupTaskServiceWithRealDatabase = async () => {
       })
     } as never
   )
+  const taskNodeRuntimeService = new TaskNodeRuntimeService(
+    db.getTaskRepository(),
+    db.getWorkflowRunService(),
+    db.getWorkflowRunNodeRepository()
+  )
 
-  return { db, taskService }
+  return { db, taskService, taskNodeRuntimeService }
 }
 
 describe('TaskService + DatabaseService conversation runtime', () => {
@@ -76,7 +82,7 @@ describe('TaskService + DatabaseService conversation runtime', () => {
     if (!setup) {
       return
     }
-    const { db, taskService } = setup
+    const { db, taskService, taskNodeRuntimeService } = setup
 
     try {
       const task = await taskService.createTask({
@@ -90,7 +96,7 @@ describe('TaskService + DatabaseService conversation runtime', () => {
       expect(run).not.toBeNull()
       expect(run?.workflow_definition_id).toBeNull()
 
-      const nodes = db.getTaskNodes(task.id)
+      const nodes = taskNodeRuntimeService.getTaskNodes(task.id)
       expect(nodes).toHaveLength(1)
       expect(nodes[0]).toEqual(
         expect.objectContaining({
@@ -109,7 +115,7 @@ describe('TaskService + DatabaseService conversation runtime', () => {
     if (!setup) {
       return
     }
-    const { db, taskService } = setup
+    const { db, taskService, taskNodeRuntimeService } = setup
 
     try {
       const definition = db.createWorkflowDefinition({
@@ -144,7 +150,7 @@ describe('TaskService + DatabaseService conversation runtime', () => {
         cliToolId: 'codex'
       })
 
-      const nodes = db.getTaskNodes(task.id)
+      const nodes = taskNodeRuntimeService.getTaskNodes(task.id)
       expect(nodes).toHaveLength(1)
       expect(nodes[0]).toEqual(
         expect.objectContaining({

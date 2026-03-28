@@ -10,5 +10,5 @@ export {
   readSkillMarkdown,
   resolvePath,
   resolveProjectSkillDirectories
-} from '@/lib/skills'
-export type { ProjectSkillDirectory, ProjectSkillsSettings } from '@/lib/skills'
+} from './model/skills'
+export type { ProjectSkillDirectory, ProjectSkillsSettings } from './model/skills'

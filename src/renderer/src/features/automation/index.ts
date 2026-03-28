@@ -1,2 +1,6 @@
 export { AutomationsPage } from './AutomationsPage'
+export { AutomationFormDialog } from './ui/AutomationFormDialog'
+export { AutomationItem } from './ui/AutomationItem'
+export { AutomationList } from './ui/AutomationList'
+export { AutomationRunList } from './ui/AutomationRunList'
 export { TriggerBadge, formatTriggerLabel } from './ui/TriggerBadge'

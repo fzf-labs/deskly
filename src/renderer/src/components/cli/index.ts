@@ -1,6 +1,0 @@
-export { TerminalOutput } from '@features/cli-session/ui/TerminalOutput'
-export { CLISession } from '@features/cli-session/ui/CLISession'
-export type { CLISessionHandle } from '@features/cli-session/ui/CLISession'
-export { SessionStatusIndicator } from '@features/cli-session/ui/SessionStatusIndicator'
-export type { NormalizedEntry, NormalizedEntryType } from '@features/cli-session/ui/logTypes'
-export { ToolCallRenderer } from '@features/cli-session/ui/ToolCallRenderer'

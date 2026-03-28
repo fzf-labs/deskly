@@ -1,15 +1,16 @@
 export { HomePage } from './Home'
-export { TaskDetailPage } from './task-detail/TaskDetailPage'
 export { SetupPage } from './Setup'
 export { DashboardPage } from './dashboard/DashboardPage'
 export { BoardPage } from './board/BoardPage'
-export { PipelineTemplatesPage } from './pipeline/PipelineTemplatesPage'
-export { WorkflowTemplateEditorPage } from './pipeline/WorkflowTemplateEditorPage'
-export { SettingsPage } from './settings/SettingsPage'
-export { SkillsPage } from './skills/SkillsPage'
+export { TaskDetailPage } from '@features/task-detail'
+export {
+  GeneratedWorkflowReviewPage,
+  PipelineTemplatesPage,
+  WorkflowTemplateEditorPage
+} from '@features/pipeline'
+export { SettingsPage } from '@features/settings'
+export { SkillsPage } from '@features/skills'
 export { McpPage } from './mcp/McpPage'
-export { ProjectsPage } from './projects/ProjectsPage'
-export { AutomationsPage } from './automations/AutomationsPage'
-export { GeneratedWorkflowReviewPage } from './generated-workflow-review/GeneratedWorkflowReviewPage'
-
+export { ProjectsPage } from '@features/projects'
+export { AutomationsPage } from '@features/automation'
 export { TasksPage } from './tasks/TasksPage'

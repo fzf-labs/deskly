@@ -4,9 +4,9 @@ import { Loader2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { db, type OptimizePromptInput, type OptimizePromptResult } from '@/data'
 import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
-import { resolvePromptOptimizationErrorMessage } from '@/lib/prompt-optimization'
 import { useToast } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
+import { resolvePromptOptimizationErrorMessage } from './prompt-optimization'
 
 interface PromptOptimizeButtonProps
   extends Pick<

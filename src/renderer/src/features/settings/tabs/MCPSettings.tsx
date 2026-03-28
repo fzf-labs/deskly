@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { getMcpConfigPath } from '@/lib/paths';
-import { buildMcpServersFromConfig, extractMcpServers } from '@/lib/mcp';
+import { buildMcpServersFromConfig, extractMcpServers } from '../model/mcp';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/providers/language-provider';
 import { Button } from '@/components/ui/button';

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { db, type Task } from '@/data';
 import { useProjects } from '@features/projects';
-import { TASKS_CHANGED_EVENT } from '@/lib/task-events';
+import { TASKS_CHANGED_EVENT } from '@features/tasks';
 
 export interface WorkspaceTaskItem {
   id: string;

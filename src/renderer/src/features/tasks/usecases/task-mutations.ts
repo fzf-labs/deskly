@@ -1,5 +1,4 @@
 import { db, type Task, type UpdateTaskInput } from '@/data'
-import { notifyTasksChanged } from '@/lib/task-events'
 import type { CreateTaskOptions, TaskWithWorktree } from '@shared/contracts/task'
 
 import {
@@ -7,6 +6,7 @@ import {
   notifyTaskNeedsReview,
   playTaskReviewSound
 } from '@features/notifications'
+import { notifyTasksChanged } from '@features/tasks'
 
 export async function createTaskWithSideEffects(
   input: CreateTaskOptions

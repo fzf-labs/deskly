@@ -13,7 +13,7 @@ import {
   getLocalizedSystemCliText,
   getSystemCliSupportedSources,
   isSystemCliToolInstalled
-} from '@/lib/system-cli-tools'
+} from '@features/cli-tools'
 import { useLanguage } from '@/providers/language-provider'
 import {
   resolveSystemCliInstallMethods,

@@ -6,6 +6,9 @@ const repoRoot = process.cwd()
 const featuresRoot = join(repoRoot, 'src/renderer/src/features')
 const rendererRoot = join(repoRoot, 'src/renderer/src')
 const sharedContractsRoot = join(repoRoot, 'src/shared/contracts')
+const componentsRoot = join(rendererRoot, 'components')
+const hooksRoot = join(rendererRoot, 'hooks')
+const libRoot = join(rendererRoot, 'lib')
 
 const requiredFrontendSpecFiles = [
   'index.md',
@@ -53,6 +56,7 @@ const requiredArtifactFeatureFiles = [
 ]
 
 const requiredSettingsFeatureFiles = [
+  'model/mcp.ts',
   'components/Switch.tsx',
   'tabs/AboutSettings.tsx',
   'tabs/AccountSettings.tsx',
@@ -74,8 +78,15 @@ const requiredSettingsFeatureFiles = [
   'ui/constants.tsx'
 ]
 
-const requiredAutomationFeatureFiles = ['AutomationsPage.tsx', 'ui/TriggerBadge.tsx']
-
+const requiredAutomationFeatureFiles = [
+  'AutomationsPage.tsx',
+  'ui/AutomationFormDialog.tsx',
+  'ui/AutomationItem.tsx',
+  'ui/AutomationList.tsx',
+  'ui/AutomationRunList.tsx',
+  'ui/TriggerBadge.tsx'
+]
+const requiredSkillsFeatureFiles = ['SkillsPage.tsx', 'model/skills.ts']
 const requiredGitFeatureFiles = [
   'ui/DiffViewer.tsx',
   'ui/GitDiffView.tsx',
@@ -83,26 +94,24 @@ const requiredGitFeatureFiles = [
   'ui/CommitHistory.tsx',
   'ui/BranchSelector.tsx'
 ]
-
 const requiredTerminalFeatureFiles = [
   'ui/TerminalPanel.tsx',
   'ui/TerminalView.tsx',
   'model/helpers.ts'
 ]
-
 const requiredHomeFeatureFiles = [
   'hooks/useDashboardData.ts',
   'ui/AgentMessages.tsx',
   'ui/TaskInput.tsx'
 ]
-
 const requiredProjectsFeatureFiles = [
   'ProjectsPage.tsx',
   'hooks/useProjects.ts',
+  'model/routing.ts',
   'ui/ProjectDialogs.tsx'
 ]
-
 const requiredTaskDetailFeatureFiles = [
+  'hooks/useVitePreview.ts',
   'model/tool-selection-context.ts',
   'model/right-panel.ts',
   'components/ErrorMessage.tsx',
@@ -115,11 +124,14 @@ const requiredTaskDetailFeatureFiles = [
   'components/RunningIndicator.tsx',
   'components/TaskGroupComponent.tsx',
   'components/ToolExecutionItem.tsx',
-  'components/UserMessage.tsx'
+  'components/UserMessage.tsx',
+  'components/VirtualComputer.tsx',
+  'components/VitePreview.tsx'
 ]
-
 const requiredTasksFeatureFiles = [
   'hooks/useTaskComposer.ts',
+  'model/task-events.ts',
+  'model/task-status.ts',
   'ui/CreateTaskDialog.tsx',
   'ui/TaskComposer.tsx',
   'ui/TaskCreateMenu.tsx',
@@ -127,27 +139,87 @@ const requiredTasksFeatureFiles = [
   'ui/TaskMetadataPanel.tsx',
   'ui/WorkflowProgressBar.tsx'
 ]
+const requiredCliToolsFeatureFiles = [
+  'model/agent-cli-tool-enablement.ts',
+  'model/agent-cli-tools.ts',
+  'model/system-cli-tools.ts'
+]
 
 const featureImportPattern = /from\s+['"](@features\/[^'"]+)['"]/g
-const legacyArtifactImportPattern = /from\s+['"](@\/components\/artifacts(?:\/[^'"]+)?)['"]/g
-const legacySettingsShellImportPattern =
-  /from\s+['"](@\/components\/settings\/(?:SettingsContent|SettingsSidebar|constants))['"]/g
-const legacySettingsTabImportPattern =
-  /from\s+['"](@\/components\/settings\/tabs\/(?:AboutSettings|AccountSettings|AgentCLISettings|CLIToolsSettings|DataSettings|EditorSettings|GeneralSettings|GitSettings|MCPSettings|NotificationSettings|ProjectsSettings|SkillsSettings|SoundSettings|SystemCliToolDetailDialog|WorkflowTemplatesSettings))['"]/g
-const legacySettingsSwitchImportPattern =
-  /from\s+['"](@\/components\/settings\/components\/Switch)['"]/g
-const legacyRendererHookImportPattern =
-  /from\s+['"](@\/hooks\/(?:useAgent|useSessionLogs|useLogStream|useProjects|useDashboardData))['"]/g
-const legacyRendererLibImportPattern =
-  /from\s+['"](@\/lib\/(?:notifications|providers|session))['"]/g
-const legacyTaskImportPattern = /from\s+['"](@\/components\/task(?:\/[^'"]+)?)['"]/g
-const legacyAutomationTriggerImportPattern =
-  /from\s+['"](@\/components\/automation\/TriggerBadge)['"]/g
-const legacyGitImportPattern = /from\s+['"](@\/components\/git(?:\/[^'"]+)?)['"]/g
-const legacyTerminalImportPattern = /from\s+['"](@\/components\/terminal(?:\/[^'"]+)?)['"]/g
-const legacyHomeImportPattern = /from\s+['"](@\/components\/home(?:\/[^'"]+)?)['"]/g
-const legacyProjectDialogsImportPattern =
-  /from\s+['"](@\/components\/projects\/ProjectDialogs)['"]/g
+const pageImportPattern = /from\s+['"](@\/pages\/[^'"]+)['"]/g
+const legacyComponentImportPattern =
+  /from\s+['"](@\/components\/(?:artifacts|automation|cli|git|home|pipeline|projects|settings|task|terminal)(?:\/[^'"]+)?)['"]/g
+const legacyHookImportPattern =
+  /from\s+['"](@\/hooks\/(?:agent(?:\/[^'"]+)?|useAgent|useDashboardData|useLogStream|useProjects|useProviders|useSessionLogs|useVitePreview))['"]/g
+const legacyLibImportPattern =
+  /from\s+['"](@\/lib\/(?:agent-cli-tool-enablement|agent-cli-tools|background-tasks|mcp|notifications|project-routing|prompt-optimization|providers|session|session-logs|skills|system-cli-tools|task-events|task-status))['"]/g
+
+const removedComponentDirs = [
+  'artifacts',
+  'automation',
+  'cli',
+  'git',
+  'home',
+  'pipeline',
+  'projects',
+  'settings',
+  'task',
+  'terminal'
+]
+
+const removedHookEntries = [
+  'agent',
+  'useAgent.ts',
+  'useDashboardData.ts',
+  'useLogStream.ts',
+  'useProjects.ts',
+  'useProviders.ts',
+  'useSessionLogs.ts',
+  'useVitePreview.ts'
+]
+
+const removedLibFiles = [
+  'agent-cli-tool-enablement.ts',
+  'agent-cli-tools.ts',
+  'background-tasks.ts',
+  'mcp.ts',
+  'notifications.ts',
+  'project-routing.ts',
+  'prompt-optimization.ts',
+  'providers.ts',
+  'session-logs.ts',
+  'session.ts',
+  'skills.ts',
+  'system-cli-tools.ts',
+  'task-events.ts',
+  'task-status.ts'
+]
+const allowedLibFiles = ['electron-api.ts', 'ids.ts', 'paths.ts', 'utils.ts']
+const removedPageCompatibilityFiles = [
+  'src/renderer/src/pages/automations/AutomationsPage.tsx',
+  'src/renderer/src/pages/generated-workflow-review/GeneratedWorkflowReviewPage.tsx',
+  'src/renderer/src/pages/pipeline/PipelineTemplatesPage.tsx',
+  'src/renderer/src/pages/pipeline/WorkflowTemplateEditorPage.tsx',
+  'src/renderer/src/pages/projects/ProjectsPage.tsx',
+  'src/renderer/src/pages/settings/SettingsPage.tsx',
+  'src/renderer/src/pages/skills/SkillsPage.tsx',
+  'src/renderer/src/pages/task-detail/TaskDetailContainer.tsx',
+  'src/renderer/src/pages/task-detail/TaskDetailPage.tsx',
+  'src/renderer/src/pages/task-detail/components/ExecutionPanel.tsx',
+  'src/renderer/src/pages/task-detail/components/ReplyCard.tsx',
+  'src/renderer/src/pages/task-detail/components/RightPanelSection.tsx',
+  'src/renderer/src/pages/task-detail/components/TaskDetailHeader.tsx',
+  'src/renderer/src/pages/task-detail/components/TaskDialogs.tsx',
+  'src/renderer/src/pages/task-detail/components/WorkflowCard.tsx',
+  'src/renderer/src/pages/task-detail/constants.ts',
+  'src/renderer/src/pages/task-detail/types.ts',
+  'src/renderer/src/pages/task-detail/useTaskDetail.tsx',
+  'src/renderer/src/pages/task-detail/workflow-graph.ts',
+  'src/renderer/src/pages/automations/components/AutomationFormDialog.tsx',
+  'src/renderer/src/pages/automations/components/AutomationItem.tsx',
+  'src/renderer/src/pages/automations/components/AutomationList.tsx',
+  'src/renderer/src/pages/automations/components/AutomationRunList.tsx'
+]
 
 const walkFiles = (directoryPath: string): string[] => {
   const entries = readdirSync(directoryPath, { withFileTypes: true })
@@ -176,6 +248,15 @@ const expectDocumentSet = (directoryPath: string, files: string[]) => {
   }
 }
 
+const expectFeatureFileSet = (featureName: string, files: string[]) => {
+  const featureRoot = join(featuresRoot, featureName)
+
+  for (const fileName of files) {
+    const filePath = join(featureRoot, fileName)
+    expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
+  }
+}
+
 describe('architecture guards', () => {
   it('keeps required frontend and backend spec documents in place', () => {
     expectDocumentSet(join(repoRoot, '.trellis/spec/frontend'), requiredFrontendSpecFiles)
@@ -200,85 +281,18 @@ describe('architecture guards', () => {
     }
   })
 
-  it('keeps the artifacts feature model files in place', () => {
-    const artifactsRoot = join(featuresRoot, 'artifacts')
-
-    for (const fileName of requiredArtifactFeatureFiles) {
-      const filePath = join(artifactsRoot, fileName)
-      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    }
-  })
-
-  it('keeps the settings feature shell files in place', () => {
-    const settingsRoot = join(featuresRoot, 'settings')
-
-    for (const fileName of requiredSettingsFeatureFiles) {
-      const filePath = join(settingsRoot, fileName)
-      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    }
-  })
-
-  it('keeps the automation feature files in place', () => {
-    const automationRoot = join(featuresRoot, 'automation')
-
-    for (const fileName of requiredAutomationFeatureFiles) {
-      const filePath = join(automationRoot, fileName)
-      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    }
-  })
-
-  it('keeps the git feature ui files in place', () => {
-    const gitRoot = join(featuresRoot, 'git')
-
-    for (const fileName of requiredGitFeatureFiles) {
-      const filePath = join(gitRoot, fileName)
-      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    }
-  })
-
-  it('keeps the terminal feature ui files in place', () => {
-    const terminalRoot = join(featuresRoot, 'terminal')
-
-    for (const fileName of requiredTerminalFeatureFiles) {
-      const filePath = join(terminalRoot, fileName)
-      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    }
-  })
-
-  it('keeps the home feature files in place', () => {
-    const homeRoot = join(featuresRoot, 'home')
-
-    for (const fileName of requiredHomeFeatureFiles) {
-      const filePath = join(homeRoot, fileName)
-      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    }
-  })
-
-  it('keeps the projects feature files in place', () => {
-    const projectsRoot = join(featuresRoot, 'projects')
-
-    for (const fileName of requiredProjectsFeatureFiles) {
-      const filePath = join(projectsRoot, fileName)
-      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    }
-  })
-
-  it('keeps the task-detail feature files in place', () => {
-    const taskDetailRoot = join(featuresRoot, 'task-detail')
-
-    for (const fileName of requiredTaskDetailFeatureFiles) {
-      const filePath = join(taskDetailRoot, fileName)
-      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    }
-  })
-
-  it('keeps the tasks feature ui files in place', () => {
-    const tasksRoot = join(featuresRoot, 'tasks')
-
-    for (const fileName of requiredTasksFeatureFiles) {
-      const filePath = join(tasksRoot, fileName)
-      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    }
+  it('keeps the required feature file sets in place', () => {
+    expectFeatureFileSet('artifacts', requiredArtifactFeatureFiles)
+    expectFeatureFileSet('settings', requiredSettingsFeatureFiles)
+    expectFeatureFileSet('automation', requiredAutomationFeatureFiles)
+    expectFeatureFileSet('skills', requiredSkillsFeatureFiles)
+    expectFeatureFileSet('git', requiredGitFeatureFiles)
+    expectFeatureFileSet('terminal', requiredTerminalFeatureFiles)
+    expectFeatureFileSet('home', requiredHomeFeatureFiles)
+    expectFeatureFileSet('projects', requiredProjectsFeatureFiles)
+    expectFeatureFileSet('task-detail', requiredTaskDetailFeatureFiles)
+    expectFeatureFileSet('tasks', requiredTasksFeatureFiles)
+    expectFeatureFileSet('cli-tools', requiredCliToolsFeatureFiles)
   })
 
   it('only allows cross-feature imports through feature index barrels', () => {
@@ -304,199 +318,92 @@ describe('architecture guards', () => {
     expect(violations).toEqual([])
   })
 
-  it('keeps legacy artifacts imports contained to the artifacts compatibility layer', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
+  it('does not allow feature modules to depend on page-layer modules', () => {
+    const sourceFiles = walkFiles(featuresRoot).filter(
       (filePath) =>
         (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
     )
     const violations: string[] = []
 
     for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (relativePath.startsWith('src/renderer/src/components/artifacts/')) {
-        continue
-      }
-
       const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyArtifactImportPattern.test(fileContent)) {
-        violations.push(relativePath)
+
+      if (pageImportPattern.test(fileContent)) {
+        violations.push(`${relative(repoRoot, filePath)} -> page-layer import`)
       }
-      legacyArtifactImportPattern.lastIndex = 0
+      pageImportPattern.lastIndex = 0
     }
 
     expect(violations).toEqual([])
   })
 
-  it('keeps legacy settings shell imports contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
+  it('keeps top-level components limited to ui, shared, and layout', () => {
+    const componentDirectories = readdirSync(componentsRoot)
+      .filter((entryName) => statSync(join(componentsRoot, entryName)).isDirectory())
+      .sort()
 
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (
-        relativePath === 'src/renderer/src/components/settings/SettingsContent.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/SettingsSidebar.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/constants.tsx'
-      ) {
-        continue
-      }
+    expect(componentDirectories).toEqual(['layout', 'shared', 'ui'])
 
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacySettingsShellImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacySettingsShellImportPattern.lastIndex = 0
+    for (const removedDir of removedComponentDirs) {
+      expect(existsSync(join(componentsRoot, removedDir))).toBe(false)
     }
-
-    expect(violations).toEqual([])
   })
 
-  it('keeps migrated settings tab imports contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
+  it('keeps top-level hooks limited to generic utilities', () => {
+    const hookEntries = readdirSync(hooksRoot).sort()
 
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (
-        relativePath === 'src/renderer/src/components/settings/tabs/AboutSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/AccountSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/AgentCLISettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/CLIToolsSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/DataSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/EditorSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/GeneralSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/GitSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/MCPSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/NotificationSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/ProjectsSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/SkillsSettings.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/SoundSettings.tsx' ||
-        relativePath ===
-          'src/renderer/src/components/settings/tabs/SystemCliToolDetailDialog.tsx' ||
-        relativePath === 'src/renderer/src/components/settings/tabs/WorkflowTemplatesSettings.tsx'
-      ) {
-        continue
-      }
+    expect(hookEntries).toEqual(['useUnsavedChangesGuard.ts'])
 
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacySettingsTabImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacySettingsTabImportPattern.lastIndex = 0
+    for (const removedEntry of removedHookEntries) {
+      expect(existsSync(join(hooksRoot, removedEntry))).toBe(false)
     }
-
-    expect(violations).toEqual([])
   })
 
-  it('keeps migrated settings switch imports contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
-
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (relativePath === 'src/renderer/src/components/settings/components/Switch.tsx') {
-        continue
-      }
-
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacySettingsSwitchImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacySettingsSwitchImportPattern.lastIndex = 0
+  it('removes obsolete renderer lib compatibility wrappers', () => {
+    for (const fileName of removedLibFiles) {
+      const filePath = join(libRoot, fileName)
+      expect(existsSync(filePath), `${relative(repoRoot, filePath)} should be removed`).toBe(
+        false
+      )
     }
-
-    expect(violations).toEqual([])
   })
 
-  it('keeps migrated renderer business hooks contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
+  it('keeps top-level lib limited to generic utilities and Electron adapters', () => {
+    const libEntries = readdirSync(libRoot).sort()
 
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (
-        relativePath === 'src/renderer/src/hooks/useAgent.ts' ||
-        relativePath === 'src/renderer/src/hooks/useSessionLogs.ts' ||
-        relativePath === 'src/renderer/src/hooks/useLogStream.ts' ||
-        relativePath === 'src/renderer/src/hooks/useProjects.ts' ||
-        relativePath === 'src/renderer/src/hooks/useDashboardData.ts'
-      ) {
-        continue
-      }
-
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyRendererHookImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacyRendererHookImportPattern.lastIndex = 0
-    }
-
-    expect(violations).toEqual([])
+    expect(libEntries).toEqual(allowedLibFiles)
   })
 
-  it('keeps migrated renderer side-effect libs contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
-
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (
-        relativePath === 'src/renderer/src/lib/notifications.ts' ||
-        relativePath === 'src/renderer/src/lib/providers.ts' ||
-        relativePath === 'src/renderer/src/lib/session.ts'
-      ) {
-        continue
-      }
-
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyRendererLibImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacyRendererLibImportPattern.lastIndex = 0
+  it('removes obsolete page compatibility wrappers', () => {
+    for (const relativePath of removedPageCompatibilityFiles) {
+      const filePath = join(repoRoot, relativePath)
+      expect(existsSync(filePath), `${relativePath} should be removed`).toBe(false)
     }
-
-    expect(violations).toEqual([])
   })
 
-  it('keeps migrated task imports contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
+  it('keeps DatabaseService focused on persistence and repository coordination', () => {
+    const databaseServiceSource = readFileSync(
+      join(repoRoot, 'src/main/services/DatabaseService.ts'),
+      'utf-8'
     )
-    const violations: string[] = []
+    const createAppContextSource = readFileSync(
+      join(repoRoot, 'src/main/app/create-app-context.ts'),
+      'utf-8'
+    )
 
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (relativePath.startsWith('src/renderer/src/components/task/')) {
-        continue
-      }
-
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyTaskImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacyTaskImportPattern.lastIndex = 0
-    }
-
-    expect(violations).toEqual([])
+    expect(databaseServiceSource).not.toMatch(/AgentToolProfileService/)
+    expect(databaseServiceSource).not.toMatch(/WorkflowDefinitionGenerationService/)
+    expect(databaseServiceSource).not.toMatch(/PromptOptimizationService/)
+    expect(databaseServiceSource).not.toMatch(/AiAuthoringService/)
+    expect(databaseServiceSource).not.toMatch(/TaskNodeRuntimeService/)
+    expect(databaseServiceSource).not.toMatch(/WorkflowRunLifecycleService/)
+    expect(createAppContextSource).toMatch(/new AgentToolProfileService/)
+    expect(createAppContextSource).toMatch(/new AiAuthoringService/)
+    expect(createAppContextSource).toMatch(/new TaskNodeRuntimeService/)
+    expect(createAppContextSource).toMatch(/new WorkflowRunLifecycleService/)
   })
 
-  it('keeps migrated automation trigger imports contained to compatibility wrappers', () => {
+  it('does not allow imports from removed component, hook, or lib compatibility layers', () => {
     const sourceFiles = walkFiles(rendererRoot).filter(
       (filePath) =>
         (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
@@ -505,130 +412,22 @@ describe('architecture guards', () => {
 
     for (const filePath of sourceFiles) {
       const relativePath = relative(repoRoot, filePath)
-      if (relativePath === 'src/renderer/src/components/automation/TriggerBadge.tsx') {
-        continue
-      }
-
       const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyAutomationTriggerImportPattern.test(fileContent)) {
-        violations.push(relativePath)
+
+      if (legacyComponentImportPattern.test(fileContent)) {
+        violations.push(`${relativePath} -> removed components compatibility layer`)
       }
-      legacyAutomationTriggerImportPattern.lastIndex = 0
-    }
+      legacyComponentImportPattern.lastIndex = 0
 
-    expect(violations).toEqual([])
-  })
-
-  it('keeps migrated git imports contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
-
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (relativePath.startsWith('src/renderer/src/components/git/')) {
-        continue
+      if (legacyHookImportPattern.test(fileContent)) {
+        violations.push(`${relativePath} -> removed hooks compatibility layer`)
       }
+      legacyHookImportPattern.lastIndex = 0
 
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyGitImportPattern.test(fileContent)) {
-        violations.push(relativePath)
+      if (legacyLibImportPattern.test(fileContent)) {
+        violations.push(`${relativePath} -> removed lib compatibility layer`)
       }
-      legacyGitImportPattern.lastIndex = 0
-    }
-
-    expect(violations).toEqual([])
-  })
-
-  it('keeps migrated terminal imports contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
-
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (relativePath.startsWith('src/renderer/src/components/terminal/')) {
-        continue
-      }
-
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyTerminalImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacyTerminalImportPattern.lastIndex = 0
-    }
-
-    expect(violations).toEqual([])
-  })
-
-  it('keeps migrated home imports contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
-
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (relativePath.startsWith('src/renderer/src/components/home/')) {
-        continue
-      }
-
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyHomeImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacyHomeImportPattern.lastIndex = 0
-    }
-
-    expect(violations).toEqual([])
-  })
-
-  it('keeps migrated home imports contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
-
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (relativePath.startsWith('src/renderer/src/components/home/')) {
-        continue
-      }
-
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyHomeImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacyHomeImportPattern.lastIndex = 0
-    }
-
-    expect(violations).toEqual([])
-  })
-
-  it('keeps migrated project dialog imports contained to compatibility wrappers', () => {
-    const sourceFiles = walkFiles(rendererRoot).filter(
-      (filePath) =>
-        (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts')
-    )
-    const violations: string[] = []
-
-    for (const filePath of sourceFiles) {
-      const relativePath = relative(repoRoot, filePath)
-      if (relativePath === 'src/renderer/src/components/projects/ProjectDialogs.tsx') {
-        continue
-      }
-
-      const fileContent = readFileSync(filePath, 'utf-8')
-      if (legacyProjectDialogsImportPattern.test(fileContent)) {
-        violations.push(relativePath)
-      }
-      legacyProjectDialogsImportPattern.lastIndex = 0
+      legacyLibImportPattern.lastIndex = 0
     }
 
     expect(violations).toEqual([])

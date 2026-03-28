@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { shell } from '@/lib/electron-api'
 import { cn } from '@/lib/utils'
-import { useLanguage } from '@/providers/language-provider'
 import {
   getSystemCliDocsUrl,
   getLocalizedSystemCliText,
@@ -18,7 +17,8 @@ import {
   getSystemCliSupportedSources,
   isSystemCliToolInstalled,
   normalizeSystemCliTools
-} from '@/lib/system-cli-tools'
+} from '@features/cli-tools'
+import { useLanguage } from '@/providers/language-provider'
 import {
   SYSTEM_CLI_PACKAGE_MANAGERS,
   type SystemCliPackageManager,

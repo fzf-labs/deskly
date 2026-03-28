@@ -19,9 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { CreateProjectDialog } from '@features/projects'
+import { CreateProjectDialog, isProjectRequiredRoute } from '@features/projects'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { isProjectRequiredRoute } from '@/lib/project-routing'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
 

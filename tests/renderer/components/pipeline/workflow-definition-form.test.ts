@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildWorkflowDefinitionFromForm,
   workflowDefinitionToFormValues
-} from '../../../../src/renderer/src/components/pipeline/workflow-definition-form'
+} from '../../../../src/renderer/src/features/pipeline'
 
 describe('workflow-definition-form', () => {
   it('builds an agent-only DAG workflow definition from form values', () => {

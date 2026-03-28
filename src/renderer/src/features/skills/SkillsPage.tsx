@@ -12,7 +12,7 @@ import {
   loadSkillsFromDirectory,
   openFolderInSystem,
   resolvePath
-} from '@/lib/skills'
+} from './model/skills'
 
 interface CliTarget {
   id: string

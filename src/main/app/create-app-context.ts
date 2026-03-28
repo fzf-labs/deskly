@@ -12,22 +12,24 @@ import { NotificationService } from '../services/NotificationService'
 import { DatabaseService } from '../services/DatabaseService'
 import { SettingsService } from '../services/SettingsService'
 import { TaskService } from '../services/TaskService'
+import { AgentToolProfileService } from '../services/AgentToolProfileService'
+import { TaskNodeRuntimeService } from '../services/TaskNodeRuntimeService'
+import { WorkflowRunLifecycleService } from '../services/WorkflowRunLifecycleService'
 import { CliSessionService } from '../services/cli/CliSessionService'
 import { TerminalService } from '../services/terminal/TerminalService'
 import { AutomationRunnerService } from '../services/AutomationRunnerService'
 import { AutomationService } from '../services/AutomationService'
 import { WorkflowSchedulerService } from '../services/WorkflowSchedulerService'
+import { WorkflowDefinitionGenerationService } from '../services/WorkflowDefinitionGenerationService'
+import { PromptOptimizationService } from '../services/PromptOptimizationService'
+import { AiAuthoringService } from '../services/AiAuthoringService'
 import { AppContext, AppServices } from './AppContext'
 
 type CoreServices = Pick<
   AppServices,
-  | 'databaseService'
-  | 'settingsService'
-  | 'agentToolProfileService'
-  | 'taskNodeRuntimeService'
-  | 'workflowRunLifecycleService'
-  | 'aiAuthoringService'
+  'databaseService' | 'settingsService' | 'agentToolProfileService'
 >
+type AiAuthoringServices = Pick<AppServices, 'aiAuthoringService'>
 type ProjectGitServices = Pick<AppServices, 'projectService' | 'gitService'>
 type CliSessionServices = Pick<
   AppServices,
@@ -43,8 +45,9 @@ type WorkspaceToolServices = Pick<
 >
 type TaskWorkflowServices = Pick<
   AppServices,
-  'taskService' | 'workflowSchedulerService' | 'terminalService'
+  'taskService' | 'taskNodeRuntimeService' | 'workflowRunLifecycleService' | 'terminalService'
 >
+type WorkflowSchedulerServices = Pick<AppServices, 'workflowSchedulerService'>
 type AutomationNotificationServices = Pick<
   AppServices,
   'notificationService' | 'automationRunnerService' | 'automationService'
@@ -57,10 +60,9 @@ const createCoreServices = (): CoreServices => {
   return {
     settingsService,
     databaseService,
-    agentToolProfileService: databaseService.getAgentToolProfileService(),
-    taskNodeRuntimeService: databaseService.getTaskNodeRuntimeService(),
-    workflowRunLifecycleService: databaseService.getWorkflowRunLifecycleService(),
-    aiAuthoringService: databaseService.getAiAuthoringService()
+    agentToolProfileService: new AgentToolProfileService(
+      databaseService.getAgentToolConfigRepository()
+    )
   }
 }
 
@@ -74,7 +76,7 @@ const createCliSessionServices = ({
   agentToolProfileService,
   taskNodeRuntimeService,
   settingsService
-}: CoreServices): CliSessionServices => {
+}: CoreServices & Pick<TaskWorkflowServices, 'taskNodeRuntimeService'>): CliSessionServices => {
   const cliProcessService = new CLIProcessService()
   const cliToolDetectorService = new AgentCLIToolDetectorService()
   const cliToolConfigService = new AgentCLIToolConfigService()
@@ -102,27 +104,86 @@ const createWorkspaceToolServices = (): WorkspaceToolServices => ({
   previewService: new PreviewService()
 })
 
+const createAiAuthoringServices = ({
+  databaseService,
+  settingsService,
+  agentToolProfileService,
+  cliSessionService,
+  cliToolDetectorService
+}: CoreServices &
+  Pick<CliSessionServices, 'cliSessionService' | 'cliToolDetectorService'>): AiAuthoringServices => {
+  const workflowDefinitionGenerationService = new WorkflowDefinitionGenerationService()
+  workflowDefinitionGenerationService.setCliRuntime(
+    cliSessionService,
+    cliToolDetectorService,
+    databaseService.getWorkflowDefinitionService(),
+    settingsService
+  )
+
+  const promptOptimizationService = new PromptOptimizationService()
+  promptOptimizationService.setCliRuntime(cliSessionService, cliToolDetectorService, settingsService)
+
+  return {
+    aiAuthoringService: new AiAuthoringService(
+      workflowDefinitionGenerationService,
+      promptOptimizationService,
+      agentToolProfileService
+    )
+  }
+}
+
 const createTaskWorkflowServices = ({
+  databaseService,
+  settingsService,
+  gitService
+}: CoreServices &
+  Pick<ProjectGitServices, 'gitService'>): TaskWorkflowServices => {
+  const taskNodeRuntimeService = new TaskNodeRuntimeService(
+    databaseService.getTaskRepository(),
+    databaseService.getWorkflowRunService(),
+    databaseService.getWorkflowRunNodeRepository()
+  )
+  const workflowRunLifecycleService = new WorkflowRunLifecycleService(
+    databaseService.getWorkflowRunService(),
+    databaseService.getWorkflowRunNodeRepository(),
+    {
+      getTaskNode: (nodeId) => taskNodeRuntimeService.getTaskNode(nodeId),
+      notifyTaskNodeStatusChange: (node) => taskNodeRuntimeService.notifyTaskNodeStatusChange(node)
+    }
+  )
+
+  return {
+    taskService: new TaskService(databaseService, gitService, settingsService),
+    taskNodeRuntimeService,
+    workflowRunLifecycleService,
+    terminalService: new TerminalService()
+  }
+}
+
+const createWorkflowSchedulerServices = ({
   databaseService,
   agentToolProfileService,
   taskNodeRuntimeService,
   workflowRunLifecycleService,
-  settingsService,
-  gitService,
   cliSessionService
 }: CoreServices &
-  Pick<ProjectGitServices, 'gitService'> &
-  Pick<CliSessionServices, 'cliSessionService'>): TaskWorkflowServices => ({
-  taskService: new TaskService(databaseService, gitService, settingsService),
-  workflowSchedulerService: new WorkflowSchedulerService(
+  Pick<TaskWorkflowServices, 'taskNodeRuntimeService' | 'workflowRunLifecycleService'> &
+  Pick<CliSessionServices, 'cliSessionService'>): WorkflowSchedulerServices => {
+  const workflowSchedulerService = new WorkflowSchedulerService(
     databaseService,
     agentToolProfileService,
     taskNodeRuntimeService,
     cliSessionService,
     workflowRunLifecycleService
-  ),
-  terminalService: new TerminalService()
-})
+  )
+
+  taskNodeRuntimeService.setWorkflowSchedulerService(workflowSchedulerService)
+  workflowRunLifecycleService.setWorkflowSchedulerService(workflowSchedulerService)
+
+  return {
+    workflowSchedulerService
+  }
+}
 
 const createAutomationNotificationServices = ({
   databaseService,
@@ -148,63 +209,35 @@ const createAutomationNotificationServices = ({
   }
 }
 
-const wireAiRuntimeServices = ({
-  databaseService,
-  settingsService,
-  cliSessionService,
-  cliToolDetectorService
-}: Pick<
-  AppServices,
-  'databaseService' | 'settingsService' | 'cliSessionService' | 'cliToolDetectorService'
->) => {
-  databaseService
-    .getWorkflowDefinitionGenerationService()
-    .setCliRuntime(
-      cliSessionService,
-      cliToolDetectorService,
-      databaseService.getWorkflowDefinitionService(),
-      settingsService
-    )
-  databaseService
-    .getPromptOptimizationService()
-    .setCliRuntime(cliSessionService, cliToolDetectorService, settingsService)
-}
-
-const wireWorkflowRuntimeServices = ({
-  databaseService,
-  workflowSchedulerService
-}: Pick<AppServices, 'databaseService' | 'workflowSchedulerService'>) => {
-  databaseService.setWorkflowSchedulerService(workflowSchedulerService)
-}
-
 export const createAppContext = (): AppContext => {
   const appPaths = getAppPaths()
 
   const coreServices = createCoreServices()
   const projectGitServices = createProjectGitServices(coreServices.databaseService)
-  const cliSessionServices = createCliSessionServices(coreServices)
-  const workspaceToolServices = createWorkspaceToolServices()
   const taskWorkflowServices = createTaskWorkflowServices({
     ...coreServices,
-    gitService: projectGitServices.gitService,
+    gitService: projectGitServices.gitService
+  })
+  const cliSessionServices = createCliSessionServices({
+    ...coreServices,
+    taskNodeRuntimeService: taskWorkflowServices.taskNodeRuntimeService
+  })
+  const workflowSchedulerServices = createWorkflowSchedulerServices({
+    ...coreServices,
+    taskNodeRuntimeService: taskWorkflowServices.taskNodeRuntimeService,
+    workflowRunLifecycleService: taskWorkflowServices.workflowRunLifecycleService,
     cliSessionService: cliSessionServices.cliSessionService
   })
-
-  wireAiRuntimeServices({
-    databaseService: coreServices.databaseService,
-    settingsService: coreServices.settingsService,
+  const aiAuthoringServices = createAiAuthoringServices({
+    ...coreServices,
     cliSessionService: cliSessionServices.cliSessionService,
     cliToolDetectorService: cliSessionServices.cliToolDetectorService
   })
-
-  wireWorkflowRuntimeServices({
-    databaseService: coreServices.databaseService,
-    workflowSchedulerService: taskWorkflowServices.workflowSchedulerService
-  })
+  const workspaceToolServices = createWorkspaceToolServices()
 
   const automationNotificationServices = createAutomationNotificationServices({
     databaseService: coreServices.databaseService,
-    taskNodeRuntimeService: coreServices.taskNodeRuntimeService,
+    taskNodeRuntimeService: taskWorkflowServices.taskNodeRuntimeService,
     taskService: taskWorkflowServices.taskService,
     cliSessionService: cliSessionServices.cliSessionService
   })
@@ -221,14 +254,14 @@ export const createAppContext = (): AppContext => {
     previewService: workspaceToolServices.previewService,
     notificationService: automationNotificationServices.notificationService,
     agentToolProfileService: coreServices.agentToolProfileService,
-    aiAuthoringService: coreServices.aiAuthoringService,
+    aiAuthoringService: aiAuthoringServices.aiAuthoringService,
     databaseService: coreServices.databaseService,
     settingsService: coreServices.settingsService,
     taskService: taskWorkflowServices.taskService,
-    taskNodeRuntimeService: coreServices.taskNodeRuntimeService,
-    workflowRunLifecycleService: coreServices.workflowRunLifecycleService,
+    taskNodeRuntimeService: taskWorkflowServices.taskNodeRuntimeService,
+    workflowRunLifecycleService: taskWorkflowServices.workflowRunLifecycleService,
     cliSessionService: cliSessionServices.cliSessionService,
-    workflowSchedulerService: taskWorkflowServices.workflowSchedulerService,
+    workflowSchedulerService: workflowSchedulerServices.workflowSchedulerService,
     terminalService: taskWorkflowServices.terminalService,
     automationRunnerService: automationNotificationServices.automationRunnerService,
     automationService: automationNotificationServices.automationService
@@ -237,9 +270,7 @@ export const createAppContext = (): AppContext => {
   const serviceOrder = [
     coreServices.databaseService,
     coreServices.agentToolProfileService,
-    coreServices.aiAuthoringService,
-    coreServices.taskNodeRuntimeService,
-    coreServices.workflowRunLifecycleService,
+    aiAuthoringServices.aiAuthoringService,
     projectGitServices.projectService,
     projectGitServices.gitService,
     cliSessionServices.cliProcessService,
@@ -253,7 +284,9 @@ export const createAppContext = (): AppContext => {
     automationNotificationServices.notificationService,
     coreServices.settingsService,
     taskWorkflowServices.taskService,
-    taskWorkflowServices.workflowSchedulerService,
+    taskWorkflowServices.taskNodeRuntimeService,
+    taskWorkflowServices.workflowRunLifecycleService,
+    workflowSchedulerServices.workflowSchedulerService,
     taskWorkflowServices.terminalService,
     automationNotificationServices.automationRunnerService,
     automationNotificationServices.automationService

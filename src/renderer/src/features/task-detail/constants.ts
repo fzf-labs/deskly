@@ -1,4 +1,4 @@
-import { taskStatusUi, type TaskStatusUiConfig } from '@/lib/task-status'
+import { taskStatusUi, type TaskStatusUiConfig } from '@features/tasks'
 import type { PipelineDisplayStatus } from './types';
 
 export const statusConfig: Record<

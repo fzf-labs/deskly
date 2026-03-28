@@ -11,11 +11,11 @@ import {
 import { db } from '@/data'
 import { getSettings } from '@/data/settings'
 import type { MessageAttachment } from '@features/cli-session'
-import { notifyTasksChanged } from '@/lib/task-events'
 import { useLanguage } from '@/providers/language-provider'
 import {
   buildTaskCreatePayload,
   createTaskWithSideEffects,
+  notifyTasksChanged,
   resolveWorkflowGenerationToolId,
   type GeneratedWorkflowReviewRequest
 } from '@features/tasks'
