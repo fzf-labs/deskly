@@ -179,6 +179,12 @@ export default {
   generatedWorkflowReviewPageTitle: 'Review generated workflow',
   generatedWorkflowReviewPageSubtitle:
     'Inspect the generated workflow, fine-tune it, then start the task.',
+  generatedWorkflowSaveProjectButton: 'Save to project workflows',
+  generatedWorkflowSaveProjectLoading: 'Saving...',
+  generatedWorkflowUpdateProjectButton: 'Update project workflow',
+  generatedWorkflowUpdateProjectLoading: 'Updating...',
+  generatedWorkflowSavedToProject: 'Saved to project workflows.',
+  generatedWorkflowUpdatedInProject: 'Updated in project workflows.',
   generatedWorkflowReviewMissingDraftTitle: 'No generated workflow draft found',
   generatedWorkflowReviewMissingDraft:
     'There is no generated workflow draft to review right now. Please go back and generate one again.',

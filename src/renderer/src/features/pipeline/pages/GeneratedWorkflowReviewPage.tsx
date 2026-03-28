@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import {
 import { db } from '@/data'
 import { getSettings } from '@/data/settings'
 import type { MessageAttachment } from '@features/cli-session'
+import { useToast } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
 import {
   buildTaskCreatePayload,
@@ -37,9 +38,15 @@ const buildInitialValues = (title: string): WorkflowTemplateFormValues => ({
 
 export function GeneratedWorkflowReviewPage() {
   const { t } = useLanguage()
+  const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
   const state = location.state as GeneratedWorkflowReviewLocationState | null
+  const [savedWorkflowDefinitionId, setSavedWorkflowDefinitionId] = useState<string | null>(null)
+  const initialValues = useMemo(
+    () => buildInitialValues(state?.title || ''),
+    [state?.title]
+  )
 
   const handleBack = useCallback(() => {
     if (state?.returnTo) {
@@ -99,6 +106,48 @@ export function GeneratedWorkflowReviewPage() {
     [navigate, state, t.task.createTaskAutoStartFailed, t.task.generatedWorkflowReviewMissingDraft]
   )
 
+  const handleSaveToProject = useCallback(
+    async (values: WorkflowTemplateFormValues) => {
+      if (!state?.projectId) {
+        throw new Error(t.task.pipelineTemplateNoProject)
+      }
+
+      const definition = buildWorkflowDefinitionFromForm(values)
+
+      if (savedWorkflowDefinitionId) {
+        await db.updateWorkflowDefinition({
+          id: savedWorkflowDefinitionId,
+          scope: 'project',
+          project_id: state.projectId,
+          name: values.name,
+          description: values.description,
+          definition
+        })
+        toast.success(t.task.generatedWorkflowUpdatedInProject)
+        return
+      }
+
+      const createdDefinition = await db.createWorkflowDefinition({
+        scope: 'project',
+        project_id: state.projectId,
+        name: values.name,
+        description: values.description,
+        definition
+      })
+
+      setSavedWorkflowDefinitionId(createdDefinition.id)
+      toast.success(t.task.generatedWorkflowSavedToProject)
+    },
+    [
+      savedWorkflowDefinitionId,
+      state?.projectId,
+      t.task.generatedWorkflowSavedToProject,
+      t.task.generatedWorkflowUpdatedInProject,
+      t.task.pipelineTemplateNoProject,
+      toast
+    ]
+  )
+
   const pageSubtitle = state?.projectName || t.task.generatedWorkflowReviewPageSubtitle
 
   if (!state?.projectId || !state.prompt.trim() || !state.title.trim()) {
@@ -132,13 +181,23 @@ export function GeneratedWorkflowReviewPage() {
       <PageBody className="page-shell-scroll-no-gutter flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0 md:px-0">
         <WorkflowTemplateEditor
           mode="task-draft"
-          initialValues={buildInitialValues(state.title)}
+          showTemplateMetadata
+          initialValues={initialValues}
           initialGenerationPrompt={state.prompt}
           preferredGenerationToolId={resolveWorkflowGenerationToolId(state.cliToolId)}
           preferredGenerationAgentToolConfigId={state.agentToolConfigId}
           nodeRuntimeDefaults={{
             cliToolId: state.cliToolId,
             agentToolConfigId: state.agentToolConfigId
+          }}
+          secondaryAction={{
+            label: savedWorkflowDefinitionId
+              ? t.task.generatedWorkflowUpdateProjectButton
+              : t.task.generatedWorkflowSaveProjectButton,
+            loadingLabel: savedWorkflowDefinitionId
+              ? t.task.generatedWorkflowUpdateProjectLoading
+              : t.task.generatedWorkflowSaveProjectLoading,
+            onAction: handleSaveToProject
           }}
           submitLabel={t.task.generatedWorkflowConfirmButton}
           savingLabel={t.task.generatedWorkflowConfirmLoading}

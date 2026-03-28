@@ -1,10 +1,18 @@
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Folder, FolderOpen } from 'lucide-react'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/providers/language-provider'
 
 import type { WorkspaceProjectGroup } from './useWorkspaceSidebar'
 import { WorkspaceSidebarTaskItem } from './workspace-sidebar-task-item'
+
+const TASK_BATCH_SIZE = 10
+
+function getVisibleTaskCountForIndex(taskIndex: number) {
+  return Math.ceil((taskIndex + 1) / TASK_BATCH_SIZE) * TASK_BATCH_SIZE
+}
 
 interface WorkspaceSidebarProjectGroupProps {
   group: WorkspaceProjectGroup
@@ -27,10 +35,28 @@ export function WorkspaceSidebarProjectGroup({
   onSelectTask,
   onToggleGroup
 }: WorkspaceSidebarProjectGroupProps) {
+  const { tt } = useTranslation()
+  const [visibleTaskCount, setVisibleTaskCount] = useState(TASK_BATCH_SIZE)
+
+  const activeTaskIndex = useMemo(
+    () => group.tasks.findIndex((task) => task.id === activeTaskId),
+    [activeTaskId, group.tasks]
+  )
+
+  useEffect(() => {
+    if (activeTaskIndex < 0) return
+
+    const requiredVisibleTaskCount = getVisibleTaskCountForIndex(activeTaskIndex)
+    setVisibleTaskCount((current) => Math.max(current, requiredVisibleTaskCount))
+  }, [activeTaskIndex])
+
   const handleToggleProjectGroup = () => {
     onSelectProject(group.kind === 'project' ? group.id : null)
     onToggleGroup(group.id)
   }
+
+  const visibleTasks = group.tasks.slice(0, visibleTaskCount)
+  const remainingTaskCount = Math.max(0, group.tasks.length - visibleTasks.length)
 
   if (!leftOpen) {
     const Icon = isCurrentGroup ? FolderOpen : Folder
@@ -84,7 +110,7 @@ export function WorkspaceSidebarProjectGroup({
       {isExpanded && (
         <div className="ml-2 space-y-0.5 pl-1">
           {group.tasks.length > 0 ? (
-            group.tasks.map((task) => (
+            visibleTasks.map((task) => (
               <WorkspaceSidebarTaskItem
                 key={task.id}
                 task={task}
@@ -92,6 +118,18 @@ export function WorkspaceSidebarProjectGroup({
                 onClick={onSelectTask}
               />
             ))
+          ) : null}
+          {remainingTaskCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setVisibleTaskCount((current) => current + TASK_BATCH_SIZE)}
+              className={cn(
+                'text-sidebar-foreground/58 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground/74',
+                'w-full rounded-sm px-2 py-1.5 text-center text-[12px] font-medium transition-colors'
+              )}
+            >
+              {tt('nav.showMoreThreads')}
+            </button>
           ) : null}
         </div>
       )}

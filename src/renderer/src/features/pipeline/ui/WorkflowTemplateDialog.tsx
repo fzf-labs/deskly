@@ -18,6 +18,7 @@ import {
   FileText,
   GitBranchPlus,
   LayoutTemplate,
+  type LucideIcon,
   Save,
   Sparkles,
   Settings2,
@@ -76,6 +77,7 @@ interface WorkflowTemplateEditorProps {
   active?: boolean
   initialValues?: WorkflowTemplateFormValues | null
   mode?: 'template' | 'task-draft'
+  showTemplateMetadata?: boolean
   submitLabel?: string
   savingLabel?: string
   initialGenerationPrompt?: string
@@ -84,6 +86,12 @@ interface WorkflowTemplateEditorProps {
   nodeRuntimeDefaults?: {
     cliToolId?: string | null
     agentToolConfigId?: string | null
+  }
+  secondaryAction?: {
+    label: string
+    loadingLabel?: string
+    icon?: LucideIcon
+    onAction: (values: WorkflowTemplateFormValues) => Promise<void>
   }
   onSubmit: (values: WorkflowTemplateFormValues) => Promise<void>
   onCancel: () => void
@@ -682,18 +690,21 @@ export function WorkflowTemplateEditor({
   active = true,
   initialValues,
   mode = 'template',
+  showTemplateMetadata: showTemplateMetadataProp,
   submitLabel,
   savingLabel,
   initialGenerationPrompt,
   preferredGenerationToolId,
   preferredGenerationAgentToolConfigId,
   nodeRuntimeDefaults,
+  secondaryAction,
   onSubmit,
   onCancel
 }: WorkflowTemplateEditorProps) {
   const { t } = useLanguage()
   const confirm = useConfirm()
   const isTaskDraft = mode === 'task-draft'
+  const showTemplateMetadata = showTemplateMetadataProp ?? !isTaskDraft
   const initialNodeRef = useRef<TaskNodeTemplateDraft>(createDefaultNode(0))
   const formRef = useRef<HTMLFormElement | null>(null)
   const templateNameInputRef = useRef<HTMLInputElement | null>(null)
@@ -714,9 +725,11 @@ export function WorkflowTemplateEditor({
   const [cliConfigsByTool, setCliConfigsByTool] = useState<Record<string, AgentToolConfig[]>>({})
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [secondaryActionLoading, setSecondaryActionLoading] = useState(false)
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false)
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
+  const [scheduledFitRequestId, setScheduledFitRequestId] = useState(0)
   const [initialSnapshot, setInitialSnapshot] = useState(() =>
     serializeDrafts({
       name: '',
@@ -724,6 +737,7 @@ export function WorkflowTemplateEditor({
       nodes: [initialNodeRef.current]
     })
   )
+  const completedFitRequestIdRef = useRef(0)
 
   const loadCliConfigs = useCallback(
     async (toolId: string): Promise<AgentToolConfig[]> => {
@@ -1163,11 +1177,19 @@ export function WorkflowTemplateEditor({
     setSelectedNodeId((current) => (current === nodeId ? null : current))
   }, [])
 
+  const performFitCanvas = useCallback(() => {
+    reactFlowInstance?.fitView({ padding: 0.18, maxZoom: 1.05, duration: 250 })
+  }, [reactFlowInstance])
+
   const fitCanvas = useCallback(() => {
     window.requestAnimationFrame(() => {
-      reactFlowInstance?.fitView({ padding: 0.18, maxZoom: 1.05, duration: 250 })
+      performFitCanvas()
     })
-  }, [reactFlowInstance])
+  }, [performFitCanvas])
+
+  const scheduleFitCanvas = useCallback(() => {
+    setScheduledFitRequestId((current) => current + 1)
+  }, [])
 
   const getAutoLaidOutNodes = useCallback((nodes: TaskNodeTemplateDraft[]) => {
     const nextPositions = buildAutoLayoutPositions(nodes)
@@ -1181,8 +1203,40 @@ export function WorkflowTemplateEditor({
   const applyAutoLayout = useCallback(() => {
     setTemplateNodes((prev) => getAutoLaidOutNodes(prev))
     setError(null)
-    fitCanvas()
-  }, [fitCanvas, getAutoLaidOutNodes])
+    scheduleFitCanvas()
+  }, [getAutoLaidOutNodes, scheduleFitCanvas])
+
+  useEffect(() => {
+    if (
+      !reactFlowInstance ||
+      scheduledFitRequestId === 0 ||
+      scheduledFitRequestId === completedFitRequestIdRef.current
+    ) {
+      return
+    }
+
+    let cancelled = false
+    let firstFrameId = 0
+    let secondFrameId = 0
+
+    // Wait until React Flow applies the latest node positions, then fit the updated bounds.
+    firstFrameId = window.requestAnimationFrame(() => {
+      secondFrameId = window.requestAnimationFrame(() => {
+        if (cancelled) {
+          return
+        }
+
+        performFitCanvas()
+        completedFitRequestIdRef.current = scheduledFitRequestId
+      })
+    })
+
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(firstFrameId)
+      window.cancelAnimationFrame(secondFrameId)
+    }
+  }, [editorGraph.edges, editorGraph.nodes, performFitCanvas, reactFlowInstance, scheduledFitRequestId])
 
   const handleCancelRequest = useCallback(async () => {
     const shouldLeave = await confirmNavigationIfDirty()
@@ -1294,9 +1348,9 @@ export function WorkflowTemplateEditor({
       setTemplateNodes(nextNodes)
       setSelectedNodeId(nextNodes[0]?.id ?? null)
       setSelectedEdgeId(null)
-      fitCanvas()
+      scheduleFitCanvas()
     },
-    [fitCanvas, getAutoLaidOutNodes]
+    [getAutoLaidOutNodes, scheduleFitCanvas]
   )
 
   const handleGenerate = useCallback(
@@ -1353,14 +1407,12 @@ export function WorkflowTemplateEditor({
     void handleGenerate(trimmedPrompt)
   }, [active, handleGenerate, initialGenerationPrompt, isGenerating, isTaskDraft])
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-
+  const buildValidatedPayload = useCallback((): WorkflowTemplateFormValues | null => {
     if (!isTaskDraft && !templateName.trim()) {
       setTemplateNameError(t.task.createTemplateNameRequired)
       setError(null)
       focusTemplateNameField()
-      return
+      return null
     }
 
     setTemplateNameError(null)
@@ -1385,38 +1437,42 @@ export function WorkflowTemplateEditor({
 
     if (nodes.length === 0) {
       setError(t.task.createTemplateStageRequired)
-      return
+      return null
     }
 
     const invalidNode = nodes.find((node) => !node.prompt)
     if (invalidNode) {
       setError(t.task.workflowNodeContentRequired || '每个工作流节点都需要填写提示词。')
-      return
+      return null
     }
 
-    setSaving(true)
-    setError(null)
+    const fallbackName =
+      templateName.trim() ||
+      generationPrompt.trim().split('\n').map((line) => line.trim()).find(Boolean) ||
+      'Generated workflow'
 
-    try {
-      const fallbackName =
-        templateName.trim() ||
-        generationPrompt.trim().split('\n').map((line) => line.trim()).find(Boolean) ||
-        'Generated workflow'
-      const payload: WorkflowTemplateFormValues = {
-        name: fallbackName,
-        description: templateDescription.trim() || undefined,
-        nodes
-      }
-      allowNextNavigation()
-      await onSubmit(payload)
-      setInitialSnapshot(serializeDrafts(payload))
-    } catch (err) {
-      resetNavigationAllowance()
+    return {
+      name: fallbackName,
+      description: templateDescription.trim() || undefined,
+      nodes
+    }
+  }, [
+    focusTemplateNameField,
+    generationPrompt,
+    isTaskDraft,
+    t.task,
+    templateDescription,
+    templateName,
+    templateNodes
+  ])
+
+  const handleSaveError = useCallback(
+    (err: unknown) => {
       const resolvedError = resolveTemplateSaveErrorMessage(err, t.task)
       const templateNameConflictMessage =
         t.task.createTemplateNameConflict || '当前范围内已存在同名工作流，请修改名称后再保存。'
 
-      if (!isTaskDraft && resolvedError === templateNameConflictMessage) {
+      if (showTemplateMetadata && resolvedError === templateNameConflictMessage) {
         setTemplateNameError(resolvedError)
         setError(null)
         focusTemplateNameField()
@@ -1424,10 +1480,54 @@ export function WorkflowTemplateEditor({
       }
 
       setError(resolvedError)
+    },
+    [focusTemplateNameField, showTemplateMetadata, t.task]
+  )
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const payload = buildValidatedPayload()
+    if (!payload) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      allowNextNavigation()
+      await onSubmit(payload)
+      setInitialSnapshot(serializeDrafts(payload))
+    } catch (err) {
+      resetNavigationAllowance()
+      handleSaveError(err)
     } finally {
       setSaving(false)
     }
   }
+
+  const handleSecondaryAction = useCallback(async () => {
+    if (!secondaryAction) {
+      return
+    }
+
+    const payload = buildValidatedPayload()
+    if (!payload) {
+      return
+    }
+
+    setSecondaryActionLoading(true)
+    setError(null)
+
+    try {
+      await secondaryAction.onAction(payload)
+      setInitialSnapshot(serializeDrafts(payload))
+    } catch (err) {
+      handleSaveError(err)
+    } finally {
+      setSecondaryActionLoading(false)
+    }
+  }, [buildValidatedPayload, handleSaveError, secondaryAction])
 
   useEffect(() => {
     if (!active) return
@@ -1502,6 +1602,20 @@ export function WorkflowTemplateEditor({
                   variant="ghost"
                   onClick={handleCancelRequest}
                 />
+                {secondaryAction ? (
+                  <EditorToolButton
+                    icon={secondaryAction.icon || LayoutTemplate}
+                    label={
+                      secondaryActionLoading
+                        ? (secondaryAction.loadingLabel || secondaryAction.label)
+                        : secondaryAction.label
+                    }
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleSecondaryAction()}
+                    disabled={saving || secondaryActionLoading}
+                  />
+                ) : null}
                 <EditorToolButton
                   icon={Save}
                   label={
@@ -1509,7 +1623,7 @@ export function WorkflowTemplateEditor({
                   }
                   type="submit"
                   variant="default"
-                  disabled={saving}
+                  disabled={saving || secondaryActionLoading}
                 />
               </div>
             </div>
@@ -1557,11 +1671,11 @@ export function WorkflowTemplateEditor({
 
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-4 p-2">
-                  {!isTaskDraft && (
+                  {showTemplateMetadata && (
                     <section className={cn(EDITOR_SECTION_CLASS, 'overflow-hidden')}>
                       <div className="border-b border-slate-200/70 px-4 py-3">
                         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          模板
+                          {isTaskDraft ? t.task.createTemplateTitle : '模板'}
                         </div>
                       </div>
                       <div className="space-y-4 px-4 py-4">

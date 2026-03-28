@@ -15,6 +15,7 @@ export default {
   sortThreads: '排序对话',
   sortByRecent: '按最近活动排序',
   sortByTitle: '按名称排序',
+  showMoreThreads: '更多...',
   noTasksYet: '暂无任务',
   startConversation: '开始一个对话',
   settings: '设置',

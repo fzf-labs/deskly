@@ -15,6 +15,7 @@ export default {
   sortThreads: 'Sort threads',
   sortByRecent: 'Sort by recent activity',
   sortByTitle: 'Sort by title',
+  showMoreThreads: 'More...',
   noTasksYet: 'No tasks yet',
   startConversation: 'Start a conversation',
   settings: 'Settings',
