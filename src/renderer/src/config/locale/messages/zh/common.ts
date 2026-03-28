@@ -24,7 +24,7 @@ export default {
   info: '提示',
   refresh: '刷新',
   keepEditing: '继续编辑',
-  leaveWithoutSaving: '不保存离开',
+  leaveWithoutSaving: '离开',
 
   // 滚动
   scrollToBottom: '滚动到底部',
