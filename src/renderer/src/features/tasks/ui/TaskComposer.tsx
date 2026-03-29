@@ -6,6 +6,7 @@ import { getEnabledDefaultCliToolId, getSettings } from '@/data/settings'
 import type { GeneratedWorkflowReviewRequest } from '../model/task-create'
 
 import { TaskCreateMenu } from './TaskCreateMenu'
+import { TaskComposerInput } from './TaskComposerInput'
 import { useTaskComposer } from '../hooks/useTaskComposer'
 
 interface TaskComposerProps {
@@ -59,72 +60,150 @@ export function TaskComposer({
     titleRequired
   })
 
+  const useConversationInput = composer.createMode === 'conversation'
+  const optimizePromptSource = useConversationInput
+    ? composer.compiledConversationPrompt
+    : composer.prompt
+
   return (
     <>
-      <ChatInput
-        variant="home"
-        value={composer.prompt}
-        onValueChange={composer.setPrompt}
-        titleValue={titleRequired ? composer.title : undefined}
-        onTitleChange={titleRequired ? composer.setTitle : undefined}
-        titlePlaceholder={titlePlaceholder}
-        requireTitle={titleRequired}
-        placeholder={promptPlaceholder}
-        onSubmit={async (text, attachments) => {
-          const result = await composer.createTask(text, attachments)
-          if (!result) return
-          if (result.reviewRequest) {
-            await onOpenGeneratedWorkflowReview?.(result.reviewRequest)
-            return
+      {useConversationInput ? (
+        <TaskComposerInput
+          value={composer.prompt}
+          onValueChange={composer.setPrompt}
+          promptNodes={composer.promptNodes}
+          onPromptNodesChange={composer.setPromptNodes}
+          slashItems={composer.slashItems}
+          slashLoading={composer.slashLoading}
+          slashEnabled={Boolean(
+            composer.selectedCliToolId || getEnabledDefaultCliToolId(getSettings())
+          )}
+          titleValue={titleRequired ? composer.title : undefined}
+          onTitleChange={titleRequired ? composer.setTitle : undefined}
+          titlePlaceholder={titlePlaceholder}
+          requireTitle={titleRequired}
+          placeholder={promptPlaceholder}
+          className={className}
+          autoFocus={autoFocus}
+          disabled={composer.loading}
+          operationBar={
+            <TaskCreateMenu
+              createMode={composer.createMode}
+              onCreateModeChange={composer.setCreateMode}
+              canUseProjectWorkflowModes={Boolean(projectId)}
+              cliTools={composer.cliTools}
+              selectedCliToolId={composer.selectedCliToolId}
+              onSelectCliToolId={composer.setSelectedCliToolId}
+              cliConfigs={composer.cliConfigs}
+              selectedCliConfigId={composer.selectedCliConfigId}
+              onSelectCliConfigId={composer.setSelectedCliConfigId}
+              workflowTemplates={composer.workflowDefinitions}
+              selectedTemplateId={composer.selectedTemplateId}
+              onSelectTemplateId={composer.setSelectedTemplateId}
+              isGitProject={composer.isGitProject}
+              branches={composer.branches}
+              selectedBaseBranch={composer.selectedBaseBranch}
+              onSelectBaseBranch={composer.setSelectedBaseBranch}
+            />
           }
-          if (!result.task || !result.context) return
-          await onCreated?.(result.task, result.context)
-        }}
-        className={className}
-        autoFocus={autoFocus}
-        disabled={composer.loading}
-        operationBar={
-          <TaskCreateMenu
-            createMode={composer.createMode}
-            onCreateModeChange={composer.setCreateMode}
-            canUseProjectWorkflowModes={Boolean(projectId)}
-            cliTools={composer.cliTools}
-            selectedCliToolId={composer.selectedCliToolId}
-            onSelectCliToolId={composer.setSelectedCliToolId}
-            cliConfigs={composer.cliConfigs}
-            selectedCliConfigId={composer.selectedCliConfigId}
-            onSelectCliConfigId={composer.setSelectedCliConfigId}
-            workflowTemplates={composer.workflowDefinitions}
-            selectedTemplateId={composer.selectedTemplateId}
-            onSelectTemplateId={composer.setSelectedTemplateId}
-            isGitProject={composer.isGitProject}
-            branches={composer.branches}
-            selectedBaseBranch={composer.selectedBaseBranch}
-            onSelectBaseBranch={composer.setSelectedBaseBranch}
-          />
-        }
-        submitLeftBar={
-          <PromptOptimizeButton
-            prompt={composer.prompt}
-            contextType="task"
-            name={titleRequired ? composer.title || null : null}
-            toolId={
-              composer.selectedCliToolId || getEnabledDefaultCliToolId(getSettings()) || null
+          submitLeftBar={
+            <PromptOptimizeButton
+              prompt={optimizePromptSource}
+              contextType="task"
+              name={titleRequired ? composer.title || null : null}
+              toolId={
+                composer.selectedCliToolId || getEnabledDefaultCliToolId(getSettings()) || null
+              }
+              agentToolConfigId={
+                composer.selectedCliConfigId ||
+                composer.cliConfigs.find((config) => config.is_default)?.id ||
+                null
+              }
+              disabled={composer.loading}
+              onApply={(optimizedPrompt) => {
+                composer.setPrompt(optimizedPrompt)
+                composer.setError(null)
+              }}
+              onError={(message) => composer.setError(message)}
+            />
+          }
+          onSubmit={async ({ text, attachments, promptNodes }) => {
+            const result = await composer.createTask(text, attachments, promptNodes)
+            if (!result) return
+            if (result.reviewRequest) {
+              await onOpenGeneratedWorkflowReview?.(result.reviewRequest)
+              return
             }
-            agentToolConfigId={
-              composer.selectedCliConfigId ||
-              composer.cliConfigs.find((config) => config.is_default)?.id ||
-              null
+            if (!result.task || !result.context) return
+            await onCreated?.(result.task, result.context)
+          }}
+        />
+      ) : (
+        <ChatInput
+          variant="home"
+          value={composer.prompt}
+          onValueChange={composer.setPrompt}
+          titleValue={titleRequired ? composer.title : undefined}
+          onTitleChange={titleRequired ? composer.setTitle : undefined}
+          titlePlaceholder={titlePlaceholder}
+          requireTitle={titleRequired}
+          placeholder={promptPlaceholder}
+          onSubmit={async (text, attachments) => {
+            const result = await composer.createTask(text, attachments)
+            if (!result) return
+            if (result.reviewRequest) {
+              await onOpenGeneratedWorkflowReview?.(result.reviewRequest)
+              return
             }
-            disabled={composer.loading}
-            onApply={(optimizedPrompt) => {
-              composer.setPrompt(optimizedPrompt)
-              composer.setError(null)
-            }}
-            onError={(message) => composer.setError(message)}
-          />
-        }
-      />
+            if (!result.task || !result.context) return
+            await onCreated?.(result.task, result.context)
+          }}
+          className={className}
+          autoFocus={autoFocus}
+          disabled={composer.loading}
+          operationBar={
+            <TaskCreateMenu
+              createMode={composer.createMode}
+              onCreateModeChange={composer.setCreateMode}
+              canUseProjectWorkflowModes={Boolean(projectId)}
+              cliTools={composer.cliTools}
+              selectedCliToolId={composer.selectedCliToolId}
+              onSelectCliToolId={composer.setSelectedCliToolId}
+              cliConfigs={composer.cliConfigs}
+              selectedCliConfigId={composer.selectedCliConfigId}
+              onSelectCliConfigId={composer.setSelectedCliConfigId}
+              workflowTemplates={composer.workflowDefinitions}
+              selectedTemplateId={composer.selectedTemplateId}
+              onSelectTemplateId={composer.setSelectedTemplateId}
+              isGitProject={composer.isGitProject}
+              branches={composer.branches}
+              selectedBaseBranch={composer.selectedBaseBranch}
+              onSelectBaseBranch={composer.setSelectedBaseBranch}
+            />
+          }
+          submitLeftBar={
+            <PromptOptimizeButton
+              prompt={optimizePromptSource}
+              contextType="task"
+              name={titleRequired ? composer.title || null : null}
+              toolId={
+                composer.selectedCliToolId || getEnabledDefaultCliToolId(getSettings()) || null
+              }
+              agentToolConfigId={
+                composer.selectedCliConfigId ||
+                composer.cliConfigs.find((config) => config.is_default)?.id ||
+                null
+              }
+              disabled={composer.loading}
+              onApply={(optimizedPrompt) => {
+                composer.setPrompt(optimizedPrompt)
+                composer.setError(null)
+              }}
+              onError={(message) => composer.setError(message)}
+            />
+          }
+        />
+      )}
 
       {composer.error && <div className="mt-3 text-sm text-red-500">{composer.error}</div>}
     </>

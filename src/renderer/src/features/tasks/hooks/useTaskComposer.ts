@@ -14,6 +14,15 @@ import {
   isProjectWorkflowTaskCreateMode,
   type TaskCreateMode
 } from '../model/task-create'
+import {
+  compileTaskPrompt,
+  getTaskPromptVisibleText,
+  normalizeTaskPromptNodes,
+  replaceTaskPromptWithText,
+  type TaskPromptNode,
+  type TaskPromptSlashItem
+} from '../model/task-prompt'
+import { loadTaskPromptSlashItems } from '../model/task-prompt-slash'
 
 interface UseTaskComposerOptions {
   active?: boolean
@@ -51,6 +60,7 @@ export function useTaskComposer({
 
   const [title, setTitle] = useState('')
   const [prompt, setPrompt] = useState('')
+  const [promptNodes, setPromptNodesState] = useState<TaskPromptNode[]>([])
   const [cliTools, setCliTools] = useState<CLIToolInfo[]>([])
   const [selectedCliToolId, setSelectedCliToolId] = useState('')
   const [cliConfigs, setCliConfigs] = useState<AgentToolConfig[]>([])
@@ -62,6 +72,8 @@ export function useTaskComposer({
   )
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [createMode, setCreateMode] = useState<TaskCreateMode>('conversation')
+  const [slashItems, setSlashItems] = useState<TaskPromptSlashItem[]>([])
+  const [slashLoading, setSlashLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -73,6 +85,7 @@ export function useTaskComposer({
     setError(null)
     setTitle('')
     setPrompt('')
+    setPromptNodesState([])
     setCreateMode('conversation')
     setSelectedCliToolId('')
     setSelectedCliConfigId('')
@@ -290,12 +303,98 @@ export function useTaskComposer({
     [cliConfigs, selectedCliConfigId]
   )
 
+  const normalizedPromptNodes = useMemo(
+    () => normalizeTaskPromptNodes(promptNodes),
+    [promptNodes]
+  )
+
+  const compiledConversationPrompt = useMemo(
+    () => compileTaskPrompt(normalizedPromptNodes),
+    [normalizedPromptNodes]
+  )
+
+  const setPromptValue = useCallback(
+    (nextPrompt: string) => {
+      setPrompt(nextPrompt)
+      if (createMode === 'conversation') {
+        setPromptNodesState(replaceTaskPromptWithText(nextPrompt))
+      }
+    },
+    [createMode]
+  )
+
+  const setPromptNodes = useCallback((nodes: TaskPromptNode[]) => {
+    const normalizedNodes = normalizeTaskPromptNodes(nodes)
+    setPromptNodesState(normalizedNodes)
+    setPrompt(getTaskPromptVisibleText(normalizedNodes))
+  }, [])
+
+  useEffect(() => {
+    if (createMode !== 'conversation') {
+      setSlashItems([])
+      setSlashLoading(false)
+      return
+    }
+
+    if (normalizedPromptNodes.length === 0 && prompt.trim()) {
+      setPromptNodesState(replaceTaskPromptWithText(prompt))
+    }
+  }, [createMode, normalizedPromptNodes.length, prompt])
+
+  useEffect(() => {
+    if (!active || createMode !== 'conversation' || !resolvedTaskCliToolId) {
+      setSlashItems([])
+      setSlashLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const loadItems = async () => {
+      try {
+        setSlashLoading(true)
+        const items = await loadTaskPromptSlashItems({
+          toolId: resolvedTaskCliToolId,
+          projectPath
+        })
+
+        if (!cancelled) {
+          setSlashItems(items)
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          console.error('[useTaskComposer] Failed to load slash items:', loadError)
+          setSlashItems([])
+        }
+      } finally {
+        if (!cancelled) {
+          setSlashLoading(false)
+        }
+      }
+    }
+
+    void loadItems()
+    return () => {
+      cancelled = true
+    }
+  }, [active, createMode, projectPath, resolvedTaskCliToolId])
+
   const createTask = useCallback(
-    async (text: string, attachments?: MessageAttachment[]): Promise<TaskComposerSubmitResult | null> => {
-      const trimmedPrompt = text.trim()
+    async (
+      text: string,
+      attachments?: MessageAttachment[],
+      promptNodesOverride?: TaskPromptNode[]
+    ): Promise<TaskComposerSubmitResult | null> => {
+      const conversationNodes =
+        createMode === 'conversation'
+          ? normalizeTaskPromptNodes(promptNodesOverride ?? normalizedPromptNodes)
+          : []
+      const compiledPrompt =
+        createMode === 'conversation' ? compileTaskPrompt(conversationNodes).trim() : text.trim()
+      const visiblePrompt =
+        createMode === 'conversation' ? getTaskPromptVisibleText(conversationNodes).trim() : text.trim()
       const trimmedTitle = title.trim()
 
-      if (!trimmedPrompt && (!attachments || attachments.length === 0)) {
+      if (!compiledPrompt && (!attachments || attachments.length === 0)) {
         setError(t.task.createPromptRequired)
         return null
       }
@@ -331,7 +430,9 @@ export function useTaskComposer({
         return null
       }
 
-      const resolvedTitle = titleRequired ? trimmedTitle : deriveTaskTitle(trimmedPrompt)
+      const resolvedTitle = titleRequired
+        ? trimmedTitle
+        : deriveTaskTitle(visiblePrompt)
       const resolvedProjectId = projectId ?? ''
 
       if (createMode === 'generated-workflow') {
@@ -339,7 +440,7 @@ export function useTaskComposer({
         return {
           reviewRequest: {
             title: resolvedTitle,
-            prompt: trimmedPrompt,
+            prompt: compiledPrompt,
             attachments,
             projectId: resolvedProjectId,
             projectName,
@@ -364,7 +465,7 @@ export function useTaskComposer({
           buildTaskCreatePayload({
             createMode,
             title: resolvedTitle,
-            prompt: trimmedPrompt,
+            prompt: compiledPrompt,
             projectId,
             projectPath,
             createWorktree: Boolean(isGitProject && projectPath),
@@ -380,7 +481,7 @@ export function useTaskComposer({
         return {
           task: createdTask,
           context: {
-            prompt: trimmedPrompt,
+            prompt: compiledPrompt,
             attachments
           } satisfies CreatedTaskContext
         }
@@ -402,6 +503,7 @@ export function useTaskComposer({
       resolvedTaskCliToolId,
       selectedBaseBranch,
       selectedTemplateId,
+      normalizedPromptNodes,
       projectType,
       t.task.createBaseBranchRequired,
       t.task.createCliConfigRequired,
@@ -420,7 +522,12 @@ export function useTaskComposer({
     title,
     setTitle,
     prompt,
-    setPrompt,
+    setPrompt: setPromptValue,
+    promptNodes: normalizedPromptNodes,
+    setPromptNodes,
+    compiledConversationPrompt,
+    slashItems,
+    slashLoading,
     cliTools,
     selectedCliToolId,
     setSelectedCliToolId,
