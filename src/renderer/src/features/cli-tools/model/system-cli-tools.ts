@@ -70,6 +70,16 @@ export const getSystemCliInstalledSources = (
   return getSystemCliSupportedSources(tool)
 }
 
+export const getSystemCliRecommendedGroupSource = (
+  tool: SystemCliToolInfo
+): SystemCliInstalledSource | null => {
+  if (isSystemCliToolInstalled(tool)) {
+    return getSystemCliInstalledSources(tool)[0] ?? null
+  }
+
+  return getSystemCliPrimarySupportedSource(tool)
+}
+
 export const getSystemCliDocsUrl = (tool: SystemCliToolInfo): string | null => {
   if (tool.installedVia === 'system') {
     return tool.docsUrl ?? null

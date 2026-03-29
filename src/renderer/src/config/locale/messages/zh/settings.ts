@@ -104,7 +104,8 @@ export default {
   cliToolsInstalledSection: '已安装',
   cliToolsRecommendedSection: '推荐安装',
   cliToolsInstalledPageDescription: '按安装来源查看当前已检测到的 CLI 软件包。',
-  cliToolsRecommendedPageDescription: '浏览适合常见 Agent 工作流的推荐 CLI 工具。',
+  cliToolsRecommendedPageDescription:
+    '浏览适合常见 Agent 工作流的推荐 CLI 工具。已安装工具按实际检测到的来源分组，未安装工具按推荐安装来源分组。',
   cliToolsInstalledEmpty: '尚未检测到已安装的推荐 CLI Tools。',
   cliToolsInstalled: '已安装',
   cliToolsNotInstalled: '未安装',

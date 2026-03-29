@@ -114,7 +114,8 @@ export default {
   cliToolsInstalledSection: 'Installed',
   cliToolsRecommendedSection: 'Recommended',
   cliToolsInstalledPageDescription: 'Review detected CLI packages grouped by installation source.',
-  cliToolsRecommendedPageDescription: 'Browse curated CLI tools worth installing for common agent workflows.',
+  cliToolsRecommendedPageDescription:
+    'Browse curated CLI tools for common agent workflows. Installed tools stay grouped by their detected source, while missing tools stay grouped by the recommended install source.',
   cliToolsInstalledEmpty: 'No recommended CLI tools were detected yet.',
   cliToolsInstalled: 'Installed',
   cliToolsNotInstalled: 'Not installed',

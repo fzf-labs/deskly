@@ -216,7 +216,9 @@ export class WorkflowRunNodeRepository {
 
     fields.push('updated_at = ?')
     values.push(now, id)
-    this.db.prepare(`UPDATE workflow_run_nodes SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+    this.db
+      .prepare(`UPDATE workflow_run_nodes SET ${fields.join(', ')} WHERE id = ?`)
+      .run(...values)
     return this.getRunNode(id)
   }
 
@@ -296,13 +298,16 @@ export class WorkflowRunNodeRepository {
     })
   }
 
-  markReview(id: string, result: {
-    result_summary?: string | null
-    error_message?: string | null
-    cost?: number | null
-    duration?: number | null
-    session_id?: string | null
-  } = {}): WorkflowRunNode | null {
+  markReview(
+    id: string,
+    result: {
+      result_summary?: string | null
+      error_message?: string | null
+      cost?: number | null
+      duration?: number | null
+      session_id?: string | null
+    } = {}
+  ): WorkflowRunNode | null {
     return this.updateRunNode(id, {
       status: 'review',
       result_summary: result.result_summary ?? null,
@@ -315,12 +320,15 @@ export class WorkflowRunNodeRepository {
     })
   }
 
-  markDone(id: string, result: {
-    result_summary?: string | null
-    cost?: number | null
-    duration?: number | null
-    session_id?: string | null
-  } = {}): WorkflowRunNode | null {
+  markDone(
+    id: string,
+    result: {
+      result_summary?: string | null
+      cost?: number | null
+      duration?: number | null
+      session_id?: string | null
+    } = {}
+  ): WorkflowRunNode | null {
     return this.updateRunNode(id, {
       status: 'done',
       result_summary: result.result_summary ?? null,
@@ -381,7 +389,7 @@ export class WorkflowRunNodeRepository {
             END,
             completed_at = COALESCE(completed_at, ?),
             updated_at = ?
-          WHERE workflow_run_id = ? AND status IN ('waiting', 'running', 'review')
+          WHERE workflow_run_id = ? AND status IN ('running', 'review')
         `
       )
       .run(reason, now, now, workflowRunId)

@@ -15,7 +15,7 @@ import {
   getSystemCliDocsUrl,
   getSystemCliInstalledSources,
   getLocalizedSystemCliText,
-  getSystemCliPrimarySupportedSource,
+  getSystemCliRecommendedGroupSource,
   getSystemCliSearchText,
   getSystemCliSupportedSources,
   isSystemCliToolInstalled,
@@ -24,9 +24,7 @@ import {
 import { useLanguage } from '@/providers/language-provider'
 import {
   SYSTEM_CLI_INSTALLED_SOURCES,
-  SYSTEM_CLI_PACKAGE_MANAGERS,
   type SystemCliInstalledSource,
-  type SystemCliPackageManager,
   type SystemCliToolInfo
 } from '../../../../../shared/system-cli-tools'
 import { SystemCliToolDetailDialog } from './SystemCliToolDetailDialog'
@@ -118,12 +116,6 @@ export function CLIToolsSettings() {
     }
   }, [])
 
-  useEffect(() => {
-    if (page === 'recommended' && activeSource === 'system') {
-      setActiveSource('all')
-    }
-  }, [activeSource, page])
-
   const installedTools = useMemo(
     () => tools.filter((tool) => isSystemCliToolInstalled(tool)),
     [tools]
@@ -148,7 +140,7 @@ export function CLIToolsSettings() {
           return true
         }
 
-        return getSystemCliPrimarySupportedSource(tool) === (activeSource as SystemCliPackageManager)
+        return getSystemCliRecommendedGroupSource(tool) === activeSource
       }),
     [activeSource, searchFilteredTools]
   )
@@ -175,10 +167,7 @@ export function CLIToolsSettings() {
   )
 
   const sourceOptions = useMemo(
-    () =>
-      (page === 'installed'
-        ? SYSTEM_CLI_INSTALLED_SOURCES
-        : SYSTEM_CLI_PACKAGE_MANAGERS) as SystemCliInstalledSource[],
+    () => SYSTEM_CLI_INSTALLED_SOURCES,
     [page]
   )
 
@@ -190,10 +179,10 @@ export function CLIToolsSettings() {
   const sourceCounts = useMemo(() => {
     if (page === 'recommended') {
       return Object.fromEntries(
-        SYSTEM_CLI_PACKAGE_MANAGERS.map((source) => [
+        SYSTEM_CLI_INSTALLED_SOURCES.map((source) => [
           source,
           filterRecommendedSystemCliTools(searchFilteredTools).filter(
-            (tool) => getSystemCliPrimarySupportedSource(tool) === source
+            (tool) => getSystemCliRecommendedGroupSource(tool) === source
           ).length
         ])
       ) as Record<SystemCliInstalledSource, number>
@@ -223,9 +212,7 @@ export function CLIToolsSettings() {
       Object.fromEntries(
         visibleSourceGroups.map((source) => [
           source,
-          source === 'system'
-            ? []
-            : recommendedTools.filter((tool) => getSystemCliPrimarySupportedSource(tool) === source)
+          recommendedTools.filter((tool) => getSystemCliRecommendedGroupSource(tool) === source)
         ])
       ) as Record<SystemCliInstalledSource, SystemCliToolInfo[]>,
     [recommendedTools, visibleSourceGroups]
@@ -371,8 +358,16 @@ export function CLIToolsSettings() {
           >
             {installed ? t.settings.cliToolsInstalled : t.settings.cliToolsNotInstalled}
           </span>
-          {visibleSources.map(renderSourceBadge)}
         </div>
+
+        {!installed && visibleSources.length > 0 ? (
+          <div className="space-y-2 text-[11px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground">{t.settings.cliToolsAvailableVia}</span>
+              {visibleSources.map(renderSourceBadge)}
+            </div>
+          </div>
+        ) : null}
 
         {primaryUseCase ? (
           <div className="bg-muted/60 rounded-xl px-3 py-2">

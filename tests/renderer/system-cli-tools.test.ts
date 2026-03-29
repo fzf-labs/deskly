@@ -4,6 +4,7 @@ import {
   filterRecommendedSystemCliTools,
   getSystemCliDocsUrl,
   getSystemCliInstalledSources,
+  getSystemCliRecommendedGroupSource,
   getSystemCliPrimarySupportedSource,
   getSystemCliSupportedSources
 } from '../../src/renderer/src/features/cli-tools'
@@ -120,5 +121,17 @@ describe('system CLI tool model helpers', () => {
 
     expect(getSystemCliSupportedSources(ytDlpTool)).toEqual(['brew', 'pipx'])
     expect(getSystemCliPrimarySupportedSource(ytDlpTool)).toBe('brew')
+    expect(getSystemCliRecommendedGroupSource(ytDlpTool)).toBe('brew')
+  })
+
+  it('groups installed recommended tools by their detected install source', () => {
+    const tool = createTool({
+      installed: true,
+      installState: 'installed',
+      installedVia: 'system',
+      installPath: '/usr/bin/jq'
+    })
+
+    expect(getSystemCliRecommendedGroupSource(tool)).toBe('system')
   })
 })

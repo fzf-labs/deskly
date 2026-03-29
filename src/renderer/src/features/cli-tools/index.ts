@@ -14,6 +14,7 @@ export {
   getSystemCliInstalledSources,
   getLocalizedSystemCliText,
   getSystemCliDocsUrl,
+  getSystemCliRecommendedGroupSource,
   getSystemCliPrimarySupportedSource,
   getSystemCliSearchText,
   getSystemCliSupportedSources,

@@ -118,10 +118,10 @@ export const getWorkflowCurrentNodeId = (
   return (
     pickFirst((status) => status === 'running') ??
     pickFirst((status) => status === 'review') ??
+    pickFirst((status) => status === 'failed') ??
     graph.topologicalOrder
       .map((definitionNodeId) => nodesByDefinitionId.get(definitionNodeId))
       .find((node) => node && readyNodeIds.has(node.definition_node_id))?.id ??
-    pickFirst((status) => status === 'failed') ??
     graph.topologicalOrder
       .map((definitionNodeId) => nodesByDefinitionId.get(definitionNodeId))
       .find(Boolean)?.id ??
