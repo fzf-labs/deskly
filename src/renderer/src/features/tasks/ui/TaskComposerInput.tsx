@@ -4,35 +4,31 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
-  type ClipboardEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode
 } from 'react'
 import type { MessageAttachment } from '@features/cli-session'
-import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
-import { ArrowUp, FileText, Paperclip, Plus, Sparkles, Wrench, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Sparkles, Wrench } from 'lucide-react'
 
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { createTaskPromptTextNode, getTaskPromptVisibleText, hasTaskPromptContent, normalizeTaskPromptNodes, type TaskPromptNode, type TaskPromptSlashItem } from '../model/task-prompt'
+import { ComposerInputShell } from '@/components/shared/ComposerInputShell'
+import {
+  INPUT_ATTACHMENT_ACCEPT,
+  useInputAttachments
+} from '@/components/shared/useInputAttachments'
+import { createTaskPromptTextNode, getTaskPromptVisibleText, hasTaskPromptContent, normalizeTaskPromptNodes, replaceTaskPromptWithText, type TaskPromptNode, type TaskPromptSlashItem } from '../model/task-prompt'
 import { scrollSelectedSlashItemIntoView } from './task-composer-input-utils'
-
-interface Attachment {
-  id: string
-  file: File
-  type: 'image' | 'file'
-  preview?: string
-}
 
 interface TaskComposerInputSubmitPayload {
   text: string
-  promptNodes: TaskPromptNode[]
+  promptNodes?: TaskPromptNode[]
   attachments?: MessageAttachment[]
 }
 
 interface TaskComposerInputProps {
+  inputMode?: 'plain' | 'slash-rich'
   value?: string
   onValueChange?: (value: string) => void
   promptNodes?: TaskPromptNode[]
@@ -52,34 +48,8 @@ interface TaskComposerInputProps {
   requireTitle?: boolean
   onSubmit: (payload: TaskComposerInputSubmitPayload) => Promise<void>
 }
-
-const generateId = () => `attachment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 const generatePromptTokenInstanceId = (baseId: string) =>
   `${baseId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-
-const isImageFile = (file: File) => {
-  if (file.type.startsWith('image/')) {
-    return true
-  }
-
-  const ext = file.name.split('.').pop()?.toLowerCase()
-  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'ico'].includes(ext || '')
-}
-
-const createImagePreview = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const result = event.target?.result as string
-      if (result) {
-        resolve(result)
-      } else {
-        reject(new Error('Failed to read file'))
-      }
-    }
-    reader.onerror = () => reject(new Error('FileReader error'))
-    reader.readAsDataURL(file)
-  })
 
 const serializePromptNodes = (nodes: TaskPromptNode[]) => JSON.stringify(normalizeTaskPromptNodes(nodes))
 
@@ -223,6 +193,7 @@ const insertTextAtSelection = (text: string) => {
 }
 
 export function TaskComposerInput({
+  inputMode = 'slash-rich',
   value = '',
   onValueChange,
   promptNodes = [],
@@ -243,22 +214,32 @@ export function TaskComposerInput({
   onSubmit
 }: TaskComposerInputProps) {
   const { t } = useLanguage()
-  const [attachments, setAttachments] = useState<Attachment[]>([])
   const [slashQuery, setSlashQuery] = useState('')
   const [slashOpen, setSlashOpen] = useState(false)
   const [selectedSlashIndex, setSelectedSlashIndex] = useState(0)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const editorRef = useRef<HTMLDivElement>(null)
   const slashMenuRef = useRef<HTMLDivElement>(null)
   const slashRangeRef = useRef<Range | null>(null)
   const lastAppliedNodesRef = useRef<string>('')
+  const {
+    attachments,
+    fileInputRef,
+    handleFileChange,
+    handlePaste,
+    openFilePicker,
+    removeAttachment,
+    resetAttachments,
+    toMessageAttachments
+  } = useInputAttachments({ logLabel: 'TaskComposerInput' })
+  const useSlashInput = inputMode === 'slash-rich'
+  const slashEditorEnabled = useSlashInput && slashEnabled
 
   const normalizedPromptNodes = useMemo(() => normalizeTaskPromptNodes(promptNodes), [promptNodes])
   const visibleText = useMemo(
-    () => (slashEnabled ? getTaskPromptVisibleText(normalizedPromptNodes) : value),
-    [normalizedPromptNodes, slashEnabled, value]
+    () => (useSlashInput ? getTaskPromptVisibleText(normalizedPromptNodes) : value),
+    [normalizedPromptNodes, useSlashInput, value]
   )
 
   const filteredSlashItems = useMemo(() => {
@@ -271,7 +252,16 @@ export function TaskComposerInput({
   }, [slashItems, slashQuery])
 
   useEffect(() => {
-    if (!slashEnabled) {
+    if (!slashEditorEnabled) {
+      setSlashOpen(false)
+      setSlashQuery('')
+      setSelectedSlashIndex(0)
+      slashRangeRef.current = null
+    }
+  }, [slashEditorEnabled])
+
+  useEffect(() => {
+    if (!slashEditorEnabled) {
       return
     }
 
@@ -288,7 +278,7 @@ export function TaskComposerInput({
 
     buildEditorDom(editor, normalizedPromptNodes)
     lastAppliedNodesRef.current = nextSignature
-  }, [normalizedPromptNodes, slashEnabled])
+  }, [normalizedPromptNodes, slashEditorEnabled])
 
   useEffect(() => {
     if (!autoFocus) {
@@ -300,13 +290,13 @@ export function TaskComposerInput({
       return
     }
 
-    if (slashEnabled) {
+    if (slashEditorEnabled) {
       editorRef.current?.focus()
       return
     }
 
     textareaRef.current?.focus()
-  }, [autoFocus, onTitleChange, slashEnabled])
+  }, [autoFocus, onTitleChange, slashEditorEnabled])
 
   useEffect(() => {
     if (!slashOpen) {
@@ -335,87 +325,6 @@ export function TaskComposerInput({
     }
   }, [filteredSlashItems, selectedSlashIndex, slashOpen])
 
-  const addFiles = useCallback(async (files: FileList | File[], forceImage = false) => {
-    const nextAttachments: Attachment[] = []
-
-    for (const file of Array.from(files)) {
-      const isImage = forceImage || isImageFile(file)
-      const attachment: Attachment = {
-        id: generateId(),
-        file,
-        type: isImage ? 'image' : 'file'
-      }
-
-      if (isImage) {
-        try {
-          attachment.preview = await createImagePreview(file)
-        } catch (error) {
-          console.error('[TaskComposerInput] Failed to create image preview:', error)
-        }
-      }
-
-      nextAttachments.push(attachment)
-    }
-
-    setAttachments((previous) => [...previous, ...nextAttachments])
-  }, [])
-
-  const removeAttachment = useCallback((id: string) => {
-    setAttachments((previous) => previous.filter((attachment) => attachment.id !== id))
-  }, [])
-
-  const convertAttachments = (): MessageAttachment[] | undefined => {
-    if (attachments.length === 0) {
-      return undefined
-    }
-
-    const result = attachments
-      .filter((attachment) => {
-        if (attachment.type !== 'image') {
-          return true
-        }
-        return Boolean(attachment.preview)
-      })
-      .map((attachment) => ({
-        id: attachment.id,
-        type: attachment.type,
-        name: attachment.file.name,
-        data: attachment.preview || '',
-        mimeType: attachment.file.type || (attachment.type === 'image' ? 'image/png' : '')
-      }))
-
-    return result.length > 0 ? result : undefined
-  }
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      void addFiles(event.target.files)
-      event.target.value = ''
-    }
-  }
-
-  const handlePaste = useCallback(
-    async (event: ClipboardEvent) => {
-      const imageFiles: File[] = []
-      for (let index = 0; index < event.clipboardData.items.length; index += 1) {
-        const item = event.clipboardData.items[index]
-        if (!item.type.startsWith('image/')) {
-          continue
-        }
-        const file = item.getAsFile()
-        if (file) {
-          imageFiles.push(file)
-        }
-      }
-
-      if (imageFiles.length > 0) {
-        event.preventDefault()
-        await addFiles(imageFiles, true)
-      }
-    },
-    [addFiles]
-  )
-
   const closeSlashMenu = useCallback(() => {
     setSlashOpen(false)
     setSlashQuery('')
@@ -435,7 +344,7 @@ export function TaskComposerInput({
   }, [onPromptNodesChange])
 
   const updateSlashState = useCallback(() => {
-    if (!slashEnabled) {
+    if (!slashEditorEnabled) {
       closeSlashMenu()
       return
     }
@@ -499,7 +408,7 @@ export function TaskComposerInput({
     slashRangeRef.current = triggerRange
     setSlashQuery(query)
     setSlashOpen(true)
-  }, [closeSlashMenu, slashEnabled])
+  }, [closeSlashMenu, slashEditorEnabled])
 
   const removeTokenById = useCallback(
     (tokenId: string) => {
@@ -664,9 +573,13 @@ export function TaskComposerInput({
   }
 
   const handleSubmit = async () => {
-    const promptContent = slashEnabled ? normalizedPromptNodes : [createTaskPromptTextNode(value)]
-    const textContent = slashEnabled ? visibleText.trim() : value.trim()
-    const hasContent = slashEnabled ? hasTaskPromptContent(promptContent) : Boolean(textContent)
+    const promptContent = useSlashInput
+      ? slashEditorEnabled
+        ? normalizedPromptNodes
+        : replaceTaskPromptWithText(value)
+      : []
+    const textContent = (useSlashInput ? visibleText : value).trim()
+    const hasContent = useSlashInput ? hasTaskPromptContent(promptContent) : Boolean(textContent)
     const hasRequiredTitle = !requireTitle || (titleValue || '').trim().length > 0
 
     if (!hasContent && attachments.length === 0) {
@@ -677,14 +590,14 @@ export function TaskComposerInput({
       return
     }
 
-    const messageAttachments = convertAttachments()
-    const submittedNodes = slashEnabled ? normalizedPromptNodes : [createTaskPromptTextNode(textContent)]
+    const messageAttachments = toMessageAttachments()
+    const submittedNodes = useSlashInput ? promptContent : undefined
 
-    if (!slashEnabled) {
+    if (!useSlashInput) {
       onValueChange?.('')
     }
     onPromptNodesChange?.([])
-    setAttachments([])
+    resetAttachments()
     closeSlashMenu()
 
     await onSubmit({
@@ -695,12 +608,12 @@ export function TaskComposerInput({
   }
 
   const canSubmit =
-    (slashEnabled ? hasTaskPromptContent(normalizedPromptNodes) : Boolean(value.trim())) ||
+    (useSlashInput ? hasTaskPromptContent(normalizedPromptNodes) : Boolean(value.trim())) ||
     attachments.length > 0
 
   return (
     <div className={cn('relative w-full', className)}>
-      {slashEnabled && slashOpen && (
+      {slashEditorEnabled && slashOpen && (
         <div className="absolute inset-x-0 bottom-full z-30 mb-3">
           <div className="border-border bg-popover w-full overflow-hidden rounded-[28px] border shadow-xl">
             <div ref={slashMenuRef} className="max-h-72 overflow-auto p-2">
@@ -786,161 +699,81 @@ export function TaskComposerInput({
         </div>
       )}
 
-      <div className="border-border/60 bg-background/96 w-full rounded-[28px] border p-4 shadow-[0_24px_60px_rgba(15,23,42,0.10)] backdrop-blur">
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*,.pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.pptx,.ppt"
-          onChange={handleFileChange}
-          className="hidden"
-        />
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={INPUT_ATTACHMENT_ACCEPT}
+        onChange={handleFileChange}
+        className="hidden"
+      />
 
-        {attachments.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {attachments.map((attachment) => (
-              <div
-                key={attachment.id}
-                className="group border-border/50 bg-muted/50 relative flex items-center gap-2 rounded-lg border px-3 py-2"
-              >
-                {attachment.type === 'image' && attachment.preview ? (
-                  <img
-                    src={attachment.preview}
-                    alt={attachment.file.name}
-                    className="h-10 w-10 rounded object-cover"
-                  />
-                ) : (
-                  <div className="bg-muted flex h-10 w-10 items-center justify-center rounded">
-                    <FileText className="text-muted-foreground h-5 w-5" />
-                  </div>
-                )}
-                <span className="text-foreground max-w-[120px] truncate text-sm">
-                  {attachment.file.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(attachment.id)}
-                  className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {typeof onTitleChange === 'function' && (
+      <ComposerInputShell
+        variant="home"
+        disabled={disabled}
+        attachments={attachments}
+        onRemoveAttachment={removeAttachment}
+        onOpenFilePicker={openFilePicker}
+        titleInputRef={titleInputRef}
+        titleValue={titleValue}
+        onTitleChange={onTitleChange}
+        titlePlaceholder={titlePlaceholder}
+        onTitleEnter={() => {
+          if (slashEditorEnabled) {
+            editorRef.current?.focus()
+          } else {
+            textareaRef.current?.focus()
+          }
+        }}
+        bodyWrapperClassName={slashEditorEnabled ? 'relative' : undefined}
+        operationBar={operationBar}
+        submitLeftBar={submitLeftBar}
+        canSubmit={canSubmit && (!requireTitle || Boolean((titleValue || '').trim()))}
+        onSubmit={() => {
+          void handleSubmit()
+        }}
+      >
+        {slashEditorEnabled ? (
           <>
-            <div className="mb-2">
-              <input
-                ref={titleInputRef}
-                value={titleValue || ''}
-                onChange={(event) => onTitleChange(event.target.value)}
-                placeholder={titlePlaceholder}
-                className="text-foreground placeholder:text-muted-foreground w-full border-0 bg-transparent px-0 py-1 text-base font-medium focus:outline-none"
-                disabled={disabled}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault()
-                    if (slashEnabled) {
-                      editorRef.current?.focus()
-                    } else {
-                      textareaRef.current?.focus()
-                    }
-                  }
-                }}
-              />
-            </div>
-            <div className="bg-border/70 mb-3 h-px w-full" />
-          </>
-        )}
-
-        <div className="relative">
-          {slashEnabled ? (
-            <>
-              {normalizedPromptNodes.length === 0 && (
-                <div
-                  className="text-muted-foreground pointer-events-none absolute top-1 left-0 text-sm"
-                  aria-hidden="true"
-                >
-                  {placeholder}
-                </div>
-              )}
+            {normalizedPromptNodes.length === 0 && (
               <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={handleEditorInput}
-                onKeyDown={handleEditorKeyDown}
-                onClick={handleEditorClick}
-                onPaste={handlePaste}
-                className="text-foreground min-h-[160px] w-full overflow-auto whitespace-pre-wrap break-words border-0 bg-transparent px-0 py-1 text-sm focus:outline-none"
-                style={{ maxHeight: '320px' }}
-                data-testid="task-composer-rich-editor"
-              />
-            </>
-          ) : (
-            <textarea
-              ref={textareaRef}
-              value={value}
-              onChange={(event) => onValueChange?.(event.target.value)}
-              onPaste={handlePaste}
-              placeholder={placeholder}
-              className="text-foreground placeholder:text-muted-foreground min-h-[160px] w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm focus:outline-none"
-              style={{ maxHeight: '320px' }}
-              rows={1}
-              disabled={disabled}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  void handleSubmit()
-                }
-              }}
-            />
-          )}
-        </div>
-
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex min-w-0 flex-1 items-center gap-1">
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger
-                disabled={disabled}
-                className="border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground flex size-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="text-muted-foreground pointer-events-none absolute top-1 left-0 text-sm"
+                aria-hidden="true"
               >
-                <Plus className="size-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" sideOffset={8} className="z-50 w-56">
-                <DropdownMenuItem
-                  onSelect={() => fileInputRef.current?.click()}
-                  className="cursor-pointer gap-3 py-2.5"
-                >
-                  <Paperclip className="size-4" />
-                  <span>{t.home.addFilesOrPhotos}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {operationBar && <div className="ml-1 min-w-0 flex-1">{operationBar}</div>}
-          </div>
-
-          <div className="flex items-center gap-1">
-            {submitLeftBar}
-            <button
-              type="button"
-              onClick={() => void handleSubmit()}
-              disabled={disabled || !canSubmit || (requireTitle && !(titleValue || '').trim())}
-              className={cn(
-                'flex size-8 items-center justify-center rounded-full transition-all',
-                !disabled && canSubmit && (!requireTitle || Boolean((titleValue || '').trim()))
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed'
-              )}
-            >
-              <ArrowUp className="size-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+                {placeholder}
+              </div>
+            )}
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleEditorInput}
+              onKeyDown={handleEditorKeyDown}
+              onClick={handleEditorClick}
+              onPaste={handlePaste}
+              className="text-foreground h-full min-h-[160px] w-full overflow-auto whitespace-pre-wrap break-words border-0 bg-transparent px-0 py-1 text-sm focus:outline-none"
+              data-testid="task-composer-rich-editor"
+            />
+          </>
+        ) : (
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(event) => onValueChange?.(event.target.value)}
+            onPaste={handlePaste}
+            placeholder={placeholder}
+            className="text-foreground placeholder:text-muted-foreground min-h-[160px] flex-1 w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm focus:outline-none"
+            rows={1}
+            disabled={disabled}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                void handleSubmit()
+              }
+            }}
+          />
+        )}
+      </ComposerInputShell>
     </div>
   )
 }

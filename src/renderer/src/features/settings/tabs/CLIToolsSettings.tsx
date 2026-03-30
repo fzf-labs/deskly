@@ -166,10 +166,7 @@ export function CLIToolsSettings() {
     [selectedToolId, tools]
   )
 
-  const sourceOptions = useMemo(
-    () => SYSTEM_CLI_INSTALLED_SOURCES,
-    [page]
-  )
+  const sourceOptions = SYSTEM_CLI_INSTALLED_SOURCES
 
   const visibleSourceGroups = useMemo(
     () => (activeSource === 'all' || !sourceOptions.includes(activeSource) ? sourceOptions : [activeSource]),

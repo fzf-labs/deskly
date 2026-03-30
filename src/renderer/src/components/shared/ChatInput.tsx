@@ -5,103 +5,48 @@
  * Supports text input, file attachments, image paste, and keyboard shortcuts.
  */
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { MessageAttachment } from '@features/cli-session';
-import { cn } from '@/lib/utils';
-import { useLanguage } from '@/providers/language-provider';
-import {
-  ArrowUp,
-  FileText,
-  Paperclip,
-  Plus,
-  Send,
-  Square,
-  X,
-} from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import type { MessageAttachment } from '@features/cli-session'
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils'
 
-// Attachment type for files and images
-export interface Attachment {
-  id: string;
-  file: File;
-  type: 'image' | 'file';
-  preview?: string; // Data URL for image preview
-}
+import { ComposerInputShell } from './ComposerInputShell'
+import { INPUT_ATTACHMENT_ACCEPT, useInputAttachments } from './useInputAttachments'
 
 export interface ChatInputProps {
   /** Controlled textarea value */
-  value?: string;
+  value?: string
   /** Controlled textarea change callback */
-  onValueChange?: (value: string) => void;
+  onValueChange?: (value: string) => void
   /** Placeholder text */
-  placeholder?: string;
+  placeholder?: string
   /** Whether the agent is running */
-  isRunning?: boolean;
+  isRunning?: boolean
   /** Callback when submitting with text and attachments */
-  onSubmit: (text: string, attachments?: MessageAttachment[]) => Promise<void>;
+  onSubmit: (text: string, attachments?: MessageAttachment[]) => Promise<void>
   /** Callback when stop button is clicked */
-  onStop?: () => void;
+  onStop?: () => void
   /** Variant: 'home' for larger home page style, 'reply' for compact reply style */
-  variant?: 'home' | 'reply';
+  variant?: 'home' | 'reply'
   /** Additional class names */
-  className?: string;
+  className?: string
   /** Whether to disable the input */
-  disabled?: boolean;
+  disabled?: boolean
   /** Auto focus on mount */
-  autoFocus?: boolean;
+  autoFocus?: boolean
   /** Extra operation controls shown in home variant */
-  operationBar?: ReactNode;
+  operationBar?: ReactNode
   /** Extra actions shown just to the left of the submit button in home variant */
-  submitLeftBar?: ReactNode;
+  submitLeftBar?: ReactNode
   /** Optional title value for task creation mode */
-  titleValue?: string;
+  titleValue?: string
   /** Optional title change callback for task creation mode */
-  onTitleChange?: (value: string) => void;
+  onTitleChange?: (value: string) => void
   /** Title placeholder for task creation mode */
-  titlePlaceholder?: string;
+  titlePlaceholder?: string
   /** Whether title is required before submit */
-  requireTitle?: boolean;
+  requireTitle?: boolean
 }
-
-// Generate unique ID for attachments
-const generateId = () =>
-  `attachment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-
-// Check if file is an image (by MIME type or file extension)
-const isImageFile = (file: File) => {
-  // Check MIME type first
-  if (file.type.startsWith('image/')) {
-    return true;
-  }
-  // Fallback: check file extension for common image formats
-  const ext = file.name.split('.').pop()?.toLowerCase();
-  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'ico'].includes(
-    ext || ''
-  );
-};
-
-// Create preview for image files with error handling
-const createImagePreview = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) {
-        resolve(result);
-      } else {
-        reject(new Error('Failed to read file'));
-      }
-    };
-    reader.onerror = () => reject(new Error('FileReader error'));
-    reader.readAsDataURL(file);
-  });
-};
 
 export function ChatInput({
   value: controlledValue,
@@ -119,406 +64,166 @@ export function ChatInput({
   titleValue,
   onTitleChange,
   titlePlaceholder = '请输入标题',
-  requireTitle = false,
+  requireTitle = false
 }: ChatInputProps) {
-  const { t } = useLanguage();
-  const [uncontrolledValue, setUncontrolledValue] = useState('');
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const isComposingRef = useRef(false);
-  const prevIsRunningRef = useRef(isRunning);
-  const isHome = variant === 'home';
-  const hasTitleField = isHome && typeof onTitleChange === 'function';
-  const isTaskCreateLayout = isHome && hasTitleField;
-  const isControlled = typeof controlledValue === 'string';
-  const value = isControlled ? controlledValue : uncontrolledValue;
+  const [uncontrolledValue, setUncontrolledValue] = useState('')
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isComposingRef = useRef(false)
+  const prevIsRunningRef = useRef(isRunning)
+  const isHome = variant === 'home'
+  const hasTitleField = isHome && typeof onTitleChange === 'function'
+  const isTaskCreateLayout = isHome && hasTitleField
+  const isControlled = typeof controlledValue === 'string'
+  const value = isControlled ? controlledValue : uncontrolledValue
+  const {
+    attachments,
+    fileInputRef,
+    handleFileChange,
+    handlePaste,
+    openFilePicker,
+    removeAttachment,
+    resetAttachments,
+    toMessageAttachments
+  } = useInputAttachments({ logLabel: 'ChatInput' })
 
   const setValue = useCallback(
     (nextValue: string) => {
       if (!isControlled) {
-        setUncontrolledValue(nextValue);
+        setUncontrolledValue(nextValue)
       }
-      onValueChange?.(nextValue);
+      onValueChange?.(nextValue)
     },
     [isControlled, onValueChange]
-  );
+  )
 
-  // Auto focus on mount if autoFocus is true
   useEffect(() => {
     if (!autoFocus) return;
     if (isTaskCreateLayout && titleInputRef.current) {
-      titleInputRef.current.focus();
-      return;
+      titleInputRef.current.focus()
+      return
     }
     if (textareaRef.current) {
-      textareaRef.current.focus();
+      textareaRef.current.focus()
     }
-  }, [autoFocus, isTaskCreateLayout]);
+  }, [autoFocus, isTaskCreateLayout])
 
-  // Auto focus when agent stops running (reply completed)
   useEffect(() => {
     if (prevIsRunningRef.current && !isRunning && textareaRef.current) {
-      textareaRef.current.focus();
+      textareaRef.current.focus()
     }
-    prevIsRunningRef.current = isRunning;
-  }, [isRunning]);
-
-  // Add files to attachments
-  // forceImage: when true, treat all files as images (e.g., from clipboard paste)
-  const addFiles = useCallback(
-    async (files: FileList | File[], forceImage = false) => {
-      const fileArray = Array.from(files);
-      const newAttachments: Attachment[] = [];
-
-      for (const file of fileArray) {
-        const isImage = forceImage || isImageFile(file);
-
-        const attachment: Attachment = {
-          id: generateId(),
-          file,
-          type: isImage ? 'image' : 'file',
-        };
-
-        if (isImage) {
-          try {
-            attachment.preview = await createImagePreview(file);
-          } catch (error) {
-            console.error('[ChatInput] Failed to create image preview:', error);
-            // Keep as image type but with empty preview - it will show file icon
-          }
-        }
-
-        newAttachments.push(attachment);
-      }
-
-      setAttachments((prev) => [...prev, ...newAttachments]);
-    },
-    []
-  );
-
-  // Remove attachment
-  const removeAttachment = useCallback((id: string) => {
-    setAttachments((prev) => prev.filter((a) => a.id !== id));
-  }, []);
-
-  // Handle file input change
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      addFiles(e.target.files);
-      e.target.value = '';
-    }
-  };
-
-  // Handle paste event for image upload
-  const handlePaste = useCallback(
-    async (e: React.ClipboardEvent) => {
-      const items = e.clipboardData.items;
-      const imageFiles: File[] = [];
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type.startsWith('image/')) {
-          const file = item.getAsFile();
-          if (file) {
-            imageFiles.push(file);
-          }
-        }
-      }
-
-      if (imageFiles.length > 0) {
-        e.preventDefault();
-        // Pass forceImage=true since we've already verified these are images
-        await addFiles(imageFiles, true);
-      }
-    },
-    [addFiles]
-  );
-
-  // Open file picker
-  const openFilePicker = () => {
-    fileInputRef.current?.click();
-  };
-
-  // Convert attachments to MessageAttachment format
-  const convertToMessageAttachments = (): MessageAttachment[] | undefined => {
-    if (attachments.length === 0) return undefined;
-
-    const result = attachments
-      .filter((a) => {
-        // For images, only include if preview exists and has data
-        if (a.type === 'image') {
-          const hasPreview = a.preview && a.preview.length > 0;
-          if (!hasPreview) {
-            console.warn(
-              `[ChatInput] Skipping image ${a.file.name}: no preview data`
-            );
-          }
-          return hasPreview;
-        }
-        return true; // Keep non-image files
-      })
-      .map((a) => {
-        // Determine mimeType with fallback for clipboard pastes where file.type might be empty
-        let mimeType = a.file.type;
-        if (!mimeType && a.type === 'image') {
-          // Default to png for images without type (common for clipboard pastes)
-          mimeType = 'image/png';
-        }
-
-        return {
-          id: a.id,
-          type: a.type,
-          name: a.file.name,
-          data: a.preview || '',
-          mimeType,
-        };
-      });
-
-    return result.length > 0 ? result : undefined;
-  };
+    prevIsRunningRef.current = isRunning
+  }, [isRunning])
 
   const handleSubmit = async () => {
-    const hasContent = value.trim() || attachments.length > 0;
-    const hasRequiredTitle = !requireTitle || (titleValue || '').trim().length > 0;
+    const hasContent = value.trim() || attachments.length > 0
+    const hasRequiredTitle = !requireTitle || (titleValue || '').trim().length > 0
 
     if (hasContent && hasRequiredTitle && !isRunning && !disabled) {
-      const text = value.trim();
-      const messageAttachments = convertToMessageAttachments();
+      const text = value.trim()
+      const messageAttachments = toMessageAttachments()
 
-      setValue('');
-      setAttachments([]);
-      await onSubmit(text, messageAttachments);
+      setValue('')
+      resetAttachments()
+      await onSubmit(text, messageAttachments)
     }
-  };
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
-      e.preventDefault();
-      handleSubmit();
+      e.preventDefault()
+      void handleSubmit()
     }
-  };
+  }
 
   const handleCompositionStart = () => {
-    isComposingRef.current = true;
-  };
+    isComposingRef.current = true
+  }
 
   const handleCompositionEnd = () => {
     setTimeout(() => {
-      isComposingRef.current = false;
-    }, 10);
-  };
+      isComposingRef.current = false
+    }, 10)
+  }
 
   const canSubmit =
     Boolean(value.trim() || attachments.length > 0) &&
     Boolean(!requireTitle || (titleValue || '').trim()) &&
     !disabled &&
-    !isRunning;
+    !isRunning
 
-  // Auto-resize textarea based on content
   useEffect(() => {
-    const textarea = textareaRef.current;
+    const textarea = textareaRef.current
     if (!textarea || isTaskCreateLayout) return;
 
-    // Reset height to auto to get the correct scrollHeight
-    textarea.style.height = 'auto';
+    textarea.style.height = 'auto'
 
-    // Calculate the new height
-    const maxHeight = isHome ? 200 : 120; // Max height in pixels
-    const minHeight = isHome ? 56 : 20; // Min height in pixels (home: taller default)
+    const maxHeight = isHome ? 200 : 120
+    const minHeight = isHome ? 56 : 20
     const newHeight = Math.min(
       Math.max(textarea.scrollHeight, minHeight),
       maxHeight
-    );
+    )
 
-    textarea.style.height = `${newHeight}px`;
-
-    // Enable/disable overflow based on content height
-    textarea.style.overflowY =
-      textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
-  }, [isTaskCreateLayout, value, isHome]);
+    textarea.style.height = `${newHeight}px`
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }, [isTaskCreateLayout, value, isHome])
 
   return (
-    <div
-      className={cn(
-        'w-full',
-        isHome
-          ? 'border-border/60 bg-background/96 rounded-[28px] border p-4 shadow-[0_24px_60px_rgba(15,23,42,0.10)] backdrop-blur'
-          : 'border-border/60 bg-background rounded-xl border p-3 shadow-sm',
-        isTaskCreateLayout && 'flex min-h-[300px] flex-col',
-        className
-      )}
-    >
-      {/* Hidden file input */}
+    <>
       <input
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/*,.pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.pptx,.ppt"
+        accept={INPUT_ATTACHMENT_ACCEPT}
         onChange={handleFileChange}
         className="hidden"
       />
 
-      {/* Attachment Preview */}
-      {attachments.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {attachments.map((attachment) => (
-            <div
-              key={attachment.id}
-              className="group border-border/50 bg-muted/50 relative flex items-center gap-2 rounded-lg border px-3 py-2"
-            >
-              {attachment.type === 'image' && attachment.preview ? (
-                <img
-                  src={attachment.preview}
-                  alt={attachment.file.name}
-                  className="h-10 w-10 rounded object-cover"
-                />
-              ) : (
-                <div className="bg-muted flex h-10 w-10 items-center justify-center rounded">
-                  <FileText className="text-muted-foreground h-5 w-5" />
-                </div>
-              )}
-              <span className="text-foreground max-w-[120px] truncate text-sm">
-                {attachment.file.name}
-              </span>
-              <button
-                type="button"
-                onClick={() => removeAttachment(attachment.id)}
-                className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {hasTitleField && (
-        <>
-          <div className="mb-2">
-            <input
-              ref={titleInputRef}
-              value={titleValue || ''}
-              onChange={(e) => onTitleChange?.(e.target.value)}
-              placeholder={titlePlaceholder}
-              className="text-foreground placeholder:text-muted-foreground w-full border-0 bg-transparent px-0 py-1 text-base font-medium focus:outline-none"
-              disabled={isRunning || disabled}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  textareaRef.current?.focus();
-                }
-              }}
-            />
-          </div>
-          <div className="bg-border/70 mb-3 h-px w-full" />
-        </>
-      )}
-
-      {/* Textarea */}
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onCompositionStart={handleCompositionStart}
-        onCompositionEnd={handleCompositionEnd}
-        onPaste={handlePaste}
-        placeholder={placeholder}
-        className={cn(
-          'text-foreground placeholder:text-muted-foreground w-full resize-none border-0 bg-transparent focus:outline-none',
-          isHome ? 'text-base' : 'px-1 text-sm',
-          isTaskCreateLayout && 'min-h-[160px] flex-1 overflow-auto px-0 py-1 text-sm'
-        )}
-        style={{
-          minHeight: isTaskCreateLayout ? undefined : isHome ? '56px' : '20px',
-          maxHeight: isTaskCreateLayout ? undefined : isHome ? '200px' : '120px',
-          overflowY: isTaskCreateLayout ? 'auto' : 'hidden',
+      <ComposerInputShell
+        variant={variant}
+        className={className}
+        disabled={disabled}
+        isRunning={isRunning}
+        onStop={onStop}
+        attachments={attachments}
+        onRemoveAttachment={removeAttachment}
+        onOpenFilePicker={openFilePicker}
+        titleInputRef={titleInputRef}
+        titleValue={titleValue}
+        onTitleChange={onTitleChange}
+        titlePlaceholder={titlePlaceholder}
+        onTitleEnter={() => textareaRef.current?.focus()}
+        operationBar={operationBar}
+        submitLeftBar={submitLeftBar}
+        canSubmit={canSubmit}
+        onSubmit={() => {
+          void handleSubmit()
         }}
-        rows={1}
-        disabled={isRunning || disabled}
-      />
-
-      {/* Bottom Actions */}
-      <div
-        className={cn(
-          'flex items-center justify-between',
-          isHome ? 'mt-3' : 'mt-2'
-        )}
       >
-        {/* Add Button with Dropdown */}
-        <div className={cn('flex items-center gap-1', isHome && 'min-w-0 flex-1')}>
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger
-              disabled={isRunning || disabled}
-              className={cn(
-                'flex items-center justify-center transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
-                isHome
-                  ? 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground size-8 rounded-full border'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground size-7 rounded-md'
-              )}
-            >
-              <Plus className={isHome ? 'size-4' : 'size-4'} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              sideOffset={8}
-              className="z-50 w-56"
-            >
-              <DropdownMenuItem
-                onSelect={openFilePicker}
-                className="cursor-pointer gap-3 py-2.5"
-              >
-                <Paperclip className="size-4" />
-                <span>{t.home.addFilesOrPhotos}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {isHome && operationBar && (
-            <div className="ml-1 min-w-0 flex-1">{operationBar}</div>
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={handleKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          onPaste={handlePaste}
+          placeholder={placeholder}
+          className={cn(
+            'text-foreground placeholder:text-muted-foreground w-full resize-none border-0 bg-transparent focus:outline-none',
+            isHome ? 'text-base' : 'px-1 text-sm',
+            isTaskCreateLayout && 'min-h-[160px] flex-1 overflow-auto px-0 py-1 text-sm'
           )}
-        </div>
-
-        {/* Submit/Stop Button */}
-        <div className="flex items-center gap-1">
-          {isHome && submitLeftBar}
-          {isRunning && onStop ? (
-            <button
-              type="button"
-              onClick={onStop}
-              className={cn(
-                'flex items-center justify-center rounded-full transition-colors',
-                isHome
-                  ? 'size-8 bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-destructive text-destructive-foreground hover:bg-destructive/90 size-7'
-              )}
-            >
-              <Square className={isHome ? 'size-3.5' : 'size-3'} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className={cn(
-                'flex items-center justify-center rounded-full transition-all',
-                canSubmit
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed',
-                isHome ? 'size-8' : 'size-7'
-              )}
-            >
-              {isHome ? (
-                <ArrowUp className="size-4" />
-              ) : (
-                <Send className="size-3" />
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+          style={{
+            minHeight: isTaskCreateLayout ? undefined : isHome ? '56px' : '20px',
+            maxHeight: isTaskCreateLayout ? undefined : isHome ? '200px' : '120px',
+            overflowY: isTaskCreateLayout ? 'auto' : 'hidden'
+          }}
+          rows={1}
+          disabled={isRunning || disabled}
+        />
+      </ComposerInputShell>
+    </>
+  )
 }

@@ -92,15 +92,15 @@ export function TaskCreateMenu({
   }, [selectedTemplateId, t.task.createPipelineLabel, workflowTemplates])
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="border-border bg-background inline-flex overflow-hidden rounded-full border">
+    <div className="scrollbar-hide flex min-w-0 items-center gap-2 overflow-x-auto whitespace-nowrap">
+      <div className="border-border bg-background inline-grid shrink-0 grid-cols-3 overflow-hidden rounded-full border">
         <button
           type="button"
           onClick={() => onCreateModeChange('conversation')}
           className={
             createMode === 'conversation'
-              ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-sm'
-              : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs'
+              ? 'bg-primary text-primary-foreground min-w-[88px] px-3 py-1.5 text-center text-xs shadow-sm'
+              : 'hover:bg-accent/60 text-foreground min-w-[88px] px-3 py-1.5 text-center text-xs'
           }
         >
           {t.task.createModeConversation}
@@ -111,8 +111,8 @@ export function TaskCreateMenu({
           disabled={!canUseProjectWorkflowModes}
           className={
             createMode === 'workflow'
-              ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-sm disabled:opacity-50'
-              : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50'
+              ? 'bg-primary text-primary-foreground min-w-[88px] px-3 py-1.5 text-center text-xs shadow-sm disabled:opacity-50'
+              : 'hover:bg-accent/60 text-foreground min-w-[88px] px-3 py-1.5 text-center text-xs disabled:cursor-not-allowed disabled:opacity-50'
           }
         >
           {t.task.createModeWorkflow}
@@ -123,8 +123,8 @@ export function TaskCreateMenu({
           disabled={!canUseProjectWorkflowModes}
           className={
             createMode === 'generated-workflow'
-              ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-sm disabled:opacity-50'
-              : 'hover:bg-accent/60 text-foreground px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50'
+              ? 'bg-primary text-primary-foreground min-w-[88px] px-3 py-1.5 text-center text-xs shadow-sm disabled:opacity-50'
+              : 'hover:bg-accent/60 text-foreground min-w-[88px] px-3 py-1.5 text-center text-xs disabled:cursor-not-allowed disabled:opacity-50'
           }
         >
           {t.task.createModeGeneratedWorkflow}
@@ -133,9 +133,9 @@ export function TaskCreateMenu({
 
       {(createMode === 'conversation' || createMode === 'generated-workflow') && (
         <DropdownMenu modal={false}>
-          <DropdownMenuTrigger className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors">
+          <DropdownMenuTrigger className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors">
             <Wrench className="size-3.5" />
-            <span className="max-w-[140px] truncate">{selectedCliToolName}</span>
+            <span className="max-w-[120px] truncate">{selectedCliToolName}</span>
             <ChevronDown className="size-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" sideOffset={8} className="max-h-64 w-56 overflow-auto">
@@ -159,10 +159,10 @@ export function TaskCreateMenu({
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger
             disabled={!selectedCliToolId || cliConfigs.length === 0}
-            className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Settings2 className="size-3.5" />
-            <span className="max-w-[140px] truncate">{selectedCliConfigName}</span>
+            <span className="max-w-[120px] truncate">{selectedCliConfigName}</span>
             <ChevronDown className="size-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" sideOffset={8} className="max-h-64 w-56 overflow-auto">
@@ -186,7 +186,7 @@ export function TaskCreateMenu({
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger
             disabled={workflowTemplates.length === 0}
-            className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             title={selectedWorkflowTemplateName}
             aria-label={selectedWorkflowTemplateName}
           >
@@ -213,10 +213,10 @@ export function TaskCreateMenu({
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger
           disabled={!isGitProject || branches.length === 0}
-          className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-border bg-background hover:bg-accent/60 text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           <GitBranch className="size-3.5" />
-          <span className="max-w-[140px] truncate">{selectedBaseBranch || '工作流基础分支'}</span>
+          <span className="max-w-[120px] truncate">{selectedBaseBranch || '工作流基础分支'}</span>
           <ChevronDown className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" sideOffset={8} className="max-h-64 w-56 overflow-auto">
