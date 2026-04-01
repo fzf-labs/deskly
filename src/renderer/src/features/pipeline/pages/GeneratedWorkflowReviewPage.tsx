@@ -63,7 +63,8 @@ export function GeneratedWorkflowReviewPage() {
       }
 
       const settings = getSettings()
-      const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'WT-'
+      const worktreePrefix = settings.gitWorktreePrefix || 'wt'
+      const branchPrefix = settings.gitBranchPrefix || 'feature'
       const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
 
       const createdTask = await createTaskWithSideEffects(
@@ -75,7 +76,8 @@ export function GeneratedWorkflowReviewPage() {
           projectPath: state.projectPath,
           createWorktree: Boolean(state.projectType === 'git' && state.projectPath),
           baseBranch: state.projectType === 'git' ? state.baseBranch || undefined : undefined,
-          worktreeBranchPrefix,
+          worktreePrefix,
+          branchPrefix,
           worktreeRootPath,
           cliToolId: state.cliToolId || undefined,
           agentToolConfigId: state.agentToolConfigId || undefined,

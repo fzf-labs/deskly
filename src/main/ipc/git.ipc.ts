@@ -10,15 +10,6 @@ export const registerGitIpc = ({ handle, v, services }: IpcModuleContext): void 
     return installed
   })
 
-  handle(IPC_CHANNELS.git.clone, [v.string(), v.string()], async (_, remoteUrl, targetPath) => {
-    try {
-      await gitService.clone(remoteUrl, targetPath)
-      return { success: true }
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) }
-    }
-  })
-
   handle(IPC_CHANNELS.git.init, [v.string()], async (_, path) => {
     await gitService.init(path)
   })

@@ -23,6 +23,12 @@ import {
   DEFAULT_TASK_COMPLETE_SOUND,
   DEFAULT_TASK_NODE_COMPLETE_SOUND,
 } from './sounds';
+import {
+  DEFAULT_BRANCH_PREFIX,
+  DEFAULT_WORKTREE_PREFIX,
+  normalizeBranchPrefix,
+  normalizeWorktreePrefix
+} from '@shared/task-naming';
 
 // ============ Default Values ============
 
@@ -160,7 +166,8 @@ export const defaultSettings: Settings = {
   },
   enabledCliTools: createDefaultEnabledCliTools(),
   defaultCliToolId: '',
-  gitWorktreeBranchPrefix: 'WT-',
+  gitWorktreePrefix: DEFAULT_WORKTREE_PREFIX,
+  gitBranchPrefix: DEFAULT_BRANCH_PREFIX,
   gitWorktreeDir: '~/.deskly/worktrees',
   claudeCodePath: '',
   codexCliPath: '',
@@ -243,6 +250,7 @@ const normalizeLoadedSettings = (value: unknown): Settings => {
     providers?: unknown;
     accentColor?: unknown;
     backgroundStyle?: unknown;
+    gitWorktreeBranchPrefix?: string;
   };
 
   if ('mcpEnabled' in loadedSettings) {
@@ -267,9 +275,15 @@ const normalizeLoadedSettings = (value: unknown): Settings => {
     delete loadedSettings.profile.avatar;
   }
 
-  if (!loadedSettings.gitWorktreeBranchPrefix?.trim()) {
-    loadedSettings.gitWorktreeBranchPrefix = defaultSettings.gitWorktreeBranchPrefix;
+  loadedSettings.gitWorktreePrefix = normalizeWorktreePrefix(
+    loadedSettings.gitWorktreePrefix || loadedSettings.gitWorktreeBranchPrefix
+  );
+
+  if ('gitWorktreeBranchPrefix' in loadedSettings) {
+    delete loadedSettings.gitWorktreeBranchPrefix;
   }
+
+  loadedSettings.gitBranchPrefix = normalizeBranchPrefix(loadedSettings.gitBranchPrefix);
 
   if (!loadedSettings.gitWorktreeDir?.trim()) {
     loadedSettings.gitWorktreeDir = defaultSettings.gitWorktreeDir;

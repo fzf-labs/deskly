@@ -56,6 +56,7 @@ const createTaskServiceDeps = () => {
 
 describe('TaskService worktree dependency bootstrap', () => {
   afterEach(() => {
+    vi.useRealTimers()
     while (tempRoots.length > 0) {
       const root = tempRoots.pop()
       if (root) {
@@ -64,7 +65,10 @@ describe('TaskService worktree dependency bootstrap', () => {
     }
   })
 
-  it('links node_modules from the source repo into a new worktree', async () => {
+  it('links node_modules from the source repo into a timestamped worktree', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 2, 29, 23, 38, 31))
+
     const rootDir = mkdtempSync(join(tmpdir(), 'deskly-task-service-worktree-'))
     tempRoots.push(rootDir)
 
@@ -75,8 +79,10 @@ describe('TaskService worktree dependency bootstrap', () => {
     const { db, settingsService } = createTaskServiceDeps()
     let createdWorktreePath: string | null = null
     const git = {
-      addWorktree: vi.fn(async (_repoPath: string, nextWorktreePath: string) => {
+      branchExists: vi.fn(async () => false),
+      addWorktree: vi.fn(async (_repoPath: string, nextWorktreePath: string, branchName: string) => {
         createdWorktreePath = nextWorktreePath
+        expect(branchName).toBe('feature/20260329-233831')
         mkdirSync(nextWorktreePath, { recursive: true })
       })
     }
@@ -91,13 +97,63 @@ describe('TaskService worktree dependency bootstrap', () => {
       projectPath,
       createWorktree: true,
       baseBranch: 'main',
-      worktreeBranchPrefix: 'WT-',
+      worktreePrefix: 'wt',
+      branchPrefix: 'feature',
       worktreeRootPath: join(rootDir, 'worktrees'),
       cliToolId: 'codex'
     })
 
-    expect(createdWorktreePath).toBeTruthy()
+    expect(git.branchExists).toHaveBeenCalledWith(projectPath, 'feature/20260329-233831')
+    expect(createdWorktreePath).toBe(join(rootDir, 'worktrees', 'project-1', 'wt-20260329-233831'))
     const linkedPath = join(createdWorktreePath!, 'node_modules')
     expect(readlinkSync(linkedPath)).toBe(join(projectPath, 'node_modules'))
+  })
+
+  it('appends a numeric suffix when the timestamped name already exists', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 2, 29, 23, 38, 31))
+
+    const rootDir = mkdtempSync(join(tmpdir(), 'deskly-task-service-worktree-'))
+    tempRoots.push(rootDir)
+
+    const projectPath = join(rootDir, 'project')
+    mkdirSync(projectPath, { recursive: true })
+
+    const { db, settingsService } = createTaskServiceDeps()
+    const git = {
+      branchExists: vi
+        .fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false),
+      addWorktree: vi.fn(async (_repoPath: string, nextWorktreePath: string) => {
+        mkdirSync(nextWorktreePath, { recursive: true })
+      })
+    }
+
+    const service = new TaskService(db as never, git as never, settingsService as never)
+
+    await service.createTask({
+      title: 'Worktree task',
+      prompt: 'Prompt',
+      taskMode: 'conversation',
+      projectId: 'project-1',
+      projectPath,
+      createWorktree: true,
+      baseBranch: 'main',
+      worktreePrefix: 'wt',
+      branchPrefix: 'feature',
+      worktreeRootPath: join(rootDir, 'worktrees'),
+      cliToolId: 'codex'
+    })
+
+    expect(git.branchExists).toHaveBeenNthCalledWith(1, projectPath, 'feature/20260329-233831')
+    expect(git.branchExists).toHaveBeenNthCalledWith(2, projectPath, 'feature/20260329-233831-1')
+    expect(git.addWorktree).toHaveBeenCalledWith(
+      projectPath,
+      join(rootDir, 'worktrees', 'project-1', 'wt-20260329-233831-1'),
+      'feature/20260329-233831-1',
+      true,
+      'main'
+    )
   })
 })

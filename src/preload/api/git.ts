@@ -4,8 +4,6 @@ import { invoke } from './common'
 export const gitApi = {
   git: {
     checkInstalled: (): Promise<unknown> => invoke(IPC_CHANNELS.git.checkInstalled),
-    clone: (remoteUrl: string, targetPath: string): Promise<unknown> =>
-      invoke(IPC_CHANNELS.git.clone, remoteUrl, targetPath),
     init: (path: string): Promise<unknown> => invoke(IPC_CHANNELS.git.init, path),
     listWorktrees: (repoPath: string): Promise<unknown> =>
       invoke(IPC_CHANNELS.git.listWorktrees, repoPath),

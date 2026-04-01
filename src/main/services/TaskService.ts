@@ -11,6 +11,7 @@ import { isCliToolEnabled } from '../../shared/agent-cli-tool-enablement'
 import type { CreateTaskOptions, TaskWithWorktree } from '../types/domain/task'
 import type { TaskStatus } from '../types/task'
 import type { WorkflowDefinition } from '../types/workflow-definition'
+import { buildTaskWorktreeNames, formatTaskTimestamp } from '../../shared/task-naming'
 import {
   applyWorkflowDefinitionRuntimeDefaults,
   buildConversationWorkflowDefinition
@@ -22,8 +23,6 @@ type TaskStatusValue = (typeof TASK_STATUS_VALUES)[number]
 const WORKTREE_SHARED_DIRECTORY_NAMES = ['node_modules'] as const
 
 export class TaskService {
-  private static readonly DEFAULT_WORKTREE_PREFIX = 'WT-'
-
   private db: DatabaseService
   private git: GitService
   private settingsService: SettingsService
@@ -82,6 +81,75 @@ export class TaskService {
     }
   }
 
+  private isRetryableWorktreeCollision(error: unknown): boolean {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+    return (
+      message.includes('already exists') ||
+      message.includes('already checked out') ||
+      message.includes('already used by worktree') ||
+      message.includes('already registered worktree')
+    )
+  }
+
+  private async createUniqueWorktree(params: {
+    projectPath: string
+    projectId?: string
+    baseBranch: string
+    worktreeRootPath?: string
+    worktreePrefix?: string
+    branchPrefix?: string
+  }): Promise<{ branchName: string; worktreePath: string }> {
+    const projectKey = params.projectId || 'project'
+    const worktreesRoot = path.join(this.resolveWorktreeRoot(params.worktreeRootPath), projectKey)
+    const timestamp = formatTaskTimestamp(new Date())
+
+    mkdirSync(worktreesRoot, { recursive: true })
+
+    let lastError: unknown = null
+
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const suffix = attempt === 0 ? undefined : attempt
+      const { branchName, worktreeDirName } = buildTaskWorktreeNames({
+        branchPrefix: params.branchPrefix,
+        worktreePrefix: params.worktreePrefix,
+        timestamp,
+        suffix
+      })
+      const nextWorktreePath = path.join(worktreesRoot, worktreeDirName)
+
+      const [branchExists, worktreeExists] = await Promise.all([
+        this.git.branchExists(params.projectPath, branchName),
+        this.pathExists(nextWorktreePath)
+      ])
+
+      if (branchExists || worktreeExists) {
+        continue
+      }
+
+      try {
+        await this.git.addWorktree(
+          params.projectPath,
+          nextWorktreePath,
+          branchName,
+          true,
+          params.baseBranch
+        )
+
+        return {
+          branchName,
+          worktreePath: nextWorktreePath
+        }
+      } catch (error) {
+        if (!this.isRetryableWorktreeCollision(error)) {
+          throw error
+        }
+        lastError = error
+      }
+    }
+
+    throw lastError ?? new Error(`Failed to allocate unique worktree name for ${timestamp}`)
+  }
+
   async createTask(options: CreateTaskOptions): Promise<TaskWithWorktree> {
     const taskId = newUlid()
     let worktreePath: string | null = null
@@ -99,21 +167,17 @@ export class TaskService {
       }
       try {
         baseBranch = options.baseBranch
-        const prefix = options.worktreeBranchPrefix?.trim() || TaskService.DEFAULT_WORKTREE_PREFIX
-        branchName = `${prefix}${taskId}`
-        const projectKey = options.projectId || 'project'
-        const worktreesRoot = path.join(this.resolveWorktreeRoot(options.worktreeRootPath), projectKey)
-        mkdirSync(worktreesRoot, { recursive: true })
-        worktreePath = path.join(worktreesRoot, branchName)
+        const createdWorktree = await this.createUniqueWorktree({
+          projectPath: options.projectPath,
+          projectId: options.projectId,
+          baseBranch,
+          worktreeRootPath: options.worktreeRootPath,
+          worktreePrefix: options.worktreePrefix,
+          branchPrefix: options.branchPrefix
+        })
+        branchName = createdWorktree.branchName
+        worktreePath = createdWorktree.worktreePath
         workspacePath = worktreePath
-
-        await this.git.addWorktree(
-          options.projectPath,
-          worktreePath,
-          branchName,
-          true,
-          baseBranch
-        )
         await this.bootstrapWorktreeDependencies(options.projectPath, worktreePath)
       } catch (error) {
         console.error('Failed to create worktree:', error)

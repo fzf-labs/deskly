@@ -14,7 +14,8 @@ export interface TaskCreateRequest {
   projectPath?: string
   createWorktree?: boolean
   baseBranch?: string
-  worktreeBranchPrefix?: string
+  worktreePrefix?: string
+  branchPrefix?: string
   worktreeRootPath?: string
   cliToolId?: string
   agentToolConfigId?: string

@@ -458,7 +458,8 @@ export function useTaskComposer({
 
       try {
         const settings = getSettings()
-        const worktreeBranchPrefix = settings.gitWorktreeBranchPrefix || 'WT-'
+        const worktreePrefix = settings.gitWorktreePrefix || 'wt'
+        const branchPrefix = settings.gitBranchPrefix || 'feature'
         const worktreeRootPath = settings.gitWorktreeDir || '~/.deskly/worktrees'
 
         const createdTask = await createTaskWithSideEffects(
@@ -470,7 +471,8 @@ export function useTaskComposer({
             projectPath,
             createWorktree: Boolean(isGitProject && projectPath),
             baseBranch: isGitProject ? selectedBaseBranch || undefined : undefined,
-            worktreeBranchPrefix,
+            worktreePrefix,
+            branchPrefix,
             worktreeRootPath,
             cliToolId: resolvedTaskCliToolId || undefined,
             agentToolConfigId: resolvedTaskCliConfigId || undefined,

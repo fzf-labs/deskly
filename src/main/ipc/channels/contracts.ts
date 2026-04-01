@@ -44,7 +44,6 @@ export interface IpcContracts {
   'projects:checkPath': IpcContract<[string], CheckProjectPathResult>
 
   'git:checkInstalled': IpcContract<[], unknown>
-  'git:clone': IpcContract<[string, string], unknown>
   'git:init': IpcContract<[string], unknown>
   'git:listWorktrees': IpcContract<[string], unknown>
   'git:addWorktree': IpcContract<[string, string, string, boolean, string?], unknown>

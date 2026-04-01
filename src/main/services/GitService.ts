@@ -143,14 +143,6 @@ export class GitService {
     }
   }
 
-  async clone(remoteUrl: string, targetPath: string): Promise<void> {
-    try {
-      await this.runGit(['clone', remoteUrl, targetPath])
-    } catch (error) {
-      throw new Error(`Failed to clone repository: ${error}`)
-    }
-  }
-
   async init(path?: string): Promise<void> {
     if (!path) return
     try {
@@ -210,6 +202,27 @@ export class GitService {
       return output.trim()
     } catch (error) {
       throw new Error(`Failed to get current branch: ${error}`)
+    }
+  }
+
+  async branchExists(path: string, branchName: string): Promise<boolean> {
+    const command = await this.resolveGitCommand()
+
+    try {
+      await safeExecFile(command, ['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`], {
+        cwd: path,
+        env: this.gitEnv ?? this.buildGitEnv(),
+        timeoutMs: defaultTimeoutMs,
+        allowlist: gitAllowlist,
+        label: 'GitService'
+      })
+      return true
+    } catch (error) {
+      const code = (error as { code?: unknown }).code
+      if (code === 1 || code === '1') {
+        return false
+      }
+      throw new Error(`Failed to check branch existence: ${String(error)}`)
     }
   }
 

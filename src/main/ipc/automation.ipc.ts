@@ -80,9 +80,15 @@ const parseTemplate = (raw: unknown) => {
     createWorktree: Boolean(record.createWorktree),
     baseBranch:
       typeof record.baseBranch === 'string' && record.baseBranch ? record.baseBranch : undefined,
-    worktreeBranchPrefix:
-      typeof record.worktreeBranchPrefix === 'string' && record.worktreeBranchPrefix
-        ? record.worktreeBranchPrefix
+    worktreePrefix:
+      typeof record.worktreePrefix === 'string' && record.worktreePrefix
+        ? record.worktreePrefix
+        : typeof record.worktreeBranchPrefix === 'string' && record.worktreeBranchPrefix
+          ? record.worktreeBranchPrefix
+          : undefined,
+    branchPrefix:
+      typeof record.branchPrefix === 'string' && record.branchPrefix
+        ? record.branchPrefix
         : undefined,
     worktreeRootPath:
       typeof record.worktreeRootPath === 'string' && record.worktreeRootPath

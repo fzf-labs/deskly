@@ -72,16 +72,20 @@ describe('task-create-utils', () => {
         createMode: 'generated-workflow',
         title: 'Generated task',
         prompt: 'Prompt',
+        branchPrefix: 'feature',
         cliToolId: 'codex',
         agentToolConfigId: 'cfg-default',
+        worktreePrefix: 'wt',
         workflowDefinition
       })
     ).toEqual({
       title: 'Generated task',
       prompt: 'Prompt',
       taskMode: 'workflow',
+      branchPrefix: 'feature',
       cliToolId: 'codex',
       agentToolConfigId: 'cfg-default',
+      worktreePrefix: 'wt',
       workflowDefinitionId: undefined,
       workflowDefinition
     })

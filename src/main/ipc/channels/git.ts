@@ -1,7 +1,6 @@
 export const gitChannels = {
   git: {
     checkInstalled: 'git:checkInstalled',
-    clone: 'git:clone',
     init: 'git:init',
     listWorktrees: 'git:listWorktrees',
     addWorktree: 'git:addWorktree',

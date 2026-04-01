@@ -19,9 +19,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { CreateProjectDialog, isProjectRequiredRoute } from '@features/projects'
+import { createProjectFromDirectory, isProjectRequiredRoute } from '@features/projects'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
 
 import { useSidebar } from './sidebar-context'
@@ -64,8 +65,8 @@ export function WorkspaceSidebarContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useLanguage()
+  const toast = useToast()
   const { leftOpen } = useSidebar()
-  const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [sortMode, setSortMode] = useState<WorkspaceSidebarSortMode>(getInitialSidebarSortMode)
   const activeTaskId = useActiveTaskId()
@@ -107,6 +108,21 @@ export function WorkspaceSidebarContent() {
   const handleSetCurrentProject = (projectId: string) => {
     setCurrentProjectId(projectId)
     navigate('/tasks')
+  }
+
+  const handleCreateProject = async () => {
+    try {
+      const project = await createProjectFromDirectory({
+        addProject,
+        setCurrentProjectId: handleSetCurrentProject
+      })
+      if (project) {
+        navigate('/tasks')
+      }
+    } catch (error) {
+      console.error('Failed to create project:', error)
+      toast.error(error instanceof Error ? error.message : '创建项目失败')
+    }
   }
 
   const handleSelectTask = (taskId: string, projectId: string | null) => {
@@ -214,7 +230,7 @@ export function WorkspaceSidebarContent() {
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setCreateProjectOpen(true)}
+                onClick={() => void handleCreateProject()}
                 className="text-sidebar-foreground/66 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-7 items-center justify-center rounded-lg transition-colors"
                 aria-label={t.nav.addProject}
                 title={t.nav.addProject}
@@ -275,12 +291,6 @@ export function WorkspaceSidebarContent() {
         </div>
       </div>
 
-      <CreateProjectDialog
-        open={createProjectOpen}
-        onOpenChange={setCreateProjectOpen}
-        onAddProject={addProject}
-        onSetCurrentProject={handleSetCurrentProject}
-      />
     </TooltipProvider>
   )
 }

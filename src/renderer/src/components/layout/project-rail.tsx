@@ -1,13 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { Plus, Settings, FolderPlus } from 'lucide-react';
-import { PROJECT_SETTINGS_ROUTE } from '@features/settings';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useProjects, type Project } from '@features/projects';
+import { createProjectFromDirectory, useProjects, type Project } from '@features/projects';
 import { useToast } from '@/providers/feedback-provider';
 import { useLanguage } from '@/providers/language-provider';
 
@@ -16,12 +15,27 @@ export function ProjectRail() {
   const toast = useToast();
   const navigate = useNavigate();
   const {
+    addProject,
     projects,
     currentProject,
     setCurrentProjectId,
     checkProjectPath,
     refresh,
   } = useProjects();
+
+  const handleCreateProject = async () => {
+    try {
+      await createProjectFromDirectory({
+        addProject,
+        setCurrentProjectId,
+      });
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      toast.error(
+        error instanceof Error ? error.message : '创建项目失败'
+      );
+    }
+  };
 
   const handleSelectProject = async (id: string) => {
     try {
@@ -62,7 +76,7 @@ export function ProjectRail() {
             ))}
           </div>
         ) : (
-          <EmptyProjectsHint onAddProject={() => navigate(PROJECT_SETTINGS_ROUTE)} />
+          <EmptyProjectsHint onAddProject={() => void handleCreateProject()} />
         )}
       </div>
 
@@ -72,7 +86,7 @@ export function ProjectRail() {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => navigate(PROJECT_SETTINGS_ROUTE)}
+              onClick={() => void handleCreateProject()}
               aria-label="新建项目"
               className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground flex size-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
             >

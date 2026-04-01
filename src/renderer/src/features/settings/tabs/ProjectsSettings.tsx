@@ -9,12 +9,12 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { useConfirm } from '@/providers/feedback-provider'
+import { useConfirm, useToast } from '@/providers/feedback-provider'
 import { useLanguage } from '@/providers/language-provider'
 import { MoreVertical } from 'lucide-react'
 
 import {
-  CreateProjectDialog,
+  createProjectFromDirectory,
   ProjectEditDialog,
   useProjects,
   type Project
@@ -23,7 +23,7 @@ import {
 export function ProjectsSettings() {
   const { t, tt } = useLanguage()
   const confirm = useConfirm()
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const toast = useToast()
   const [editProject, setEditProject] = useState<Project | null>(null)
 
   const { projects, currentProject, addProject, updateProject, deleteProject, setCurrentProjectId } =
@@ -48,6 +48,18 @@ export function ProjectsSettings() {
     await deleteProject(project.id)
   }
 
+  const handleCreateProject = async () => {
+    try {
+      await createProjectFromDirectory({
+        addProject,
+        setCurrentProjectId
+      })
+    } catch (error) {
+      console.error('Failed to create project:', error)
+      toast.error(error instanceof Error ? error.message : '创建项目失败')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -57,7 +69,7 @@ export function ProjectsSettings() {
             {t.settings.projectsDescription}
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>{t.settings.projectsCreate}</Button>
+        <Button onClick={() => void handleCreateProject()}>{t.settings.projectsCreate}</Button>
       </div>
 
       {sortedProjects.length === 0 ? (
@@ -131,12 +143,6 @@ export function ProjectsSettings() {
         </div>
       )}
 
-      <CreateProjectDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        onAddProject={addProject}
-        onSetCurrentProject={setCurrentProjectId}
-      />
       <ProjectEditDialog
         project={editProject}
         onOpenChange={(open) => !open && setEditProject(null)}

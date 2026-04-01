@@ -2,28 +2,41 @@ import { useEffect, useState } from 'react'
 import { GitBranch, Check, AlertCircle, FolderOpen } from 'lucide-react'
 import { useLanguage } from '@/providers/language-provider'
 import { path, shell } from '@/lib/electron-api'
+import {
+  DEFAULT_BRANCH_PREFIX,
+  DEFAULT_WORKTREE_PREFIX,
+  normalizeBranchPrefix,
+  normalizeWorktreePrefix
+} from '@shared/task-naming'
 
 import type { SettingsTabProps } from '../types'
 
-const DEFAULT_WORKTREE_PREFIX = 'WT-'
 const DEFAULT_WORKTREE_DIR = '~/.deskly/worktrees'
 
 export function GitSettings({ settings, onSettingsChange }: SettingsTabProps) {
   const { t } = useLanguage()
   const [installed, setInstalled] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
-  const [prefixInput, setPrefixInput] = useState(
-    settings.gitWorktreeBranchPrefix || DEFAULT_WORKTREE_PREFIX
+  const [worktreePrefixInput, setWorktreePrefixInput] = useState(
+    settings.gitWorktreePrefix || DEFAULT_WORKTREE_PREFIX
   )
-  const [prefixError, setPrefixError] = useState<string | null>(null)
+  const [worktreePrefixError, setWorktreePrefixError] = useState<string | null>(null)
+  const [branchPrefixInput, setBranchPrefixInput] = useState(
+    settings.gitBranchPrefix || DEFAULT_BRANCH_PREFIX
+  )
+  const [branchPrefixError, setBranchPrefixError] = useState<string | null>(null)
   const [worktreeDirInput, setWorktreeDirInput] = useState(
     settings.gitWorktreeDir || DEFAULT_WORKTREE_DIR
   )
   const [worktreeDirError, setWorktreeDirError] = useState<string | null>(null)
 
   useEffect(() => {
-    setPrefixInput(settings.gitWorktreeBranchPrefix || DEFAULT_WORKTREE_PREFIX)
-  }, [settings.gitWorktreeBranchPrefix])
+    setWorktreePrefixInput(settings.gitWorktreePrefix || DEFAULT_WORKTREE_PREFIX)
+  }, [settings.gitWorktreePrefix])
+
+  useEffect(() => {
+    setBranchPrefixInput(settings.gitBranchPrefix || DEFAULT_BRANCH_PREFIX)
+  }, [settings.gitBranchPrefix])
 
   useEffect(() => {
     setWorktreeDirInput(settings.gitWorktreeDir || DEFAULT_WORKTREE_DIR)
@@ -61,33 +74,78 @@ export function GitSettings({ settings, onSettingsChange }: SettingsTabProps) {
       ? t.settings?.gitInstalled || 'Installed'
       : t.settings?.gitNotInstalled || 'Not installed'
 
-  const handlePrefixChange = (value: string) => {
-    setPrefixInput(value)
+  const handleWorktreePrefixChange = (value: string) => {
+    setWorktreePrefixInput(value)
     const trimmed = value.trim()
     if (!trimmed) {
-      setPrefixError(
-        t.settings?.gitWorktreePrefixError || 'Prefix cannot be empty.'
+      setWorktreePrefixError(
+        t.settings?.gitWorktreePrefixError || 'Worktree prefix cannot be empty.'
       )
       return
     }
-    setPrefixError(null)
-    onSettingsChange({ ...settings, gitWorktreeBranchPrefix: trimmed })
+
+    setWorktreePrefixError(null)
+    onSettingsChange({
+      ...settings,
+      gitWorktreePrefix: normalizeWorktreePrefix(trimmed)
+    })
   }
 
-  const handlePrefixBlur = () => {
-    const trimmed = prefixInput.trim()
+  const handleWorktreePrefixBlur = () => {
+    const trimmed = worktreePrefixInput.trim()
     if (!trimmed) {
-      setPrefixInput(settings.gitWorktreeBranchPrefix || DEFAULT_WORKTREE_PREFIX)
-      setPrefixError(
-        t.settings?.gitWorktreePrefixError || 'Prefix cannot be empty.'
+      setWorktreePrefixInput(settings.gitWorktreePrefix || DEFAULT_WORKTREE_PREFIX)
+      setWorktreePrefixError(
+        t.settings?.gitWorktreePrefixError || 'Worktree prefix cannot be empty.'
       )
       return
     }
-    if (trimmed !== prefixInput) {
-      setPrefixInput(trimmed)
-      onSettingsChange({ ...settings, gitWorktreeBranchPrefix: trimmed })
+
+    const normalized = normalizeWorktreePrefix(trimmed)
+    if (normalized !== worktreePrefixInput) {
+      setWorktreePrefixInput(normalized)
     }
-    setPrefixError(null)
+    if (normalized !== settings.gitWorktreePrefix) {
+      onSettingsChange({ ...settings, gitWorktreePrefix: normalized })
+    }
+    setWorktreePrefixError(null)
+  }
+
+  const handleBranchPrefixChange = (value: string) => {
+    setBranchPrefixInput(value)
+    const trimmed = value.trim()
+    if (!trimmed) {
+      setBranchPrefixError(
+        t.settings?.gitBranchPrefixError || 'Branch prefix cannot be empty.'
+      )
+      return
+    }
+
+    setBranchPrefixError(null)
+    onSettingsChange({
+      ...settings,
+      gitBranchPrefix: normalizeBranchPrefix(trimmed)
+    })
+  }
+
+  const handleBranchPrefixBlur = () => {
+    const trimmed = branchPrefixInput.trim()
+    if (!trimmed) {
+      setBranchPrefixInput(settings.gitBranchPrefix || DEFAULT_BRANCH_PREFIX)
+      setBranchPrefixError(
+        t.settings?.gitBranchPrefixError || 'Branch prefix cannot be empty.'
+      )
+      return
+    }
+
+    const normalized = normalizeBranchPrefix(trimmed)
+    if (normalized !== branchPrefixInput) {
+      setBranchPrefixInput(normalized)
+    }
+    if (normalized !== settings.gitBranchPrefix) {
+      onSettingsChange({ ...settings, gitBranchPrefix: normalized })
+    }
+    setBranchPrefixError(null)
   }
 
   const handleWorktreeDirChange = (value: string) => {
@@ -139,7 +197,7 @@ export function GitSettings({ settings, onSettingsChange }: SettingsTabProps) {
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
         {t.settings?.gitDescription ||
-          'Check Git installation status and configure worktree branch naming.'}
+          'Check Git installation status and configure branch and worktree naming.'}
       </p>
 
       <div className="border-border rounded-lg border p-4">
@@ -179,22 +237,43 @@ export function GitSettings({ settings, onSettingsChange }: SettingsTabProps) {
 
       <div className="flex flex-col gap-2">
         <label className="text-foreground block text-sm font-medium">
-          {t.settings?.gitWorktreePrefixLabel || 'Worktree Branch Prefix'}
+          {t.settings?.gitWorktreePrefixLabel || 'Worktree Prefix'}
         </label>
         <input
           type="text"
-          value={prefixInput}
-          placeholder={t.settings?.gitWorktreePrefixPlaceholder || 'e.g., WT-'}
-          onChange={(event) => handlePrefixChange(event.target.value)}
-          onBlur={handlePrefixBlur}
+          value={worktreePrefixInput}
+          placeholder={t.settings?.gitWorktreePrefixPlaceholder || 'e.g., wt'}
+          onChange={(event) => handleWorktreePrefixChange(event.target.value)}
+          onBlur={handleWorktreePrefixBlur}
           className="border-input bg-background text-foreground focus:ring-ring block h-10 w-full max-w-sm rounded-lg border px-3 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
         />
         <p className="text-muted-foreground text-sm">
           {t.settings?.gitWorktreePrefixDesc ||
-            'Prefix used when creating new Git worktree branches.'}
+            'Prefix used when creating new Git worktree directories.'}
         </p>
-        {prefixError && (
-          <p className="text-destructive text-xs">{prefixError}</p>
+        {worktreePrefixError && (
+          <p className="text-destructive text-xs">{worktreePrefixError}</p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-foreground block text-sm font-medium">
+          {t.settings?.gitBranchPrefixLabel || 'Branch Prefix'}
+        </label>
+        <input
+          type="text"
+          value={branchPrefixInput}
+          placeholder={t.settings?.gitBranchPrefixPlaceholder || 'e.g., feature'}
+          onChange={(event) => handleBranchPrefixChange(event.target.value)}
+          onBlur={handleBranchPrefixBlur}
+          className="border-input bg-background text-foreground focus:ring-ring block h-10 w-full max-w-sm rounded-lg border px-3 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
+        />
+        <p className="text-muted-foreground text-sm">
+          {t.settings?.gitBranchPrefixDesc ||
+            'Prefix used when creating new Git branches.'}
+        </p>
+        {branchPrefixError && (
+          <p className="text-destructive text-xs">{branchPrefixError}</p>
         )}
       </div>
 
