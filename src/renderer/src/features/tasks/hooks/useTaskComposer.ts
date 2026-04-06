@@ -67,9 +67,9 @@ export function useTaskComposer({
   const [selectedCliConfigId, setSelectedCliConfigId] = useState('')
   const [branches, setBranches] = useState<string[]>([])
   const [selectedBaseBranch, setSelectedBaseBranch] = useState('')
-  const [workflowDefinitions, setWorkflowDefinitions] = useState<Array<{ id: string; name: string }>>(
-    []
-  )
+  const [workflowDefinitions, setWorkflowDefinitions] = useState<
+    Array<{ id: string; name: string }>
+  >([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [createMode, setCreateMode] = useState<TaskCreateMode>('conversation')
   const [slashItems, setSlashItems] = useState<TaskPromptSlashItem[]>([])
@@ -199,13 +199,13 @@ export function useTaskComposer({
           ...(Array.isArray(projectDefinitions)
             ? (projectDefinitions as Array<{ id: string; name: string }>)
             : []),
-          ...((Array.isArray(globalDefinitions)
+          ...(Array.isArray(globalDefinitions)
             ? (globalDefinitions as Array<{ id: string; name: string }>)
             : []
           ).map((definition) => ({
             id: definition.id,
             name: `${definition.name}（全局）`
-          })))
+          }))
         ]
 
         if (!mounted) return
@@ -303,25 +303,17 @@ export function useTaskComposer({
     [cliConfigs, selectedCliConfigId]
   )
 
-  const normalizedPromptNodes = useMemo(
-    () => normalizeTaskPromptNodes(promptNodes),
-    [promptNodes]
-  )
+  const normalizedPromptNodes = useMemo(() => normalizeTaskPromptNodes(promptNodes), [promptNodes])
 
   const compiledConversationPrompt = useMemo(
     () => compileTaskPrompt(normalizedPromptNodes),
     [normalizedPromptNodes]
   )
 
-  const setPromptValue = useCallback(
-    (nextPrompt: string) => {
-      setPrompt(nextPrompt)
-      if (createMode === 'conversation') {
-        setPromptNodesState(replaceTaskPromptWithText(nextPrompt))
-      }
-    },
-    [createMode]
-  )
+  const setPromptValue = useCallback((nextPrompt: string) => {
+    setPrompt(nextPrompt)
+    setPromptNodesState(replaceTaskPromptWithText(nextPrompt))
+  }, [])
 
   const setPromptNodes = useCallback((nodes: TaskPromptNode[]) => {
     const normalizedNodes = normalizeTaskPromptNodes(nodes)
@@ -391,7 +383,9 @@ export function useTaskComposer({
       const compiledPrompt =
         createMode === 'conversation' ? compileTaskPrompt(conversationNodes).trim() : text.trim()
       const visiblePrompt =
-        createMode === 'conversation' ? getTaskPromptVisibleText(conversationNodes).trim() : text.trim()
+        createMode === 'conversation'
+          ? getTaskPromptVisibleText(conversationNodes).trim()
+          : text.trim()
       const trimmedTitle = title.trim()
 
       if (!compiledPrompt && (!attachments || attachments.length === 0)) {
@@ -430,9 +424,7 @@ export function useTaskComposer({
         return null
       }
 
-      const resolvedTitle = titleRequired
-        ? trimmedTitle
-        : deriveTaskTitle(visiblePrompt)
+      const resolvedTitle = titleRequired ? trimmedTitle : deriveTaskTitle(visiblePrompt)
       const resolvedProjectId = projectId ?? ''
 
       if (createMode === 'generated-workflow') {

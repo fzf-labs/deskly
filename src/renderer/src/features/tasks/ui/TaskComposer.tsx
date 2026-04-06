@@ -20,9 +20,7 @@ interface TaskComposerProps {
   promptPlaceholder?: string
   autoFocus?: boolean
   className?: string
-  onOpenGeneratedWorkflowReview?: (
-    request: GeneratedWorkflowReviewRequest
-  ) => void | Promise<void>
+  onOpenGeneratedWorkflowReview?: (request: GeneratedWorkflowReviewRequest) => void | Promise<void>
   onCreated?: (
     task: unknown,
     context: {
@@ -59,22 +57,25 @@ export function TaskComposer({
     titleRequired
   })
 
-  const useSlashInput = composer.createMode === 'conversation'
-  const optimizePromptSource = useSlashInput
+  const isConversationMode = composer.createMode === 'conversation'
+  const optimizePromptSource = isConversationMode
     ? composer.compiledConversationPrompt
     : composer.prompt
 
   return (
     <>
       <TaskComposerInput
-        inputMode={useSlashInput ? 'slash-rich' : 'plain'}
+        inputMode="slash-rich"
         value={composer.prompt}
         onValueChange={composer.setPrompt}
         promptNodes={composer.promptNodes}
         onPromptNodesChange={composer.setPromptNodes}
         slashItems={composer.slashItems}
         slashLoading={composer.slashLoading}
-        slashEnabled={Boolean(composer.selectedCliToolId || getEnabledDefaultCliToolId(getSettings()))}
+        slashEnabled={
+          isConversationMode &&
+          Boolean(composer.selectedCliToolId || getEnabledDefaultCliToolId(getSettings()))
+        }
         titleValue={titleRequired ? composer.title : undefined}
         onTitleChange={titleRequired ? composer.setTitle : undefined}
         titlePlaceholder={titlePlaceholder}
@@ -108,9 +109,7 @@ export function TaskComposer({
             prompt={optimizePromptSource}
             contextType="task"
             name={titleRequired ? composer.title || null : null}
-            toolId={
-              composer.selectedCliToolId || getEnabledDefaultCliToolId(getSettings()) || null
-            }
+            toolId={composer.selectedCliToolId || getEnabledDefaultCliToolId(getSettings()) || null}
             agentToolConfigId={
               composer.selectedCliConfigId ||
               composer.cliConfigs.find((config) => config.is_default)?.id ||

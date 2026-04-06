@@ -18,7 +18,14 @@ import {
   INPUT_ATTACHMENT_ACCEPT,
   useInputAttachments
 } from '@/components/shared/useInputAttachments'
-import { createTaskPromptTextNode, getTaskPromptVisibleText, hasTaskPromptContent, normalizeTaskPromptNodes, replaceTaskPromptWithText, type TaskPromptNode, type TaskPromptSlashItem } from '../model/task-prompt'
+import {
+  createTaskPromptTextNode,
+  getTaskPromptVisibleText,
+  hasTaskPromptContent,
+  normalizeTaskPromptNodes,
+  type TaskPromptNode,
+  type TaskPromptSlashItem
+} from '../model/task-prompt'
 import { scrollSelectedSlashItemIntoView } from './task-composer-input-utils'
 
 interface TaskComposerInputSubmitPayload {
@@ -51,9 +58,13 @@ interface TaskComposerInputProps {
 const generatePromptTokenInstanceId = (baseId: string) =>
   `${baseId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
-const serializePromptNodes = (nodes: TaskPromptNode[]) => JSON.stringify(normalizeTaskPromptNodes(nodes))
+const serializePromptNodes = (nodes: TaskPromptNode[]) =>
+  JSON.stringify(normalizeTaskPromptNodes(nodes))
 
-const createTokenElement = (documentRef: Document, node: Extract<TaskPromptNode, { type: 'token' }>) => {
+const createTokenElement = (
+  documentRef: Document,
+  node: Extract<TaskPromptNode, { type: 'token' }>
+) => {
   const chip = documentRef.createElement('span')
   chip.contentEditable = 'false'
   chip.dataset.nodeKind = 'token'
@@ -233,13 +244,13 @@ export function TaskComposerInput({
     resetAttachments,
     toMessageAttachments
   } = useInputAttachments({ logLabel: 'TaskComposerInput' })
-  const useSlashInput = inputMode === 'slash-rich'
-  const slashEditorEnabled = useSlashInput && slashEnabled
+  const useRichInput = inputMode === 'slash-rich'
+  const slashEditorEnabled = useRichInput && slashEnabled
 
   const normalizedPromptNodes = useMemo(() => normalizeTaskPromptNodes(promptNodes), [promptNodes])
   const visibleText = useMemo(
-    () => (useSlashInput ? getTaskPromptVisibleText(normalizedPromptNodes) : value),
-    [normalizedPromptNodes, useSlashInput, value]
+    () => (useRichInput ? getTaskPromptVisibleText(normalizedPromptNodes) : value),
+    [normalizedPromptNodes, useRichInput, value]
   )
 
   const filteredSlashItems = useMemo(() => {
@@ -261,7 +272,7 @@ export function TaskComposerInput({
   }, [slashEditorEnabled])
 
   useEffect(() => {
-    if (!slashEditorEnabled) {
+    if (!useRichInput) {
       return
     }
 
@@ -278,7 +289,7 @@ export function TaskComposerInput({
 
     buildEditorDom(editor, normalizedPromptNodes)
     lastAppliedNodesRef.current = nextSignature
-  }, [normalizedPromptNodes, slashEditorEnabled])
+  }, [normalizedPromptNodes, useRichInput])
 
   useEffect(() => {
     if (!autoFocus) {
@@ -290,13 +301,13 @@ export function TaskComposerInput({
       return
     }
 
-    if (slashEditorEnabled) {
+    if (useRichInput) {
       editorRef.current?.focus()
       return
     }
 
     textareaRef.current?.focus()
-  }, [autoFocus, onTitleChange, slashEditorEnabled])
+  }, [autoFocus, onTitleChange, useRichInput])
 
   useEffect(() => {
     if (!slashOpen) {
@@ -544,11 +555,13 @@ export function TaskComposerInput({
 
       let sibling: ChildNode | null = null
       if (anchorNode?.nodeType === Node.TEXT_NODE) {
-        if ((direction === 'previous' && offset !== 0) || (direction === 'next' && offset !== (anchorNode.textContent?.length || 0))) {
+        if (
+          (direction === 'previous' && offset !== 0) ||
+          (direction === 'next' && offset !== (anchorNode.textContent?.length || 0))
+        ) {
           return false
         }
-        sibling =
-          direction === 'previous' ? anchorNode.previousSibling : anchorNode.nextSibling
+        sibling = direction === 'previous' ? anchorNode.previousSibling : anchorNode.nextSibling
       } else if (anchorNode === editor) {
         sibling =
           direction === 'previous'
@@ -573,13 +586,9 @@ export function TaskComposerInput({
   }
 
   const handleSubmit = async () => {
-    const promptContent = useSlashInput
-      ? slashEditorEnabled
-        ? normalizedPromptNodes
-        : replaceTaskPromptWithText(value)
-      : []
-    const textContent = (useSlashInput ? visibleText : value).trim()
-    const hasContent = useSlashInput ? hasTaskPromptContent(promptContent) : Boolean(textContent)
+    const promptContent = useRichInput ? normalizedPromptNodes : []
+    const textContent = (useRichInput ? visibleText : value).trim()
+    const hasContent = useRichInput ? hasTaskPromptContent(promptContent) : Boolean(textContent)
     const hasRequiredTitle = !requireTitle || (titleValue || '').trim().length > 0
 
     if (!hasContent && attachments.length === 0) {
@@ -591,9 +600,9 @@ export function TaskComposerInput({
     }
 
     const messageAttachments = toMessageAttachments()
-    const submittedNodes = useSlashInput ? promptContent : undefined
+    const submittedNodes = useRichInput ? promptContent : undefined
 
-    if (!useSlashInput) {
+    if (!useRichInput) {
       onValueChange?.('')
     }
     onPromptNodesChange?.([])
@@ -608,8 +617,10 @@ export function TaskComposerInput({
   }
 
   const canSubmit =
-    (useSlashInput ? hasTaskPromptContent(normalizedPromptNodes) : Boolean(value.trim())) ||
+    (useRichInput ? hasTaskPromptContent(normalizedPromptNodes) : Boolean(value.trim())) ||
     attachments.length > 0
+  const inputBodyClassName =
+    'text-foreground min-h-[160px] flex-1 border-0 bg-transparent px-0 py-1 text-sm focus:outline-none'
 
   return (
     <div className={cn('relative w-full', className)}>
@@ -618,9 +629,7 @@ export function TaskComposerInput({
           <div className="border-border bg-popover w-full overflow-hidden rounded-[28px] border shadow-xl">
             <div ref={slashMenuRef} className="max-h-72 overflow-auto p-2">
               {slashLoading ? (
-                <div className="text-muted-foreground px-3 py-6 text-sm">
-                  {t.common.loading}
-                </div>
+                <div className="text-muted-foreground px-3 py-6 text-sm">{t.common.loading}</div>
               ) : filteredSlashItems.length === 0 ? (
                 <div className="text-muted-foreground px-3 py-6 text-sm">
                   {t.task.createSlashEmpty || 'No matching skills or MCP servers.'}
@@ -719,13 +728,13 @@ export function TaskComposerInput({
         onTitleChange={onTitleChange}
         titlePlaceholder={titlePlaceholder}
         onTitleEnter={() => {
-          if (slashEditorEnabled) {
+          if (useRichInput) {
             editorRef.current?.focus()
           } else {
             textareaRef.current?.focus()
           }
         }}
-        bodyWrapperClassName={slashEditorEnabled ? 'relative' : undefined}
+        bodyWrapperClassName={useRichInput ? 'relative' : undefined}
         operationBar={operationBar}
         submitLeftBar={submitLeftBar}
         canSubmit={canSubmit && (!requireTitle || Boolean((titleValue || '').trim()))}
@@ -733,8 +742,8 @@ export function TaskComposerInput({
           void handleSubmit()
         }}
       >
-        {slashEditorEnabled ? (
-          <>
+        {useRichInput ? (
+          <div className="relative flex min-h-[160px] flex-1 flex-col">
             {normalizedPromptNodes.length === 0 && (
               <div
                 className="text-muted-foreground pointer-events-none absolute top-1 left-0 text-sm"
@@ -745,16 +754,19 @@ export function TaskComposerInput({
             )}
             <div
               ref={editorRef}
-              contentEditable
+              contentEditable={!disabled}
               suppressContentEditableWarning
               onInput={handleEditorInput}
               onKeyDown={handleEditorKeyDown}
               onClick={handleEditorClick}
               onPaste={handlePaste}
-              className="text-foreground h-full min-h-[160px] w-full overflow-auto whitespace-pre-wrap break-words border-0 bg-transparent px-0 py-1 text-sm focus:outline-none"
+              className={cn(
+                inputBodyClassName,
+                'w-full overflow-auto whitespace-pre-wrap break-words'
+              )}
               data-testid="task-composer-rich-editor"
             />
-          </>
+          </div>
         ) : (
           <textarea
             ref={textareaRef}
@@ -762,7 +774,10 @@ export function TaskComposerInput({
             onChange={(event) => onValueChange?.(event.target.value)}
             onPaste={handlePaste}
             placeholder={placeholder}
-            className="text-foreground placeholder:text-muted-foreground min-h-[160px] flex-1 w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm focus:outline-none"
+            className={cn(
+              inputBodyClassName,
+              'placeholder:text-muted-foreground w-full resize-none overflow-auto'
+            )}
             rows={1}
             disabled={disabled}
             onKeyDown={(event) => {
