@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import { app, shell } from '@/lib/electron-api'
+import { app } from '@/lib/electron-api'
 import { useLanguage } from '@/providers/language-provider'
-import { Download } from 'lucide-react'
-
-const openExternalUrl = async (url: string) => {
-  try {
-    await shell.openUrl(url)
-  } catch {
-    window.open(url, '_blank')
-  }
-}
 
 export function AboutSettings() {
   const { t } = useLanguage()
@@ -35,13 +26,6 @@ export function AboutSettings() {
             <span className="tracking-wider uppercase">{t.settings.version}</span>
             <span className="text-foreground font-semibold">{version}</span>
           </div>
-          <button
-            onClick={() => openExternalUrl('https://Deskly.ai/download?utm_source=Deskly_desktop')}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-          >
-            <Download className="size-4" />
-            {t.settings.downloadNewVersion}
-          </button>
         </div>
       </div>
     </div>

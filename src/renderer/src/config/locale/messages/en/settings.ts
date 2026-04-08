@@ -467,5 +467,4 @@ export default {
   reportIssue: 'Report Issue',
   builtWith: 'Some components built with',
   built: '',
-  downloadNewVersion: 'Upgrade',
 };

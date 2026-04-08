@@ -448,5 +448,4 @@ export default {
   reportIssue: '反馈问题',
   builtWith: '部分组件使用',
   built: '构建',
-  downloadNewVersion: '下载新版本',
 };

@@ -3,6 +3,7 @@ productName: Deskly
 icon: resources/icon.png
 directories:
   buildResources: build
+afterSign: build/after-sign-local.cjs
 files:
   - '!**/.vscode/*'
   - '!src/*'

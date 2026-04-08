@@ -21,8 +21,10 @@ describe('isProjectRequiredRoute', () => {
 
   it('ignores non project-scoped routes', () => {
     expect(isProjectRequiredRoute('/tasks')).toBe(false)
+    expect(isProjectRequiredRoute('/home')).toBe(false)
     expect(isProjectRequiredRoute('/task/123')).toBe(false)
     expect(isProjectRequiredRoute('/settings')).toBe(false)
+    expect(isProjectRequiredRoute('/settings', '?tab=projects')).toBe(false)
     expect(isProjectRequiredRoute('/pipeline-templates/editor', '?scope=global')).toBe(false)
   })
 })
