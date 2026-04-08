@@ -7,6 +7,7 @@ import { AgentCLIToolConfigService } from '../services/AgentCLIToolConfigService
 import { SystemCliToolService } from '../services/SystemCliToolService'
 import { EditorService } from '../services/EditorService'
 import { PreviewConfigService } from '../services/PreviewConfigService'
+import { PreviewDetectionService } from '../services/PreviewDetectionService'
 import { PreviewService } from '../services/PreviewService'
 import { NotificationService } from '../services/NotificationService'
 import { DatabaseService } from '../services/DatabaseService'
@@ -41,7 +42,7 @@ type CliSessionServices = Pick<
 >
 type WorkspaceToolServices = Pick<
   AppServices,
-  'editorService' | 'previewConfigService' | 'previewService'
+  'editorService' | 'previewConfigService' | 'previewDetectionService' | 'previewService'
 >
 type TaskWorkflowServices = Pick<
   AppServices,
@@ -98,11 +99,16 @@ const createCliSessionServices = ({
   }
 }
 
-const createWorkspaceToolServices = (): WorkspaceToolServices => ({
-  editorService: new EditorService(),
-  previewConfigService: new PreviewConfigService(),
-  previewService: new PreviewService()
-})
+const createWorkspaceToolServices = (): WorkspaceToolServices => {
+  const previewConfigService = new PreviewConfigService()
+
+  return {
+    editorService: new EditorService(),
+    previewConfigService,
+    previewDetectionService: new PreviewDetectionService(previewConfigService),
+    previewService: new PreviewService()
+  }
+}
 
 const createAiAuthoringServices = ({
   databaseService,
@@ -251,6 +257,7 @@ export const createAppContext = (): AppContext => {
     systemCliToolService: cliSessionServices.systemCliToolService,
     editorService: workspaceToolServices.editorService,
     previewConfigService: workspaceToolServices.previewConfigService,
+    previewDetectionService: workspaceToolServices.previewDetectionService,
     previewService: workspaceToolServices.previewService,
     notificationService: automationNotificationServices.notificationService,
     agentToolProfileService: coreServices.agentToolProfileService,
@@ -280,6 +287,7 @@ export const createAppContext = (): AppContext => {
     cliSessionServices.cliSessionService,
     workspaceToolServices.editorService,
     workspaceToolServices.previewConfigService,
+    workspaceToolServices.previewDetectionService,
     workspaceToolServices.previewService,
     automationNotificationServices.notificationService,
     coreServices.settingsService,

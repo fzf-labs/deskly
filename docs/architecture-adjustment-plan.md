@@ -14,11 +14,11 @@
 
 - `src/main`、`src/preload`、`src/renderer`、`src/shared` 的大层分隔清楚。
 - IPC channel、主进程 service、测试目录已经形成基本结构。
-- `.trellis/` 工作流、任务、PRD、workspace 机制已经为 AI 会话提供了入口。
+- 根 `AGENTS.md`、`.omx/` 规划产物和 `docs/` 文档已经为 AI 会话提供了入口。
 
 当前主要瓶颈也比较明确：
 
-- `.trellis/spec/frontend/` 中 6 个具体 guideline 文件仍为空壳模板（内容均为 `(To be filled by the team)`）；`index.md` 仅提供导航，尚未承载项目真实规范，AI 仍无法从这一组文档中获取可执行约束。
+- 当前缺少一组稳定、聚合的前后端规范文档；约束主要散落在 `AGENTS.md`、测试守卫和零散设计文档中，AI 仍无法从单一文档集合中获取可执行约束。
 - 前端出现大量超大上下文文件，局部修改风险极高。按行数排列前 10：
   - `useTaskDetail.tsx` — 2288 行
   - `WorkflowTemplateDialog.tsx` — 2125 行
@@ -30,7 +30,7 @@
   - `DatabaseService.ts` — 873 行
   - `GitService.ts` — 822 行
   - `VirtualComputer.tsx` — 807 行
-  - 按 `src/`、`tests/`、`.trellis/tasks/`、`docs/` 下常见文本文件（`ts/tsx/js/jsx/md/json/yml/yaml/mjs/cjs`）统计，共 73 个文件超过 300 行。
+  - 按 `src/`、`tests/`、`.omx/plans/`、`.omx/specs/`、`docs/` 下常见文本文件（`ts/tsx/js/jsx/md/json/yml/yaml/mjs/cjs`）统计，共 73 个文件超过 300 行。
 - `src/shared/` 仅有 3 个文件且只覆盖 CLI 工具配置（`agent-cli-config-spec.ts`、`system-cli-tools.ts`、`agent-cli-tool-enablement.ts`）。核心业务 DTO（Task、WorkflowRun、Automation 等）在 `src/main/types/` 和 renderer 侧各自独立定义，存在重复和语义漂移。
 - `preload/index.ts`（494 行）+ `index.d.ts`（549 行）是两个涵盖所有域的巨型文件，且 `renderer` 侧 `data/adapter.ts`、`lib/electron-api.ts`、`lib/notifications.ts`（529 行）、`lib/session.ts`（534 行）等数据适配和副作用文件体量持续增长。
 - `DatabaseService.ts`（873 行）同时承担仓储协调、workflow 生成运行时注入、调度器绑定等多类职责。
@@ -62,8 +62,8 @@
 
 目标：先补齐"AI 说明书"，减少后续重构中的风格漂移。
 
-- 完整填充 `.trellis/spec/frontend/` 下的目录结构、组件、hooks、状态管理、类型安全、质量规范文档。
-- 在 `.trellis/spec/backend/` 下新增并填充主进程规范，至少包含 `index.md`、`service-guidelines.md`、`repository-guidelines.md`、`ipc-guidelines.md`，覆盖 service 职责划分、repository 模式、IPC handler 编写约定，为阶段 5 的主进程重组提供约束基线。
+- 在 `docs/spec/frontend/` 下补齐目录结构、组件、hooks、状态管理、类型安全、质量规范文档。
+- 在 `docs/spec/backend/` 下新增并填充主进程规范，至少包含 `index.md`、`service-guidelines.md`、`repository-guidelines.md`、`ipc-guidelines.md`，覆盖 service 职责划分、repository 模式、IPC handler 编写约定，为阶段 5 的主进程重组提供约束基线。
 - 所有规范都引用当前代码中的真实示例，不写脱离代码现实的约定。
 - 在规范中明确新增硬性边界：
   - `pages` 只做路由入口和装配。
@@ -265,13 +265,13 @@
   - 禁止 renderer 再新增重复跨层 DTO
   - 禁止超大聚合 hook 继续无边界增长
   - 禁止新增超过 500 行的文件；存量超大文件未进入所属迁移波次前不得继续净增长
-- 将新的目录与职责规则固化到 `.trellis/spec/frontend/` 中，作为后续 AI 与人工开发共同遵守的标准。
+- 将新的目录与职责规则固化到 `docs/spec/frontend/` 中，作为后续 AI 与人工开发共同遵守的标准。
 
 ## 优先级与实施顺序
 
 建议固定按以下顺序推进，避免同时动太多层：
 
-1. 先补 `.trellis/spec/frontend/` 并创建 `.trellis/spec/backend/`（含 `index.md`、`service-guidelines.md`、`repository-guidelines.md`、`ipc-guidelines.md`）
+1. 先补 `docs/spec/frontend/` 并创建 `docs/spec/backend/`（含 `index.md`、`service-guidelines.md`、`repository-guidelines.md`、`ipc-guidelines.md`）
 2. 再统一 `src/shared` 合同、IPC `channels.ts` 按域拆分、`preload` 按域拆分
 3. 建立 renderer `features/` 骨架并完成第一批试点（`task-detail` / `cli-session` / `pipeline`），同步迁移 `components/` 和 `hooks/` 中对应域的文件
 4. 基于 feature 骨架收敛 renderer `data/`、`lib/`、顶层 `hooks/` 的数据访问层与副作用
@@ -308,8 +308,8 @@ pnpm lint && pnpm typecheck && pnpm test
 | `preload/` 各域文件行数 | ≤ 50 行 | `wc -l` |
 | `channels.ts` 拆分后各域文件行数 | ≤ 100 行 | `wc -l` |
 | renderer 侧重复跨层 DTO | 0 个 | `grep` + 类型审查 |
-| `.trellis/spec/frontend/` 空模板文件 | 0 个 | 内容检查 |
-| `.trellis/spec/backend/` 规范文件 | `index.md` + `service-guidelines.md` + `repository-guidelines.md` + `ipc-guidelines.md` 全部存在 | 文件检查 |
+| `docs/spec/frontend/` 空模板文件 | 0 个 | 内容检查 |
+| `docs/spec/backend/` 规范文件 | `index.md` + `service-guidelines.md` + `repository-guidelines.md` + `ipc-guidelines.md` 全部存在 | 文件检查 |
 | `DatabaseService.ts` 行数 | ≤ 500 行 | `wc -l` |
 | 每个 feature 有 `index.ts` 公共 API | 所有 feature 100% | 文件检查 |
 | Feature 间无内部路径直接引用 | 0 处违规 | `grep` import 路径 |

@@ -1,1 +1,1 @@
-export type RightPanelTab = 'files' | 'git' | 'terminal'
+export type RightPanelTab = 'files' | 'git' | 'terminal' | 'preview'

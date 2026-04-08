@@ -10,21 +10,17 @@ const componentsRoot = join(rendererRoot, 'components')
 const hooksRoot = join(rendererRoot, 'hooks')
 const libRoot = join(rendererRoot, 'lib')
 
-const requiredFrontendSpecFiles = [
-  'index.md',
-  'directory-structure.md',
-  'component-guidelines.md',
-  'hook-guidelines.md',
-  'state-management.md',
-  'quality-guidelines.md',
-  'type-safety.md'
+const legacyWorkspaceName = String.fromCharCode(116, 114, 101, 108, 108, 105, 115)
+const removedLegacyWorkspacePaths = [
+  `.${legacyWorkspaceName}`,
+  `.${legacyWorkspaceName}/spec`,
+  `.${legacyWorkspaceName}/tasks`
 ]
-
-const requiredBackendSpecFiles = [
-  'index.md',
-  'service-guidelines.md',
-  'repository-guidelines.md',
-  'ipc-guidelines.md'
+const removedLegacyWorkspacePattern = new RegExp(`(?:\\.${legacyWorkspaceName}|${legacyWorkspaceName})`, 'i')
+const legacyCleanupDocs = [
+  'docs/architecture-adjustment-plan.md',
+  'docs/golemancy-agent-analysis.md',
+  'docs/agent-product-usage-flows.md'
 ]
 
 const requiredSharedContractFiles = [
@@ -239,15 +235,6 @@ const walkFiles = (directoryPath: string): string[] => {
   return files
 }
 
-const expectDocumentSet = (directoryPath: string, files: string[]) => {
-  for (const fileName of files) {
-    const filePath = join(directoryPath, fileName)
-
-    expect(existsSync(filePath), `${relative(repoRoot, filePath)} should exist`).toBe(true)
-    expect(readFileSync(filePath, 'utf-8').trim().length).toBeGreaterThan(0)
-  }
-}
-
 const expectFeatureFileSet = (featureName: string, files: string[]) => {
   const featureRoot = join(featuresRoot, featureName)
 
@@ -258,9 +245,17 @@ const expectFeatureFileSet = (featureName: string, files: string[]) => {
 }
 
 describe('architecture guards', () => {
-  it('keeps required frontend and backend spec documents in place', () => {
-    expectDocumentSet(join(repoRoot, '.trellis/spec/frontend'), requiredFrontendSpecFiles)
-    expectDocumentSet(join(repoRoot, '.trellis/spec/backend'), requiredBackendSpecFiles)
+  it('removes the legacy workspace directories and references from maintained docs', () => {
+    for (const relativePath of removedLegacyWorkspacePaths) {
+      const filePath = join(repoRoot, relativePath)
+      expect(existsSync(filePath), `${relativePath} should stay removed`).toBe(false)
+    }
+
+    for (const relativePath of legacyCleanupDocs) {
+      const filePath = join(repoRoot, relativePath)
+      expect(existsSync(filePath), `${relativePath} should exist`).toBe(true)
+      expect(readFileSync(filePath, 'utf-8')).not.toMatch(removedLegacyWorkspacePattern)
+    }
   })
 
   it('keeps the required shared contract modules in place', () => {

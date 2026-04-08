@@ -586,6 +586,7 @@ export function useTaskDetail({
     cliStatus
   })
   const workingDir = preview.workingDir
+  const previewWorkspacePath = task?.workspace_path ?? task?.worktree_path ?? null
 
   // ===========================================================================
   // Section 9: Pipeline
@@ -949,6 +950,7 @@ export function useTaskDetail({
 
     // Working Dir
     workingDir,
+    previewWorkspacePath,
 
     // Pipeline
     pipelineTemplate,

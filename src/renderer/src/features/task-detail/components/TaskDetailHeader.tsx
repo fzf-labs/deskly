@@ -2,6 +2,7 @@ import {
   Check,
   FileText,
   GitBranch,
+  MonitorSmartphone,
   MoreHorizontal,
   PanelLeft,
   Play,
@@ -56,7 +57,8 @@ export function TaskDetailHeader({
   const panelActions: Array<{ id: RightPanelTab; label: string; icon: typeof FileText }> = [
     { id: 'files', label: t.preview.filesTab, icon: FileText },
     { id: 'git', label: t.preview.gitTab, icon: GitBranch },
-    { id: 'terminal', label: t.preview.terminalTab, icon: Terminal }
+    { id: 'terminal', label: t.preview.terminalTab, icon: Terminal },
+    { id: 'preview', label: t.preview.preview, icon: MonitorSmartphone }
   ]
   const ActionIcon = actionKind === 'retry' ? RotateCcw : actionKind === 'complete' ? Check : Play
 

@@ -13,6 +13,7 @@ describe('preview stop behavior', () => {
     const instanceId = 'preview-1'
     const instance = {
       id: instanceId,
+      projectId: 'project-1',
       configId: 'cfg',
       status: 'running',
       startedAt: new Date().toISOString()
@@ -41,6 +42,41 @@ describe('preview stop behavior', () => {
     child.emit('exit', 0)
     await stopPromise
     vi.useRealTimers()
+  })
+
+  it('replaces an existing preview instance when starting the same project-scoped instance again', async () => {
+    const service = new PreviewService()
+    const instanceId = 'task-detail-preview:project-1'
+
+    await service.startPreview(instanceId, 'cfg-1', process.execPath, ['-e', 'setInterval(()=>{}, 1000)'])
+    const firstInstance = service.getInstance(instanceId)
+
+    await service.startPreview(instanceId, 'cfg-2', process.execPath, ['-e', 'setInterval(()=>{}, 1000)'])
+    const secondInstance = service.getInstance(instanceId)
+
+    expect(firstInstance?.configId).toBe('cfg-1')
+    expect(secondInstance?.configId).toBe('cfg-2')
+    expect(secondInstance?.status).toBe('running')
+
+    await service.stopPreview(instanceId)
+    service.clearInstance(instanceId)
+  })
+
+  it('records an error state when preview start fails allowlist validation', async () => {
+    const service = new PreviewService()
+    const instanceId = 'task-detail-preview:project-2'
+
+    await expect(
+      service.startPreview(instanceId, 'cfg-invalid', 'definitely-not-allowlisted', [])
+    ).rejects.toThrow('Command not allowlisted')
+
+    expect(service.getInstance(instanceId)).toEqual(
+      expect.objectContaining({
+        id: instanceId,
+        configId: 'cfg-invalid',
+        status: 'error'
+      })
+    )
   })
 })
 

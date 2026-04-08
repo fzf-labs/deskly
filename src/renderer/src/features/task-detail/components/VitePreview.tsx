@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  AlertCircle,
-  ExternalLink,
-  Maximize2,
-  Play,
-  RefreshCw,
-  Square,
-  X
-} from 'lucide-react'
+import { AlertCircle, ExternalLink, Logs, Maximize2, Play, RefreshCw, Square, X } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
 import { shell } from '@/lib/electron-api'
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/providers/language-provider'
@@ -18,6 +11,9 @@ interface VitePreviewProps {
   previewUrl: string | null
   status: PreviewStatus
   error: string | null
+  outputLines?: string[]
+  launchCapability?: 'inline-web' | 'config-only'
+  canStart?: boolean
   onStart?: () => void
   onStop?: () => void
   onClose?: () => void
@@ -28,6 +24,9 @@ export function VitePreview({
   previewUrl,
   status,
   error,
+  outputLines = [],
+  launchCapability = 'inline-web',
+  canStart = true,
   onStart,
   onStop,
   onClose,
@@ -36,6 +35,7 @@ export function VitePreview({
   const { t } = useLanguage()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isLogsVisible, setIsLogsVisible] = useState(false)
   const [iframeKey, setIframeKey] = useState(0)
 
   const handleRefresh = useCallback(() => {
@@ -64,6 +64,12 @@ export function VitePreview({
   }, [handleRefresh])
 
   const renderBody = () => {
+    if (launchCapability === 'config-only') {
+      return (
+        <StatePanel title={t.preview.previewUnavailable} description={t.preview.configOnlyHint} />
+      )
+    }
+
     if (status === 'starting') {
       return <StatePanel title={t.preview.startingServer} description={t.preview.installingDeps} />
     }
@@ -74,19 +80,12 @@ export function VitePreview({
           icon={<AlertCircle className="size-8 text-red-500" />}
           title={t.preview.previewError}
           description={error}
-          action={
-            onStart ? (
-              <button
-                onClick={onStart}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-              >
-                <Play className="size-4" />
-                {t.preview.retry}
-              </button>
-            ) : null
-          }
         />
       )
+    }
+
+    if (status === 'running' && !previewUrl) {
+      return <StatePanel title={t.preview.livePreview} description={t.preview.portMissingHint} />
     }
 
     if (status === 'idle' || !previewUrl) {
@@ -94,17 +93,6 @@ export function VitePreview({
         <StatePanel
           title={t.preview.livePreview}
           description={t.preview.livePreviewHint}
-          action={
-            onStart ? (
-              <button
-                onClick={onStart}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-              >
-                <Play className="size-4" />
-                {t.preview.startPreview}
-              </button>
-            ) : null
-          }
         />
       )
     }
@@ -133,14 +121,19 @@ export function VitePreview({
       <PreviewHeader
         url={previewUrl}
         status={status}
+        canStart={canStart}
         isFullscreen={isFullscreen}
+        onStart={onStart}
         onRefresh={handleRefresh}
         onOpenExternal={handleOpenExternal}
         onStop={onStop}
         onClose={onClose}
+        isLogsVisible={isLogsVisible}
+        onToggleLogs={() => setIsLogsVisible((current) => !current)}
         onFullscreen={() => setIsFullscreen((current) => !current)}
       />
-      {renderBody()}
+      <div className="min-h-0 flex-1">{renderBody()}</div>
+      {isLogsVisible ? <PreviewLogs outputLines={outputLines} /> : null}
     </div>
   )
 }
@@ -171,26 +164,34 @@ function StatePanel({
 function PreviewHeader({
   url,
   status,
+  canStart,
   isFullscreen,
+  onStart,
   onRefresh,
   onOpenExternal,
   onStop,
   onClose,
+  isLogsVisible,
+  onToggleLogs,
   onFullscreen
 }: {
   url: string | null
   status: PreviewStatus
+  canStart: boolean
   isFullscreen: boolean
+  onStart?: () => void
   onRefresh: () => void
   onOpenExternal: () => void
   onStop?: () => void
   onClose?: () => void
+  isLogsVisible: boolean
+  onToggleLogs: () => void
   onFullscreen: () => void
 }) {
   const { t } = useLanguage()
 
   return (
-    <div className="border-border/50 bg-muted/30 flex shrink-0 items-center justify-between border-b px-4 py-2">
+    <div className="border-border/50 bg-muted/30 flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <div
           className={cn(
@@ -212,7 +213,32 @@ function PreviewHeader({
         ) : null}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-2">
+        {status !== 'running' && status !== 'starting' && onStart && canStart ? (
+          <Button
+            type="button"
+            size="icon-sm"
+            onClick={onStart}
+            title={t.preview.startPreview}
+            aria-label={t.preview.startPreview}
+          >
+            <Play className="size-4" />
+          </Button>
+        ) : null}
+
+        {status === 'running' && onStop ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onStop}
+            className="h-8 gap-1.5 border-red-200 px-3 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:hover:bg-red-950"
+          >
+            <Square className="size-4" />
+            {t.preview.stopServer}
+          </Button>
+        ) : null}
+
         {status === 'running' ? (
           <button
             onClick={onRefresh}
@@ -241,15 +267,16 @@ function PreviewHeader({
           <Maximize2 className="size-4" />
         </button>
 
-        {status === 'running' && onStop ? (
-          <button
-            onClick={onStop}
-            className="text-muted-foreground flex size-8 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950"
-            title={t.preview.stopServer}
-          >
-            <Square className="size-4" />
-          </button>
-        ) : null}
+        <Button
+          type="button"
+          size="icon-sm"
+          variant={isLogsVisible ? 'secondary' : 'outline'}
+          onClick={onToggleLogs}
+          title={t.preview.previewLogs}
+          aria-label={t.preview.previewLogs}
+        >
+          <Logs className="size-4" />
+        </Button>
 
         {onClose ? (
           <button
@@ -260,6 +287,42 @@ function PreviewHeader({
             <X className="size-4" />
           </button>
         ) : null}
+      </div>
+    </div>
+  )
+}
+
+function PreviewLogs({ outputLines }: { outputLines: string[] }) {
+  const { t } = useLanguage()
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+    element.scrollTop = element.scrollHeight
+  }, [outputLines])
+
+  return (
+    <div className="border-border/50 bg-muted/20 flex shrink-0 flex-col border-t">
+      <div className="flex items-center justify-between px-4 py-2">
+        <div className="text-foreground text-xs font-medium">{t.preview.previewLogs}</div>
+        <div className="text-muted-foreground text-[11px]">{t.preview.previewLogsHint}</div>
+      </div>
+      <div
+        ref={containerRef}
+        className="bg-background/80 max-h-40 min-h-28 overflow-y-auto border-t px-4 py-3 font-mono text-xs leading-5"
+      >
+        {outputLines.length === 0 ? (
+          <div className="text-muted-foreground whitespace-pre-wrap">
+            {t.preview.previewLogsEmpty}
+          </div>
+        ) : (
+          outputLines.map((line, index) => (
+            <div key={`${index}-${line}`} className="text-foreground whitespace-pre-wrap break-all">
+              {line}
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

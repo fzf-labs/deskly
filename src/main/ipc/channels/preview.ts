@@ -9,7 +9,8 @@ export const previewChannels = {
     get: 'previewConfig:get',
     add: 'previewConfig:add',
     update: 'previewConfig:update',
-    delete: 'previewConfig:delete'
+    delete: 'previewConfig:delete',
+    detectAndSync: 'previewConfig:detectAndSync'
   },
   preview: {
     start: 'preview:start',

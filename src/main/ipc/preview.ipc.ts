@@ -1,5 +1,5 @@
-import type { IpcModuleContext } from './types'
 import { IPC_CHANNELS } from './channels'
+import type { IpcModuleContext } from './types'
 
 export const registerPreviewIpc = ({ handle, v, services }: IpcModuleContext): void => {
   const { previewService } = services
@@ -11,15 +11,17 @@ export const registerPreviewIpc = ({ handle, v, services }: IpcModuleContext): v
       v.string(),
       v.string(),
       v.array(v.string()),
+      v.optional(v.number({ min: 1 })),
       v.optional(v.string()),
       v.optional(v.object())
     ],
-    (_, instanceId, configId, command, args, cwd, env) => {
-      previewService.startPreview(
+    async (_, instanceId, configId, command, args, port, cwd, env) => {
+      return await previewService.startPreview(
         instanceId,
         configId,
         command,
         args,
+        port,
         cwd,
         env as Record<string, string> | undefined
       )
@@ -30,9 +32,9 @@ export const registerPreviewIpc = ({ handle, v, services }: IpcModuleContext): v
     await previewService.stopPreview(instanceId)
   })
 
-  handle(IPC_CHANNELS.preview.getInstance, [v.string()], (_, instanceId) =>
-    previewService.getInstance(instanceId)
-  )
+  handle(IPC_CHANNELS.preview.getInstance, [v.string()], (_, instanceId) => {
+    return previewService.getInstance(instanceId) ?? null
+  })
 
   handle(IPC_CHANNELS.preview.getAllInstances, [], () => previewService.getAllInstances())
 

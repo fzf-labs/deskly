@@ -7,7 +7,7 @@
 
 相关 Deskly 上下文：
 
-- Agent 产品 PRD：`/.trellis/tasks/04-01-04-01-agent-profile-workflow/prd.md`
+- Agent 产品草案与用户流转说明：`/docs/agent-product-usage-flows.md`
 - Agent 使用逻辑图：`/docs/agent-product-usage-flows.md`
 
 ## 1. 先给结论
@@ -180,7 +180,7 @@
 
 相关 Deskly 约束：
 
-- `/.trellis/tasks/04-01-04-01-agent-profile-workflow/prd.md`
+- `/docs/agent-product-usage-flows.md`
 
 也就是说，Deskly 不应该做成：
 
@@ -272,7 +272,6 @@ Deskly 当前这版已经明确了：
 相关文档：
 
 - `/Users/fuzhifei/code/go/src/github.com/fzf-labs/deskly/docs/agent-product-usage-flows.md`
-- `/Users/fuzhifei/code/go/src/github.com/fzf-labs/deskly/.trellis/tasks/04-01-04-01-agent-profile-workflow/prd.md`
 
 所以 Deskly 不能被 `golemancy` 的 project-only 模型带偏。
 
@@ -455,7 +454,6 @@ Deskly 当前 PRD 已经明确：
 
 相关文档：
 
-- `/Users/fuzhifei/code/go/src/github.com/fzf-labs/deskly/.trellis/tasks/04-01-04-01-agent-profile-workflow/prd.md`
 - `/Users/fuzhifei/code/go/src/github.com/fzf-labs/deskly/docs/agent-product-usage-flows.md`
 
 这条路线和 `golemancy` 最有价值的设计点是对齐的。

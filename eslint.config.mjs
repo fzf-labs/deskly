@@ -71,6 +71,8 @@ export default [
       'out/**',
       'build/**',
       'dist/**',
+      '.codex/**',
+      '.omx/**',
       'src-api/**',
       'src-tauri/**',
       '*.config.js',

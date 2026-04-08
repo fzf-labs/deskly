@@ -1,50 +1,43 @@
 import { ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
-import { safeSpawn } from '../utils/safe-exec'
+
+import type { PreviewInstance } from '../../shared/contracts/preview'
 import { config } from '../config'
+import { safeSpawn } from '../utils/safe-exec'
 
 const previewAllowlist = config.commandAllowlist
 
-interface PreviewInstance {
-  id: string
-  configId: string
-  status: 'idle' | 'starting' | 'running' | 'stopping' | 'stopped' | 'error'
-  pid?: number
-  port?: number
-  startedAt?: string
-  error?: string
-}
+type PreviewInstanceRecord = PreviewInstance
 
 export class PreviewService extends EventEmitter {
-  private instances: Map<string, PreviewInstance> = new Map()
+  private instances: Map<string, PreviewInstanceRecord> = new Map()
   private processes: Map<string, ChildProcess> = new Map()
   private outputBuffers: Map<string, string[]> = new Map()
 
-  startPreview(
+  async startPreview(
     instanceId: string,
     configId: string,
     command: string,
     args: string[],
+    port?: number | null,
     cwd?: string,
     env?: Record<string, string>
-  ): void {
-    // 检查是否已经在运行
-    if (this.instances.has(instanceId)) {
-      throw new Error(`Preview instance ${instanceId} already exists`)
-    }
+  ): Promise<PreviewInstanceRecord> {
+    await this.replaceExistingInstance(instanceId)
 
-    // 创建实例记录
-    const instance: PreviewInstance = {
+    const instance: PreviewInstanceRecord = {
       id: instanceId,
       configId,
       status: 'starting',
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
+      port: port ?? null,
+      error: null
     }
+
     this.instances.set(instanceId, instance)
     this.outputBuffers.set(instanceId, [])
 
     try {
-      // 启动进程
       const childProcess = safeSpawn(command, args, {
         cwd: cwd || globalThis.process.cwd(),
         env: { ...globalThis.process.env, ...env },
@@ -55,8 +48,8 @@ export class PreviewService extends EventEmitter {
       this.processes.set(instanceId, childProcess)
       instance.pid = childProcess.pid
       instance.status = 'running'
+      instance.error = null
 
-      // 监听输出
       childProcess.stdout?.on('data', (data) => {
         this.handleOutput(instanceId, data.toString())
       })
@@ -65,7 +58,6 @@ export class PreviewService extends EventEmitter {
         this.handleOutput(instanceId, data.toString())
       })
 
-      // 监听进程退出
       childProcess.on('exit', (code) => {
         this.handleExit(instanceId, code)
       })
@@ -75,10 +67,12 @@ export class PreviewService extends EventEmitter {
       })
 
       this.emit('started', instanceId)
+      return { ...instance }
     } catch (error) {
       instance.status = 'error'
-      instance.error = String(error)
-      this.emit('error', instanceId, error)
+      instance.error = error instanceof Error ? error.message : String(error)
+      this.processes.delete(instanceId)
+      this.emitPreviewError(instanceId, error)
       throw error
     }
   }
@@ -86,31 +80,39 @@ export class PreviewService extends EventEmitter {
   async stopPreview(instanceId: string): Promise<void> {
     const instance = this.instances.get(instanceId)
     if (!instance) {
-      throw new Error(`Preview instance ${instanceId} not found`)
+      return
     }
 
     const process = this.processes.get(instanceId)
-    if (process) {
-      instance.status = 'stopping'
-      if (process.exitCode !== null) {
-        return
+    if (!process) {
+      instance.status = 'stopped'
+      instance.error = null
+      return
+    }
+
+    instance.status = 'stopping'
+
+    if (process.exitCode !== null) {
+      this.processes.delete(instanceId)
+      instance.status = 'stopped'
+      instance.error = null
+      return
+    }
+
+    await new Promise<void>((resolve) => {
+      const onExit = () => {
+        resolve()
       }
 
-      await new Promise<void>((resolve) => {
-        const onExit = () => {
-          resolve()
+      process.once('exit', onExit)
+      process.kill('SIGTERM')
+
+      setTimeout(() => {
+        if (process.exitCode === null) {
+          process.kill('SIGKILL')
         }
-
-        process.once('exit', onExit)
-        process.kill('SIGTERM')
-
-        setTimeout(() => {
-          if (!process.killed) {
-            process.kill('SIGKILL')
-          }
-        }, 5000)
-      })
-    }
+      }, 5000)
+    })
   }
 
   restartPreview(instanceId: string): void {
@@ -119,15 +121,14 @@ export class PreviewService extends EventEmitter {
       throw new Error(`Preview instance ${instanceId} not found`)
     }
 
-    this.stopPreview(instanceId)
-    // 重启逻辑需要在外部处理,因为需要配置信息
+    void this.stopPreview(instanceId)
   }
 
-  getInstance(instanceId: string): PreviewInstance | undefined {
+  getInstance(instanceId: string): PreviewInstanceRecord | undefined {
     return this.instances.get(instanceId)
   }
 
-  getAllInstances(): PreviewInstance[] {
+  getAllInstances(): PreviewInstanceRecord[] {
     return Array.from(this.instances.values())
   }
 
@@ -136,12 +137,26 @@ export class PreviewService extends EventEmitter {
     return buffer.slice(-limit)
   }
 
+  clearInstance(instanceId: string): void {
+    this.instances.delete(instanceId)
+    this.processes.delete(instanceId)
+    this.outputBuffers.delete(instanceId)
+  }
+
+  private async replaceExistingInstance(instanceId: string): Promise<void> {
+    if (!this.instances.has(instanceId)) {
+      return
+    }
+
+    await this.stopPreview(instanceId)
+    this.clearInstance(instanceId)
+  }
+
   private handleOutput(instanceId: string, data: string): void {
     const buffer = this.outputBuffers.get(instanceId) || []
     const lines = data.split('\n').filter((line) => line.trim())
     buffer.push(...lines)
 
-    // 限制缓冲区大小
     if (buffer.length > 1000) {
       buffer.splice(0, buffer.length - 1000)
     }
@@ -153,10 +168,9 @@ export class PreviewService extends EventEmitter {
     const instance = this.instances.get(instanceId)
     if (instance) {
       instance.status = code === 0 ? 'stopped' : 'error'
-      if (code !== 0) {
-        instance.error = `Process exited with code ${code}`
-      }
+      instance.error = code === 0 ? null : `Process exited with code ${code}`
     }
+
     this.processes.delete(instanceId)
     this.emit('exit', instanceId, code)
   }
@@ -167,12 +181,14 @@ export class PreviewService extends EventEmitter {
       instance.status = 'error'
       instance.error = error.message
     }
-    this.emit('error', instanceId, error)
+
+    this.processes.delete(instanceId)
+    this.emitPreviewError(instanceId, error)
   }
 
-  clearInstance(instanceId: string): void {
-    this.instances.delete(instanceId)
-    this.processes.delete(instanceId)
-    this.outputBuffers.delete(instanceId)
+  private emitPreviewError(instanceId: string, error: unknown): void {
+    if (this.listenerCount('error') > 0) {
+      this.emit('error', instanceId, error)
+    }
   }
 }

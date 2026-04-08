@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FileText, GitBranch, Terminal, X } from 'lucide-react'
+import { FileText, GitBranch, MonitorSmartphone, Terminal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useLanguage } from '@/providers/language-provider'
@@ -9,10 +9,13 @@ import { shell } from '@/lib/electron-api'
 import { TerminalPanel } from '@features/terminal'
 import type { RightPanelTab } from '../model/right-panel'
 import { FileListPanel } from './FileListPanel'
+import { PreviewPanel } from './PreviewPanel'
 
 interface RightPanelProps {
   taskId: string | null
+  projectId: string | null
   workingDir: string | null
+  workspacePath: string | null
   branchName?: string | null
   baseBranch?: string | null
   activeTab: RightPanelTab
@@ -26,7 +29,9 @@ interface RightPanelProps {
 
 export function RightPanel({
   taskId,
+  projectId,
   workingDir,
+  workspacePath,
   branchName,
   baseBranch,
   activeTab,
@@ -50,7 +55,8 @@ export function RightPanel({
   const tabMeta: Record<RightPanelTab, { label: string; icon: typeof FileText }> = {
     files: { label: t.preview.filesTab, icon: FileText },
     git: { label: t.preview.gitTab, icon: GitBranch },
-    terminal: { label: t.preview.terminalTab, icon: Terminal }
+    terminal: { label: t.preview.terminalTab, icon: Terminal },
+    preview: { label: t.preview.preview, icon: MonitorSmartphone }
   }
   const currentTab = tabMeta[activeTab]
   const CurrentTabIcon = currentTab.icon
@@ -112,6 +118,16 @@ export function RightPanel({
         )}
 
         {activeTab === 'git' && <GitPanel workingDir={workingDir} baseBranch={baseBranch} />}
+
+        {activeTab === 'preview' && (
+          <PreviewPanel
+            taskId={taskId}
+            projectId={projectId}
+            workingDir={workingDir}
+            workspacePath={workspacePath}
+            isVisible={activeTab === 'preview'}
+          />
+        )}
 
         {hasOpenedTerminal && (
           <div className={cn('h-full min-h-0', activeTab !== 'terminal' && 'hidden')}>

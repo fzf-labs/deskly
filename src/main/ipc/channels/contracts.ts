@@ -18,6 +18,13 @@ import type {
   RunAutomationNowResult
 } from '../../../shared/contracts/automation'
 import type {
+  CreatePreviewConfigInput,
+  PreviewConfig,
+  PreviewConfigSyncResult,
+  PreviewInstance,
+  UpdatePreviewConfigInput
+} from '../../../shared/contracts/preview'
+import type {
   ApproveWorkflowRunNodeInput,
   CreateWorkflowRunForTaskInput,
   GenerateWorkflowDefinitionInput,
@@ -116,17 +123,21 @@ export interface IpcContracts {
   'editor:getAvailable': IpcContract<[], unknown[]>
   'editor:openProject': IpcContract<[string, string], unknown>
 
-  'previewConfig:getAll': IpcContract<[], unknown[]>
-  'previewConfig:getByProject': IpcContract<[string], unknown[]>
-  'previewConfig:get': IpcContract<[string], unknown>
-  'previewConfig:add': IpcContract<[UnknownRecord], unknown>
-  'previewConfig:update': IpcContract<[string, UnknownRecord], unknown>
-  'previewConfig:delete': IpcContract<[string], unknown>
+  'previewConfig:getAll': IpcContract<[], PreviewConfig[]>
+  'previewConfig:getByProject': IpcContract<[string], PreviewConfig[]>
+  'previewConfig:get': IpcContract<[string], PreviewConfig | null>
+  'previewConfig:add': IpcContract<[CreatePreviewConfigInput], PreviewConfig>
+  'previewConfig:update': IpcContract<[string, UpdatePreviewConfigInput], PreviewConfig>
+  'previewConfig:delete': IpcContract<[string], boolean>
+  'previewConfig:detectAndSync': IpcContract<[string, string], PreviewConfigSyncResult>
 
-  'preview:start': IpcContract<[string, string, string, string[], string?, Record<string, string>?], unknown>
+  'preview:start': IpcContract<
+    [string, string, string, string[], number?, string?, Record<string, string>?],
+    PreviewInstance
+  >
   'preview:stop': IpcContract<[string], unknown>
-  'preview:getInstance': IpcContract<[string], unknown>
-  'preview:getAllInstances': IpcContract<[], unknown[]>
+  'preview:getInstance': IpcContract<[string], PreviewInstance | null>
+  'preview:getAllInstances': IpcContract<[], PreviewInstance[]>
   'preview:getOutput': IpcContract<[string, number?], string[]>
   'preview:clearInstance': IpcContract<[string], unknown>
 

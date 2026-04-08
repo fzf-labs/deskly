@@ -179,7 +179,9 @@ export function TaskDetailContainer() {
                 <RightPanelSection
                   isVisible={detail.isPreviewVisible}
                   taskId={taskId ?? null}
+                  projectId={detail.task?.project_id ?? null}
                   workingDir={detail.workingDir}
+                  workspacePath={detail.previewWorkspacePath}
                   branchName={detail.task?.branch_name || null}
                   baseBranch={detail.task?.base_branch || null}
                   activeTab={detail.activePreviewTab}

@@ -6,7 +6,9 @@ import { RightPanel } from './RightPanel'
 interface RightPanelSectionProps {
   isVisible: boolean
   taskId: string | null
+  projectId: string | null
   workingDir: string | null
+  workspacePath: string | null
   branchName: string | null
   baseBranch: string | null
   activeTab: RightPanelTab
@@ -21,7 +23,9 @@ interface RightPanelSectionProps {
 export function RightPanelSection({
   isVisible,
   taskId,
+  projectId,
   workingDir,
+  workspacePath,
   branchName,
   baseBranch,
   activeTab,
@@ -38,7 +42,9 @@ export function RightPanelSection({
     <div className="bg-muted/10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <RightPanel
         taskId={taskId}
+        projectId={projectId}
         workingDir={workingDir}
+        workspacePath={workspacePath}
         branchName={branchName}
         baseBranch={baseBranch}
         activeTab={activeTab}

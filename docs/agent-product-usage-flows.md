@@ -1,6 +1,6 @@
 # Agent 产品使用逻辑与操作流程
 
-本文基于当前 [agent brainstorm PRD](../.trellis/tasks/04-01-04-01-agent-profile-workflow/prd.md) 整理，目标是把最终产品的用户使用逻辑、操作流程和运行边界可视化，便于后续进入数据模型和 UI 设计。
+本文基于当前 Agent 产品讨论稿与 [`golemancy-agent-analysis.md`](./golemancy-agent-analysis.md) 中的结论整理，目标是把最终产品的用户使用逻辑、操作流程和运行边界可视化，便于后续进入数据模型和 UI 设计。
 
 ## 1. 产品心智模型
 
