@@ -2,7 +2,7 @@ import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
 
-interface ToolConfig {
+export interface ToolConfig {
   executablePath?: string
   apiKey?: string
   defaultModel?: string
@@ -10,23 +10,31 @@ interface ToolConfig {
 }
 
 export class AgentCLIToolConfigService {
-  private getConfigPath(toolId: string): string {
+  getConfigCandidatePaths(toolId: string): string[] {
     const homeDir = os.homedir()
 
     switch (toolId) {
       case 'claude-code':
-        return path.join(homeDir, '.config', 'claude', 'config.json')
+        return [path.join(homeDir, '.claude.json'), path.join(homeDir, '.config', 'claude', 'config.json')]
       case 'codex':
-        return path.join(homeDir, '.codex', 'config.json')
+        return [path.join(homeDir, '.codex', 'config.toml'), path.join(homeDir, '.codex', 'config.json')]
       case 'gemini-cli':
-        return path.join(homeDir, '.gemini', 'config.json')
+        return [path.join(homeDir, '.gemini', 'settings.json'), path.join(homeDir, '.gemini', 'config.json')]
       case 'opencode':
-        return path.join(homeDir, '.opencode', 'config.json')
+        return [path.join(homeDir, '.opencode', 'config.json')]
       case 'cursor-agent':
-        return path.join(homeDir, '.cursor', 'agent-config.json')
+        return [
+          path.join(homeDir, '.cursor', 'cli-config.json'),
+          path.join(homeDir, '.cursor', 'agent-config.json')
+        ]
       default:
         throw new Error(`Unknown tool: ${toolId}`)
     }
+  }
+
+  getConfigPath(toolId: string): string {
+    const candidatePaths = this.getConfigCandidatePaths(toolId)
+    return candidatePaths[candidatePaths.length - 1]
   }
 
   getConfig(toolId: string): ToolConfig {

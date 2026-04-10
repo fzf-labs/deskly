@@ -4,6 +4,8 @@ import {
   ProcessCommandSpec,
   CompletionDetector
 } from '../ProcessCliSession'
+import { config } from '../../../config'
+import { normalizeProcessCommandSpec } from '../../../utils/command-resolution'
 
 export interface ProcessCliAdapterConfig {
   id: string
@@ -26,7 +28,10 @@ export class ProcessCliAdapter implements CliAdapter {
   }
 
   async startSession(options: CliStartOptions): Promise<CliSessionHandle> {
-    const commandSpec = this.buildCommand(options)
+    const commandSpec = await normalizeProcessCommandSpec(this.buildCommand(options), {
+      allowlist: config.commandAllowlist,
+      timeoutMs: config.cliToolDetection.fastTimeoutMs
+    })
     return new ProcessCliSession(
       options.sessionId,
       options.toolId,

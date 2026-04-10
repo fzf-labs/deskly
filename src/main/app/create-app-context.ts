@@ -79,8 +79,8 @@ const createCliSessionServices = ({
   settingsService
 }: CoreServices & Pick<TaskWorkflowServices, 'taskNodeRuntimeService'>): CliSessionServices => {
   const cliProcessService = new CLIProcessService()
-  const cliToolDetectorService = new AgentCLIToolDetectorService()
   const cliToolConfigService = new AgentCLIToolConfigService()
+  const cliToolDetectorService = new AgentCLIToolDetectorService(cliToolConfigService)
   const systemCliToolService = new SystemCliToolService()
   const cliSessionService = new CliSessionService(
     cliToolConfigService,

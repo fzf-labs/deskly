@@ -4,11 +4,19 @@ import * as os from 'os'
 import { EventEmitter } from 'events'
 import { safeExecFile } from '../utils/safe-exec'
 import { config } from '../config'
+import { AgentCLIToolConfigService } from './AgentCLIToolConfigService'
+import {
+  type CommandResolutionSource,
+  CommandResolutionError,
+  type ResolvedCommand,
+  resolveCommand
+} from '../utils/command-resolution'
 
 const cliToolAllowlist = config.commandAllowlist
 
 export type CLIToolInstallState = 'unknown' | 'checking' | 'installed' | 'missing' | 'error'
 export type CLIToolConfigState = 'unknown' | 'valid' | 'missing'
+export type CLIToolExecutableState = 'unknown' | 'checking' | 'resolved' | 'missing' | 'error'
 export type CLIToolDetectionLevel = 'fast' | 'full'
 
 export interface CLIToolDetectOptions {
@@ -34,6 +42,9 @@ export interface CLIToolInfo {
   detectionCommand: string
   installState: CLIToolInstallState
   configState: CLIToolConfigState
+  executableState: CLIToolExecutableState
+  executableSource?: CommandResolutionSource
+  executableCommand?: string
   checkedLevel?: CLIToolDetectionLevel
   lastCheckedAt?: string
   latencyMs?: number
@@ -41,6 +52,8 @@ export interface CLIToolInfo {
 }
 
 export class AgentCLIToolDetectorService extends EventEmitter {
+  private readonly configService: AgentCLIToolConfigService
+
   private readonly inFlightDetections = new Map<string, Promise<CLIToolInfo | null>>()
 
   private readonly fastTimeoutMs = config.cliToolDetection.fastTimeoutMs
@@ -60,7 +73,8 @@ export class AgentCLIToolDetectorService extends EventEmitter {
       description: 'Anthropic 官方 CLI 工具',
       detectionCommand: 'claude --version',
       installState: 'unknown',
-      configState: 'unknown'
+      configState: 'unknown',
+      executableState: 'unknown'
     },
     {
       id: 'codex',
@@ -70,7 +84,8 @@ export class AgentCLIToolDetectorService extends EventEmitter {
       description: 'OpenAI Codex CLI 工具',
       detectionCommand: 'codex --version',
       installState: 'unknown',
-      configState: 'unknown'
+      configState: 'unknown',
+      executableState: 'unknown'
     },
     {
       id: 'gemini-cli',
@@ -80,7 +95,8 @@ export class AgentCLIToolDetectorService extends EventEmitter {
       description: 'Google Gemini CLI 工具',
       detectionCommand: 'gemini --version',
       installState: 'unknown',
-      configState: 'unknown'
+      configState: 'unknown',
+      executableState: 'unknown'
     },
     {
       id: 'opencode',
@@ -90,7 +106,8 @@ export class AgentCLIToolDetectorService extends EventEmitter {
       description: 'OpenCode CLI 工具',
       detectionCommand: 'opencode --version',
       installState: 'unknown',
-      configState: 'unknown'
+      configState: 'unknown',
+      executableState: 'unknown'
     },
     {
       id: 'cursor-agent',
@@ -100,12 +117,14 @@ export class AgentCLIToolDetectorService extends EventEmitter {
       description: 'Cursor AI Agent CLI 工具',
       detectionCommand: 'cursor-agent --version',
       installState: 'unknown',
-      configState: 'unknown'
+      configState: 'unknown',
+      executableState: 'unknown'
     }
   ]
 
-  constructor() {
+  constructor(configService: AgentCLIToolConfigService = new AgentCLIToolConfigService()) {
     super()
+    this.configService = configService
     this.tools = this.tools.map((tool) => ({
       ...tool,
       ...this.getConfigDetails(tool.id)
@@ -149,44 +168,57 @@ export class AgentCLIToolDetectorService extends EventEmitter {
     const startedAt = Date.now()
     this.updateTool(toolId, {
       installState: 'checking',
+      executableState: 'checking',
       errorMessage: undefined
     })
 
     const configDetails = this.getConfigDetails(toolId)
+    const executableCommand = this.getExecutableCommand(tool)
 
-    const installPath = await this.resolveInstallPath(tool.command)
-    if (!installPath) {
+    try {
+      const resolvedExecutable = await resolveCommand(executableCommand, {
+        allowlist: cliToolAllowlist,
+        timeoutMs: this.fastTimeoutMs
+      })
+
+      const version = level === 'full' ? await this.resolveVersion(resolvedExecutable) : tool.version
+
+      const updated = this.updateTool(toolId, {
+        installed: true,
+        installState: 'installed',
+        executableState: 'resolved',
+        executableSource: resolvedExecutable.source,
+        executableCommand,
+        version,
+        installPath: resolvedExecutable.executablePath,
+        checkedLevel: level,
+        lastCheckedAt: new Date().toISOString(),
+        latencyMs: Date.now() - startedAt,
+        errorMessage: undefined,
+        ...configDetails
+      })
+
+      return updated ? { ...updated } : null
+    } catch (error) {
+      const missingExecutable =
+        error instanceof CommandResolutionError && error.kind === 'not-found'
       const updated = this.updateTool(toolId, {
         installed: false,
-        installState: 'missing',
+        installState: missingExecutable ? 'missing' : 'error',
+        executableState: missingExecutable ? 'missing' : 'error',
+        executableSource: undefined,
+        executableCommand,
         version: undefined,
         installPath: undefined,
         checkedLevel: level,
         lastCheckedAt: new Date().toISOString(),
         latencyMs: Date.now() - startedAt,
+        errorMessage: error instanceof Error ? error.message : String(error),
         ...configDetails
       })
+
       return updated ? { ...updated } : null
     }
-
-    const version =
-      level === 'full'
-        ? await this.resolveVersion(tool)
-        : tool.version
-
-    const updated = this.updateTool(toolId, {
-      installed: true,
-      installState: 'installed',
-      version,
-      installPath,
-      checkedLevel: level,
-      lastCheckedAt: new Date().toISOString(),
-      latencyMs: Date.now() - startedAt,
-      errorMessage: undefined,
-      ...configDetails
-    })
-
-    return updated ? { ...updated } : null
   }
 
   private isToolFresh(tool: CLIToolInfo, level: CLIToolDetectionLevel): boolean {
@@ -227,15 +259,18 @@ export class AgentCLIToolDetectorService extends EventEmitter {
     return next
   }
 
-  private async resolveVersion(tool: CLIToolInfo): Promise<string | undefined> {
-    const [command, ...args] = tool.detectionCommand.split(' ').filter(Boolean)
-
+  private async resolveVersion(resolvedExecutable: ResolvedCommand): Promise<string | undefined> {
     try {
-      const { stdout } = await safeExecFile(command, args, {
-        allowlist: cliToolAllowlist,
-        timeoutMs: this.fullTimeoutMs,
-        label: 'AgentCLIToolDetectorService'
-      })
+      const { stdout } = await safeExecFile(
+        resolvedExecutable.executablePath,
+        [...resolvedExecutable.args, '--version'],
+        {
+          env: resolvedExecutable.env,
+          allowlist: cliToolAllowlist,
+          timeoutMs: this.fullTimeoutMs,
+          label: 'AgentCLIToolDetectorService'
+        }
+      )
 
       return stdout
         .split(/\r?\n/)
@@ -246,61 +281,31 @@ export class AgentCLIToolDetectorService extends EventEmitter {
     }
   }
 
-  private async resolveInstallPath(command: string): Promise<string | undefined> {
-    const platform = os.platform()
-    const lookupCommand = platform === 'win32' ? 'where' : 'which'
+  private getExecutableCommand(tool: Pick<CLIToolInfo, 'id' | 'command'>): string {
+    const toolConfig = this.configService.getConfig(tool.id)
+    const configuredCommand =
+      typeof toolConfig.base_command_override === 'string' && toolConfig.base_command_override.trim()
+        ? toolConfig.base_command_override.trim()
+        : typeof toolConfig.executablePath === 'string' && toolConfig.executablePath.trim()
+          ? toolConfig.executablePath.trim()
+          : tool.command
 
-    try {
-      const { stdout } = await safeExecFile(lookupCommand, [command], {
-        allowlist: cliToolAllowlist,
-        timeoutMs: this.fastTimeoutMs,
-        label: 'AgentCLIToolDetectorService'
-      })
-      const resolvedPath = stdout
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .find((line) => line.length > 0)
-      return resolvedPath || undefined
-    } catch {
-      return undefined
+    if (tool.id === 'claude-code' && configuredCommand === 'claude') {
+      return path.join(os.homedir(), '.local', 'bin', 'claude')
     }
+
+    return configuredCommand
   }
 
   private getConfigDetails(toolId: string): Pick<CLIToolInfo, 'configPath' | 'configValid' | 'configState'> {
-    const configPath = this.getConfigPath(toolId)
-    if (!configPath) {
-      return {
-        configPath: undefined,
-        configValid: undefined,
-        configState: 'unknown'
-      }
-    }
-
-    const exists = fs.existsSync(configPath)
+    const candidatePaths = this.configService.getConfigCandidatePaths(toolId)
+    const configPath = candidatePaths.find((candidatePath) => fs.existsSync(candidatePath)) ?? candidatePaths[0]
+    const exists = candidatePaths.some((candidatePath) => fs.existsSync(candidatePath))
 
     return {
       configPath,
       configValid: exists,
       configState: exists ? 'valid' : 'missing'
-    }
-  }
-
-  private getConfigPath(toolId: string): string | undefined {
-    const homeDir = os.homedir()
-
-    switch (toolId) {
-      case 'claude-code':
-        return path.join(homeDir, '.config', 'claude', 'config.json')
-      case 'codex':
-        return path.join(homeDir, '.codex', 'config.json')
-      case 'gemini-cli':
-        return path.join(homeDir, '.gemini', 'config.json')
-      case 'opencode':
-        return path.join(homeDir, '.opencode', 'config.json')
-      case 'cursor-agent':
-        return path.join(homeDir, '.cursor', 'agent-config.json')
-      default:
-        return undefined
     }
   }
 

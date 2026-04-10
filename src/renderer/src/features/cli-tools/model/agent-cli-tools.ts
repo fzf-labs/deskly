@@ -1,4 +1,5 @@
 export type CLIToolInstallState = 'unknown' | 'checking' | 'installed' | 'missing' | 'error'
+export type CLIToolExecutableState = 'unknown' | 'checking' | 'resolved' | 'missing' | 'error'
 
 export interface CLIToolInfo {
   id: string
@@ -11,9 +12,27 @@ export interface CLIToolInfo {
   configState?: 'unknown' | 'valid' | 'missing'
   version?: string
   installPath?: string
+  executableState?: CLIToolExecutableState
+  executableCommand?: string
+  executableSource?: 'direct-path' | 'path' | 'shell-path'
 }
 
 const deriveInstallState = (tool: CLIToolInfo): CLIToolInstallState => {
+  if (tool.executableState) {
+    switch (tool.executableState) {
+      case 'resolved':
+        return 'installed'
+      case 'missing':
+        return 'missing'
+      case 'checking':
+        return 'checking'
+      case 'error':
+        return 'error'
+      default:
+        break
+    }
+  }
+
   if (tool.installState) {
     return tool.installState
   }
@@ -40,6 +59,13 @@ export const normalizeCliTool = (tool: CLIToolInfo): CLIToolInfo => {
     ...tool,
     installed,
     installState,
+    executableState:
+      tool.executableState ??
+      (installState === 'installed'
+        ? 'resolved'
+        : installState === 'missing' || installState === 'error'
+          ? installState
+          : installState),
     configState: tool.configState ?? (tool.configValid ? 'valid' : 'unknown')
   }
 }

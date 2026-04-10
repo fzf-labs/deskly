@@ -4,6 +4,8 @@ import { CliAdapter, CliSessionHandle, CliStartOptions } from '../types'
 import { ProcessCliSession, InitSequenceStep } from '../ProcessCliSession'
 import { AgentCLIToolConfigService } from '../../AgentCLIToolConfigService'
 import { failureSignal, parseJsonLine } from './completion'
+import { config } from '../../../config'
+import { normalizeProcessCommandSpec } from '../../../utils/command-resolution'
 import {
   asBoolean,
   asString,
@@ -53,10 +55,15 @@ export class ClaudeCodeAdapter implements CliAdapter {
   }
 
   async startSession(options: CliStartOptions): Promise<CliSessionHandle> {
+    const commandSpec = await normalizeProcessCommandSpec(this.buildCommandSpec(options), {
+      allowlist: config.commandAllowlist,
+      timeoutMs: config.cliToolDetection.fastTimeoutMs
+    })
+
     return new ProcessCliSession(
       options.sessionId,
       options.toolId,
-      this.buildCommandSpec(options),
+      commandSpec,
       detectClaudeCompletion,
       undefined,
       options.taskId,

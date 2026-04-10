@@ -623,22 +623,33 @@ export function AgentCLISettings({
     t.settings?.cliConfigShowSecret,
   ]);
 
-  const statusLabel = (tool: CLIToolInfo) => {
-    if (tool.installState === 'checking') {
+  const executableStatusLabel = (tool: CLIToolInfo) => {
+    if (tool.executableState === 'checking' || tool.installState === 'checking') {
       return t.settings?.cliDetecting || 'Detecting...';
     }
-    if (isCliToolInstalled(tool)) {
-      return t.settings?.cliInstalled || 'Installed';
+    if (tool.executableState === 'resolved' || isCliToolInstalled(tool)) {
+      return t.settings?.cliExecutableResolved || 'Resolved';
     }
-    if (tool.installState === 'unknown') {
+    if (tool.executableState === 'unknown' || tool.installState === 'unknown') {
       return t.settings?.cliDetecting || 'Detecting...';
     }
-    return t.settings?.cliNotInstalled || 'Not installed';
+    return t.settings?.cliExecutableMissing || 'Not found';
+  };
+
+  const configStatusLabel = (tool: CLIToolInfo) => {
+    if (tool.configState === 'valid') {
+      return t.settings?.cliConfigFound || 'Found';
+    }
+    if (tool.configState === 'missing') {
+      return t.settings?.cliConfigMissing || 'Missing';
+    }
+    return t.settings?.cliDetecting || 'Detecting...';
   };
 
   const columnLabels = {
     tool: t.settings?.cliTool || 'Tool',
-    status: t.settings?.cliStatus || 'Status',
+    executable: t.settings?.cliExecutableLabel || 'Executable',
+    config: t.settings?.cliConfigStatusLabel || 'Config',
     version: t.settings?.cliVersion || 'Version',
     path: t.settings?.cliInstallPath || 'Install Path',
   };
@@ -784,23 +795,37 @@ export function AgentCLISettings({
                     </div>
                     <span
                       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                        isCliToolInstalled(activeTool)
+                        activeTool.executableState === 'resolved' || isCliToolInstalled(activeTool)
                           ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600'
-                          : activeTool.installState === 'checking' ||
+                          : activeTool.executableState === 'checking' ||
+                              activeTool.executableState === 'unknown' ||
+                              activeTool.installState === 'checking' ||
                               activeTool.installState === 'unknown'
                             ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
                             : 'border-rose-500/30 bg-rose-500/10 text-rose-600'
                       }`}
                     >
-                      {isCliToolInstalled(activeTool) ? (
+                      {activeTool.executableState === 'resolved' || isCliToolInstalled(activeTool) ? (
                         <Check className="size-3" />
                       ) : (
                         <AlertCircle className="size-3" />
                       )}
-                      {statusLabel(activeTool)}
+                      {columnLabels.executable}: {executableStatusLabel(activeTool)}
                     </span>
                   </div>
                   <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground">{columnLabels.config}</p>
+                      <p className="text-foreground font-mono">
+                        {configStatusLabel(activeTool)}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground">{columnLabels.executable}</p>
+                      <p className="text-foreground font-mono">
+                        {executableStatusLabel(activeTool)}
+                      </p>
+                    </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground">{columnLabels.version}</p>
                       <p className="text-foreground font-mono">
