@@ -6,7 +6,6 @@ import {
   AlertCircle,
   Bot,
   ChevronDown,
-  ChevronRight,
   MessageSquare,
   Terminal,
   User,
@@ -31,16 +30,6 @@ function renderLogIcon(type: NormalizedEntryType): React.ReactNode {
   if (type === 'error') return <AlertCircle className="size-4 text-red-600" />
   if (type === 'tool_result') return <Terminal className="size-4 text-amber-600" />
   return <MessageSquare className="text-muted-foreground size-4" />
-}
-
-function logRowTone(type: NormalizedEntryType): string {
-  if (type === 'assistant_message') return 'border-blue-500/20 bg-blue-500/5'
-  if (type === 'user_message') return 'border-emerald-500/20 bg-emerald-500/5'
-  if (type === 'error') return 'border-red-500/20 bg-red-500/5'
-  if (type === 'tool_use' || type === 'command_run' || type === 'file_edit' || type === 'file_read') {
-    return 'border-violet-500/20 bg-violet-500/5'
-  }
-  return 'border-border/70 bg-background'
 }
 
 function entryTitle(entry: NormalizedEntry): string {
@@ -249,96 +238,335 @@ function stripToolInput(metadata: NormalizedEntry['metadata']): RecordLike | nul
   return Object.keys(next).length > 0 ? next : null
 }
 
-function LogCard({ entry }: { entry: NormalizedEntry }): React.ReactNode {
-  const [expanded, setExpanded] = useState(false)
-  const { summary, fullContent, hasHiddenContent } = useMemo(() => buildSummary(entry), [entry])
+type GeminiProcessKind = 'command' | 'file_read' | 'file_edit' | 'tool'
+
+type GeminiTimelineItem =
+  | { id: string; type: 'user_bubble'; entry: NormalizedEntry }
+  | { id: string; type: 'answer_block'; entries: NormalizedEntry[]; content: string }
+  | {
+      id: string
+      type: 'process_block'
+      entry: NormalizedEntry
+      relatedResult?: NormalizedEntry
+      kind: GeminiProcessKind
+    }
+  | { id: string; type: 'error_block'; entry: NormalizedEntry }
+  | { id: string; type: 'status_block'; entry: NormalizedEntry }
+
+function appendAnswerContent(current: string, next: string): string {
+  if (!current) return next
+  if (!next) return current
+  const separator = current.endsWith('\n') || next.startsWith('\n') ? '' : '\n\n'
+  return `${current}${separator}${next}`
+}
+
+function processKindFromEntry(entry: NormalizedEntry): GeminiProcessKind {
+  if (entry.type === 'command_run') return 'command'
+  if (entry.type === 'file_read') return 'file_read'
+  if (entry.type === 'file_edit') return 'file_edit'
+
+  const toolName = getString(entry.metadata?.toolName)?.toLowerCase() || ''
+  if (toolName.includes('read') || toolName.includes('open')) return 'file_read'
+  if (toolName.includes('write') || toolName.includes('edit') || toolName.includes('patch')) return 'file_edit'
+  if (toolName.includes('bash') || toolName.includes('shell') || toolName.includes('command')) return 'command'
+  return 'tool'
+}
+
+function buildResultQueues(entries: NormalizedEntry[]): Map<string, NormalizedEntry[]> {
+  const resultQueues = new Map<string, NormalizedEntry[]>()
+  entries.forEach((entry) => {
+    if (entry.type !== 'tool_result') return
+    const toolUseId = getString(entry.metadata?.toolUseId)
+    if (!toolUseId) return
+    const queue = resultQueues.get(toolUseId) ?? []
+    queue.push(entry)
+    resultQueues.set(toolUseId, queue)
+  })
+  return resultQueues
+}
+
+function consumePairedResult(
+  entry: NormalizedEntry,
+  entries: NormalizedEntry[],
+  index: number,
+  resultQueues: Map<string, NormalizedEntry[]>,
+  consumedResultIds: Set<string>
+): NormalizedEntry | undefined {
+  const toolUseId = getString(entry.metadata?.toolUseId)
+  if (toolUseId) {
+    const queue = resultQueues.get(toolUseId)
+    const next = queue?.shift()
+    if (next) {
+      consumedResultIds.add(next.id)
+      return next
+    }
+  }
+
+  const adjacent = entries[index + 1]
+  if (adjacent && adjacent.type === 'tool_result' && !consumedResultIds.has(adjacent.id)) {
+    consumedResultIds.add(adjacent.id)
+    return adjacent
+  }
+
+  return undefined
+}
+
+function processTitle(kind: GeminiProcessKind, entry: NormalizedEntry): string {
+  if (kind === 'command') return '执行命令'
+  if (kind === 'file_read') return '读取文件'
+  if (kind === 'file_edit') return '编辑文件'
+  if (entry.type === 'tool_result') return '工具结果'
+  return '工具调用'
+}
+
+function processSummary(entry: NormalizedEntry, relatedResult?: NormalizedEntry): string {
+  const summary = buildSummary(relatedResult ?? entry).summary
+  if (entry.type === 'command_run' && summary.startsWith('$ ')) {
+    return summary.slice(2)
+  }
+  return summary
+}
+
+export function buildGeminiTimelineItems(entries: NormalizedEntry[]): GeminiTimelineItem[] {
+  const items: GeminiTimelineItem[] = []
+  const assistantBuffer: NormalizedEntry[] = []
+  const resultQueues = buildResultQueues(entries)
+  const consumedResultIds = new Set<string>()
+
+  const flushAssistantBuffer = () => {
+    if (assistantBuffer.length === 0) return
+    let content = ''
+    assistantBuffer.forEach((entry) => {
+      content = appendAnswerContent(content, entry.content)
+    })
+    if (content.trim()) {
+      items.push({
+        id: `gemini-answer-${assistantBuffer[0]?.id ?? items.length}`,
+        type: 'answer_block',
+        entries: [...assistantBuffer],
+        content
+      })
+    }
+    assistantBuffer.length = 0
+  }
+
+  entries.forEach((entry, index) => {
+    if (entry.type === 'user_message') {
+      flushAssistantBuffer()
+      items.push({ id: `gemini-user-${entry.id}`, type: 'user_bubble', entry })
+      return
+    }
+
+    if (entry.type === 'assistant_message') {
+      assistantBuffer.push(entry)
+      return
+    }
+
+    if (entry.type === 'tool_result' && consumedResultIds.has(entry.id)) {
+      return
+    }
+
+    flushAssistantBuffer()
+
+    if (entry.type === 'error') {
+      items.push({ id: `gemini-error-${entry.id}`, type: 'error_block', entry })
+      return
+    }
+
+    if (entry.type === 'system_message') {
+      items.push({ id: `gemini-status-${entry.id}`, type: 'status_block', entry })
+      return
+    }
+
+    if (
+      entry.type === 'tool_use' ||
+      entry.type === 'tool_result' ||
+      entry.type === 'command_run' ||
+      entry.type === 'file_read' ||
+      entry.type === 'file_edit'
+    ) {
+      items.push({
+        id: `gemini-process-${entry.id}`,
+        type: 'process_block',
+        entry,
+        relatedResult:
+          entry.type === 'tool_result'
+            ? undefined
+            : consumePairedResult(entry, entries, index, resultQueues, consumedResultIds),
+        kind: processKindFromEntry(entry)
+      })
+      return
+    }
+
+    items.push({ id: `gemini-status-fallback-${entry.id}`, type: 'status_block', entry })
+  })
+
+  flushAssistantBuffer()
+  return items
+}
+
+function UserBubble({ entry }: { entry: NormalizedEntry }): React.ReactNode {
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[76%] min-w-0 rounded-[10px] border border-border/50 bg-accent px-3.5 py-2.5 text-foreground">
+        <div className="mb-1 text-right text-[11px] text-muted-foreground">{formatTime(entry.timestamp)}</div>
+        <p className="whitespace-pre-wrap break-words text-sm leading-6">{entry.content}</p>
+      </div>
+    </div>
+  )
+}
+
+function AnswerBlock({ content }: { content: string }): React.ReactNode {
+  return (
+    <div className="w-full border-l border-border/30 bg-transparent px-3 py-0.5">
+      <div className="min-w-0 whitespace-pre-wrap break-words text-sm leading-7 text-foreground">{content}</div>
+    </div>
+  )
+}
+
+function DetailPanel({ label, entry }: { label: string; entry: NormalizedEntry }): React.ReactNode {
   const facts = useMemo(() => buildFacts(entry), [entry])
+  const { fullContent, hasHiddenContent } = useMemo(() => buildSummary(entry), [entry])
   const rawToolInput = useMemo(() => asRecord(entry.metadata?.toolInput), [entry.metadata])
   const rawMetadata = useMemo(() => stripToolInput(entry.metadata), [entry.metadata])
-  const badge = useMemo(() => statusBadge(entry), [entry])
-
-  const hasToolInput = Boolean(rawToolInput && Object.keys(rawToolInput).length > 0)
-  const hasMetadata = Boolean(rawMetadata && Object.keys(rawMetadata).length > 0)
-  const hasDetails = hasHiddenContent || hasToolInput || hasMetadata || facts.length > 0
 
   return (
-    <div className={cn('rounded-md border', logRowTone(entry.type))}>
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-2 text-[11px]">
+        <span className="font-medium text-foreground">{label}</span>
+        <span className="text-muted-foreground">{formatTime(entry.timestamp)}</span>
+      </div>
+
+      {facts.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {facts.map((fact) => (
+            <span
+              key={`${label}-${fact.label}-${fact.value}`}
+              className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
+            >
+              {fact.label}: {fact.value}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {rawToolInput && Object.keys(rawToolInput).length > 0 && (
+        <div className="mb-3">
+          <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Input</div>
+          <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-all rounded-[6px] bg-muted/25 p-2.5 text-xs leading-6 text-foreground">
+            {stringify(rawToolInput)}
+          </pre>
+        </div>
+      )}
+
+      {hasHiddenContent && fullContent && (
+        <div className="mb-3">
+          <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Output</div>
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-[6px] bg-muted/25 p-2.5 text-xs leading-6 text-foreground">
+            {fullContent}
+          </pre>
+        </div>
+      )}
+
+      {rawMetadata && Object.keys(rawMetadata).length > 0 && (
+        <div>
+          <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Metadata</div>
+          <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-all rounded-[6px] bg-muted/25 p-2.5 text-xs leading-6 text-muted-foreground">
+            {stringify(rawMetadata)}
+          </pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function processTone(kind: GeminiProcessKind): { border: string; icon: string; gradient: string } {
+  if (kind === 'command') {
+    return {
+      border: 'border-emerald-500/25 hover:border-emerald-500/40',
+      icon: 'text-emerald-700',
+      gradient: 'from-muted/45 to-emerald-100/70'
+    }
+  }
+  if (kind === 'file_read') {
+    return {
+      border: 'border-slate-400/30 hover:border-slate-500/45',
+      icon: 'text-slate-600',
+      gradient: 'from-muted/45 to-slate-100/80'
+    }
+  }
+  if (kind === 'file_edit') {
+    return {
+      border: 'border-sky-500/25 hover:border-sky-500/40',
+      icon: 'text-sky-700',
+      gradient: 'from-muted/45 to-sky-100/80'
+    }
+  }
+  return {
+    border: 'border-violet-500/25 hover:border-violet-500/40',
+    icon: 'text-violet-700',
+    gradient: 'from-muted/45 to-violet-100/80'
+  }
+}
+
+function ProcessBlock({
+  item
+}: {
+  item: Extract<GeminiTimelineItem, { type: 'process_block' }>
+}): React.ReactNode {
+  const [expanded, setExpanded] = useState(false)
+  const tone = processTone(item.kind)
+  const badge = statusBadge(item.relatedResult ?? item.entry)
+  const summary = processSummary(item.entry, item.relatedResult)
+
+  return (
+    <div className="w-full">
       <button
         type="button"
-        onClick={() => hasDetails && setExpanded((prev) => !prev)}
+        onClick={() => setExpanded((prev) => !prev)}
         className={cn(
-          'w-full px-3 py-2 text-left',
-          hasDetails ? 'cursor-pointer hover:bg-accent/30 transition-colors' : 'cursor-default'
+          'group relative flex w-full items-center justify-between overflow-hidden rounded-[4px] border border-l-[4px] px-2.5 py-1 text-left text-[13px]',
+          tone.border
         )}
       >
-        <div className="mb-1 flex items-center gap-2">
-          {hasDetails ? (
-            expanded ? (
-              <ChevronDown className="size-3.5 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="size-3.5 text-muted-foreground" />
-            )
-          ) : (
-            <span className="size-3.5" />
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-y-0 left-0 w-full rounded-r-[4px] bg-gradient-to-r opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100',
+            tone.gradient
           )}
-          {renderLogIcon(entry.type)}
-          <span className="text-xs font-medium text-foreground">{entryTitle(entry)}</span>
+        />
+        <div className="relative z-10 flex min-w-0 items-center overflow-hidden">
+          <span className={tone.icon}>{renderLogIcon(item.entry.type)}</span>
+          <div className="ml-1 text-foreground">{processTitle(item.kind, item.entry)}</div>
+          {summary ? (
+            <span className="ml-1 flex-1 overflow-hidden text-muted-foreground">
+              <div className="truncate">{summary}</div>
+            </span>
+          ) : null}
           {badge && (
             <span
               className={cn(
-                'rounded border px-1.5 py-0.5 text-[10px]',
-                badge.tone === 'ok' && 'border-emerald-500/30 text-emerald-600',
-                badge.tone === 'warn' && 'border-amber-500/30 text-amber-600',
-                badge.tone === 'error' && 'border-red-500/30 text-red-500'
+                'ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+                badge.tone === 'ok' && 'bg-emerald-500/10 text-emerald-700',
+                badge.tone === 'warn' && 'bg-amber-500/10 text-amber-700',
+                badge.tone === 'error' && 'bg-red-500/10 text-red-600'
               )}
             >
               {badge.label}
             </span>
           )}
-          <span className="ml-auto text-[11px] text-muted-foreground">{formatTime(entry.timestamp)}</span>
         </div>
-        <div className="pl-6 whitespace-pre-wrap break-words text-sm text-foreground">{summary}</div>
+        <div className="relative z-10 ml-2 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:opacity-100">
+          <ChevronDown className={cn('h-[14px] w-[14px] transition-transform duration-200', expanded && 'rotate-180')} />
+        </div>
       </button>
 
-      {expanded && hasDetails && (
-        <div className="space-y-2 border-t border-border/60 px-3 py-2">
-          {facts.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {facts.map((fact) => (
-                <span
-                  key={`${fact.label}-${fact.value}`}
-                  className="rounded border border-border/70 bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground"
-                >
-                  {fact.label}: {fact.value}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {hasHiddenContent && fullContent && (
-            <div>
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Details</div>
-              <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all rounded-sm bg-muted/30 p-2 text-xs text-foreground">
-                {fullContent}
-              </pre>
-            </div>
-          )}
-
-          {hasToolInput && (
-            <div>
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Raw arguments</div>
-              <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all rounded-sm bg-muted/30 p-2 text-xs text-muted-foreground">
-                {stringify(rawToolInput)}
-              </pre>
-            </div>
-          )}
-
-          {hasMetadata && (
-            <div>
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Metadata</div>
-              <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all rounded-sm bg-muted/30 p-2 text-xs text-muted-foreground">
-                {stringify(rawMetadata)}
-              </pre>
+      {expanded && (
+        <div className="mt-2 space-y-3 rounded-[8px] border border-border/45 bg-background/50 p-3">
+          <DetailPanel label={processTitle(item.kind, item.entry)} entry={item.entry} />
+          {item.relatedResult && (
+            <div className="border-t border-border/45 pt-3">
+              <DetailPanel label="结果" entry={item.relatedResult} />
             </div>
           )}
         </div>
@@ -347,16 +575,82 @@ function LogCard({ entry }: { entry: NormalizedEntry }): React.ReactNode {
   )
 }
 
-function CliToolLogList({ entries }: { entries: NormalizedEntry[] }): React.ReactNode {
-  if (entries.length === 0) {
+function ErrorBlock({ entry }: { entry: NormalizedEntry }): React.ReactNode {
+  const [expanded, setExpanded] = useState(false)
+  const summary = previewText(entry.content, 1, 160).text || '展开查看错误详情'
+
+  return (
+    <div className="w-full">
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="group relative flex w-full items-center justify-between overflow-hidden rounded-[4px] border border-red-500/20 border-l-[4px] px-2.5 py-1 text-left text-[13px] hover:border-red-500/35 hover:bg-red-500/5"
+      >
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-full rounded-r-[4px] bg-gradient-to-r from-red-500/5 to-red-500/10 opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100" />
+        <div className="relative z-10 flex min-w-0 items-center overflow-hidden">
+          <AlertCircle className="h-[14px] w-[14px] shrink-0 text-red-600" />
+          <div className="ml-1 text-foreground">错误信息</div>
+          <span className="ml-1 flex-1 overflow-hidden text-muted-foreground">
+            <div className="truncate">{summary}</div>
+          </span>
+        </div>
+        <div className="relative z-10 ml-2 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+          <ChevronDown className={cn('h-[14px] w-[14px] transition-transform duration-200', expanded && 'rotate-180')} />
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="mt-2 rounded-[8px] border border-red-500/20 bg-red-500/5 p-3">
+          <div className="mb-2 text-[11px] text-muted-foreground">{formatTime(entry.timestamp)}</div>
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs leading-6 text-red-700">
+            {entry.content}
+          </pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatusBlock({ entry }: { entry: NormalizedEntry }): React.ReactNode {
+  const summary = buildSummary(entry).summary || entry.content
+
+  return (
+    <div className="w-full px-0.5 py-0.5">
+      <div className="flex min-w-0 items-center overflow-hidden text-[12px] text-muted-foreground">
+        <MessageSquare className="h-[14px] w-[14px] shrink-0" />
+        <div className="ml-1 shrink-0">系统状态</div>
+        {summary ? (
+          <span className="ml-1 flex-1 overflow-hidden">
+            <div className="truncate">{summary}</div>
+          </span>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function CliToolTimeline({ items }: { items: GeminiTimelineItem[] }): React.ReactNode {
+  if (items.length === 0) {
     return <div className="px-3 py-2 text-xs text-muted-foreground">No logs yet.</div>
   }
 
   return (
-    <div className="space-y-2">
-      {entries.map((entry) => (
-        <LogCard key={entry.id} entry={entry} />
-      ))}
+    <div className="w-full space-y-2">
+      {items.map((item) => {
+        if (item.type === 'user_bubble') {
+          return <UserBubble key={item.id} entry={item.entry} />
+        }
+        if (item.type === 'answer_block') {
+          return <AnswerBlock key={item.id} content={item.content} />
+        }
+        if (item.type === 'process_block') {
+          return <ProcessBlock key={item.id} item={item} />
+        }
+        if (item.type === 'error_block') {
+          return <ErrorBlock key={item.id} entry={item.entry} />
+        }
+        return <StatusBlock key={item.id} entry={item.entry} />
+      })}
     </div>
   )
 }
@@ -508,11 +802,12 @@ function parseLogsWithParser(logs: LogMsg[], parser: RawParser | null): Normaliz
   return entries
 }
 
-function parseGeminiLogs(logs: LogMsg[]): NormalizedEntry[] {
+export function parseGeminiLogs(logs: LogMsg[]): NormalizedEntry[] {
   return parseLogsWithParser(logs, parseGeminiLine)
 }
 
 export function GeminiLogView({ logs }: { logs: LogMsg[] }): React.ReactNode {
   const entries = useMemo(() => parseGeminiLogs(logs), [logs])
-  return <CliToolLogList entries={entries} />
+  const items = useMemo(() => buildGeminiTimelineItems(entries), [entries])
+  return <CliToolTimeline items={items} />
 }
